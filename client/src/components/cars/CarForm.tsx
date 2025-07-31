@@ -169,13 +169,36 @@ export default function CarForm({ onClose, car }: CarFormProps) {
           form.setValue('power', vehicleData.power, { shouldValidate: true });
         }
         
-        // Add additional info to notes
+        // Add comprehensive technical info to notes like in the specification image
         let additionalInfo = '';
+        
+        // Technical specifications
         if (vehicleData.co2Emissions) additionalInfo += `CO₂-utslipp: ${vehicleData.co2Emissions} g/km\n`;
-        if (vehicleData.lastEuControl) additionalInfo += `Siste EU-kontroll: ${new Date(vehicleData.lastEuControl).toLocaleDateString('no-NO')}\n`;
-        if (vehicleData.nextEuControl) additionalInfo += `Neste EU-kontroll: ${new Date(vehicleData.nextEuControl).toLocaleDateString('no-NO')}\n`;
-        if (vehicleData.vehicleClass) additionalInfo += `Kjøretøyklasse: ${vehicleData.vehicleClass}\n`;
+        if (vehicleData.vehicleClass) additionalInfo += `Avgiftsklasse: ${vehicleData.vehicleClass}\n`;
         if (vehicleData.vehicleType) additionalInfo += `Kjøretøytype: ${vehicleData.vehicleType}\n`;
+        
+        // Weight and dimensions
+        if (vehicleData.weight) additionalInfo += `Vekt: ${vehicleData.weight} kg\n`;
+        if (vehicleData.maxTrailerWeight) additionalInfo += `Maksimal tilhengervekt: ${vehicleData.maxTrailerWeight} kg\n`;
+        if (vehicleData.dimensions) additionalInfo += `Dimensjoner: ${vehicleData.dimensions}\n`;
+        
+        // Engine details
+        if (vehicleData.engineSize) additionalInfo += `Slagvolum: ${vehicleData.engineSize} l\n`;
+        if (vehicleData.cylinders) additionalInfo += `Sylindre: ${vehicleData.cylinders}\n`;
+        if (vehicleData.seats) additionalInfo += `Seter: ${vehicleData.seats}\n`;
+        if (vehicleData.doors) additionalInfo += `Dører: ${vehicleData.doors}\n`;
+        
+        // Body type and VIN
+        if (vehicleData.bodyType) additionalInfo += `Karosseri: ${vehicleData.bodyType}\n`;
+        if (vehicleData.chassisNumber) additionalInfo += `Chassis nr. (VIN): ${vehicleData.chassisNumber}\n`;
+        
+        // Control dates
+        if (vehicleData.lastEuControl) additionalInfo += `Siste EU-kontroll: ${new Date(vehicleData.lastEuControl).toLocaleDateString('no-NO')}\n`;
+        if (vehicleData.nextEuControl) additionalInfo += `Neste frist for EU-kontroll: ${new Date(vehicleData.nextEuControl).toLocaleDateString('no-NO')}\n`;
+        
+        // Registration info
+        if (vehicleData.registrationDate) additionalInfo += `1. gang registrert: ${new Date(vehicleData.registrationDate).toLocaleDateString('no-NO')}\n`;
+        
         if (additionalInfo) {
           form.setValue('notes', additionalInfo.trim(), { shouldValidate: true });
         }

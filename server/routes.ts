@@ -214,8 +214,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         color = karosseriData.karosseri[0].farge.kodeBeskrivelse;
       }
       
+      // Extract girkasse (transmission) type properly
+      if (motorData?.girkassetype?.kodeBeskrivelse) {
+        transmission = motorData.girkassetype.kodeBeskrivelse;
+      }
+      
+      // Extract additional technical details
+      const vekter = tekniskData?.vekter;
+      const dimensjoner = tekniskData?.dimensjoner;
+      const persontall = tekniskData?.persontall;
+      
       // Extract emissions from miljodata
-      const co2Emissions = tekniskData?.miljodata?.co2Utslipp || null;
+      const miljoData = tekniskData?.miljodata?.[0];
+      const co2Emissions = miljoData?.co2Utslipp || null;
       
       // Extract control dates
       const lastEuControl = vehicleInfo.periodiskKjoretoyKontroll?.sistGodkjent || null;
@@ -225,6 +236,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const kjoretoyklassifisering = vehicleInfo.godkjenning?.tekniskGodkjenning?.kjoretoyklassifisering;
       const vehicleClass = kjoretoyklassifisering?.beskrivelse || "";
       const vehicleType = kjoretoyklassifisering?.tekniskKode?.kodeBeskrivelse || "";
+      
+      // Extract VIN and karosseri type
+      const vin = vehicleInfo.kjoretoyId?.understellsnummer || "";
+      const karosseriType = karosseriData?.karosseritype?.kodeBeskrivelse || "";
 
       // Get mileage from most recent registration (usually not available in this API)
       const mileage = vehicleInfo.registrering?.kilometerstand || 0;
@@ -250,6 +265,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         vehicleClass,
         vehicleType,
         registrationDate: firstRegDate,
+        // Extended technical details for notes
+        weight: vekter?.egenvekt || null,
+        maxTrailerWeight: vekter?.tillattTilhengervektMedBrems || null,
+        dimensions: dimensjoner ? `${dimensjoner.lengde}x${dimensjoner.bredde}x${dimensjoner.hoyde} mm` : null,
+        engineSize: motorData?.motor?.[0]?.slagvolum ? (motorData.motor[0].slagvolum / 1000).toFixed(1) : null,
+        cylinders: motorData?.motor?.[0]?.antallSylindre || null,
+        seats: persontall?.sitteplasserTotalt || null,
+        doors: karosseriData?.antallDorer?.[0] || null,
+        bodyType: karosseriType,
+        chassisNumber: vin,
         // Raw data for debugging
         rawData: process.env.NODE_ENV === 'development' ? vehicleData : undefined
       };
