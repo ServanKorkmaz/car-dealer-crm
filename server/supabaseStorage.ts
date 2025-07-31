@@ -1,5 +1,8 @@
-// Note: Install @supabase/supabase-js when using Supabase
-// npm install @supabase/supabase-js
+// Dynamic import for Supabase client - only loaded when needed
+const createClient = async () => {
+  const { createClient } = await import('@supabase/supabase-js');
+  return createClient;
+};
 import type { IStorage } from './storage';
 import type { User, UpsertUser, Car, InsertCar, Customer, InsertCustomer, Contract, InsertContract } from '@shared/schema';
 
@@ -14,7 +17,13 @@ export class SupabaseStorage implements IStorage {
       throw new Error('Supabase URL and Service Role Key must be provided');
     }
 
-    this.supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Use dynamic import to avoid loading Supabase unless needed
+    this.initializeSupabase(supabaseUrl, supabaseServiceKey);
+  }
+
+  private async initializeSupabase(url: string, key: string) {
+    const clientFactory = await createClient();
+    this.supabase = clientFactory(url, key);
   }
 
   // User operations
@@ -76,6 +85,22 @@ export class SupabaseStorage implements IStorage {
   }
 
   // Car operations
+  async getCarById(id: string, userId: string): Promise<Car | undefined> {
+    const { data, error } = await this.supabase
+      .from('cars')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching car:', error);
+      return undefined;
+    }
+
+    return data as Car;
+  }
+
   async getCars(userId: string): Promise<Car[]> {
     const { data, error } = await this.supabase
       .from('cars')
@@ -135,6 +160,22 @@ export class SupabaseStorage implements IStorage {
   }
 
   // Customer operations
+  async getCustomerById(id: string, userId: string): Promise<Customer | undefined> {
+    const { data, error } = await this.supabase
+      .from('customers')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching customer:', error);
+      return undefined;
+    }
+
+    return data as Customer;
+  }
+
   async getCustomers(userId: string): Promise<Customer[]> {
     const { data, error } = await this.supabase
       .from('customers')
@@ -194,6 +235,26 @@ export class SupabaseStorage implements IStorage {
   }
 
   // Contract operations
+  async getContractById(id: string, userId: string): Promise<Contract | undefined> {
+    const { data, error } = await this.supabase
+      .from('contracts')
+      .select(`
+        *,
+        car:cars(*),
+        customer:customers(*)
+      `)
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching contract:', error);
+      return undefined;
+    }
+
+    return data as Contract;
+  }
+
   async getContracts(userId: string): Promise<Contract[]> {
     const { data, error } = await this.supabase
       .from('contracts')

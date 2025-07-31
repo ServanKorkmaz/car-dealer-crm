@@ -15,8 +15,8 @@ The application follows a modern full-stack architecture with clear separation b
 
 - **Frontend**: React-based SPA using Vite as the build tool
 - **Backend**: Express.js server with TypeScript
-- **Database**: PostgreSQL with Drizzle ORM
-- **Authentication**: Replit Auth with session-based authentication
+- **Database**: Flexible PostgreSQL support (Replit built-in or external Supabase)
+- **Authentication**: Simple dev login system (bypasses Replit Auth for reliability)
 - **UI Framework**: ShadCN UI components with Tailwind CSS styling
 
 ### Directory Structure
@@ -41,25 +41,33 @@ The application follows a modern full-stack architecture with clear separation b
 ### Backend Architecture
 - **Express.js** server with TypeScript
 - **Drizzle ORM** for database operations with type-safe queries
-- **Neon Database** (PostgreSQL) for data persistence
-- **Session-based authentication** using connect-pg-simple for session storage
+- **Flexible Database Support**: Replit PostgreSQL (default) or external Supabase
+- **Dynamic Storage Provider**: Automatically switches between database providers
+- **ESM-Compatible**: Uses async imports for proper module loading
+- **Session-based authentication** with simple dev login system
 - **Zod schemas** shared between frontend and backend for validation
 
 ### Database Design
 The database uses PostgreSQL with the following main entities:
 - **Users**: Store user profiles and roles (admin/seller)
 - **Cars**: Vehicle inventory with pricing, images, and status
-- **Customers**: Customer registry with contact information
+- **Customers**: Customer registry with contact information  
 - **Contracts**: Sales contracts linking customers and cars
-- **Sessions**: Session storage for authentication (required for Replit Auth)
+- **Sessions**: Session storage for authentication
+
+### Storage Architecture
+- **Dynamic Provider System**: `storagePromise` allows async database switching
+- **ESM Compatibility**: Uses dynamic imports for external database providers
+- **Automatic Fallback**: Falls back to Replit DB if external provider fails
+- **Type Safety**: Consistent IStorage interface across all providers
 
 ## Data Flow
 
 ### Authentication Flow
-1. Users authenticate through Replit Auth (OpenID Connect)
-2. Session data stored in PostgreSQL sessions table
+1. Development: Simple login system creates test user automatically
+2. Session data stored in PostgreSQL sessions table  
 3. Protected routes verify authentication status via `/api/auth/user` endpoint
-4. Role-based access control (admin/seller roles)
+4. Fallback to Replit Auth available for production (currently disabled for reliability)
 
 ### CRUD Operations
 1. Frontend forms use React Hook Form with Zod validation
@@ -112,12 +120,28 @@ The database uses PostgreSQL with the following main entities:
 - Replit-specific configuration for authentication
 - Support for both Replit and external hosting
 
+## Recent Changes (2025-01-31)
+
+### ESM-Compatible Database Switching
+- **Fixed ESM Module Loading**: Resolved `require is not defined` error with dynamic imports
+- **Async Storage Provider**: `createStorage()` now returns Promise<IStorage>
+- **Universal Storage Access**: All API endpoints use `await storagePromise` pattern
+- **Supabase Integration**: Complete Supabase storage implementation with fallback
+
+### Flexible Database Architecture  
+- **Environment-Based Switching**: Set `DATABASE_PROVIDER=supabase` to switch providers
+- **Automatic Fallback**: Falls back to Replit DB if Supabase isn't configured
+- **Type-Safe Interface**: Consistent IStorage interface across all providers
+- **Dynamic Loading**: Only loads Supabase client when needed
+
 ### Key Architectural Decisions
 
 1. **Monorepo Structure**: Simplified development and deployment with shared types
-2. **Session-based Auth**: More suitable for traditional web app than JWT tokens
-3. **Drizzle ORM**: Type-safe database operations with good PostgreSQL support
-4. **ShadCN UI**: Professional design system with accessibility built-in
-5. **Norwegian Localization**: UI text and formatting tailored for Norwegian market
+2. **Async Storage Pattern**: ESM-compatible dynamic storage provider loading
+3. **Flexible Database Support**: Easy switching between Replit and external databases
+4. **Session-based Auth**: Simple dev login system for reliable development
+5. **Drizzle ORM**: Type-safe database operations with good PostgreSQL support
+6. **ShadCN UI**: Professional design system with accessibility built-in
+7. **Norwegian Localization**: UI text and formatting tailored for Norwegian market
 
 The system is designed to be modular and extensible, with clear separation of concerns and a foundation ready for additional features like workshop management, parts inventory, and financial reporting.

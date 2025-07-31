@@ -238,15 +238,16 @@ export class DatabaseStorage implements IStorage {
 }
 
 // Dynamic storage configuration - easily switch between databases
-function createStorage(): IStorage {
+async function createStorage(): Promise<IStorage> {
   const provider = process.env.DATABASE_PROVIDER || 'replit';
   
   console.log(`Initializing ${provider} storage provider`);
   
   if (provider === 'supabase') {
     try {
-      const { SupabaseStorage } = require('./supabaseStorage');
-      return new SupabaseStorage();
+      // Use dynamic import for ESM compatibility
+      const module = await import('./supabaseStorage.js');
+      return new module.SupabaseStorage();
     } catch (error) {
       console.warn('Supabase not configured, falling back to Replit database:', error);
       return new DatabaseStorage();
@@ -257,4 +258,5 @@ function createStorage(): IStorage {
   return new DatabaseStorage();
 }
 
-export const storage = createStorage();
+// Export storage as a Promise - all consumers must use: await storagePromise
+export const storagePromise = createStorage();

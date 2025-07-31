@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storagePromise } from "./storage";
 import { setupAuth, authMiddleware } from "./replitAuth";
 import { setupSimpleAuth, isSimpleAuthenticated } from "./simpleAuth";
 import { insertCarSchema, insertCustomerSchema, insertContractSchema } from "@shared/schema";
@@ -21,6 +21,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/dashboard/stats', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const storage = await storagePromise;
       const stats = await storage.getDashboardStats(userId);
       res.json(stats);
     } catch (error) {
@@ -33,6 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/cars', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const storage = await storagePromise;
       const cars = await storage.getCars(userId);
       res.json(cars);
     } catch (error) {
@@ -44,6 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/cars/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const storage = await storagePromise;
       const car = await storage.getCarById(req.params.id, userId);
       if (!car) {
         return res.status(404).json({ message: "Car not found" });
@@ -59,6 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const carData = insertCarSchema.parse(req.body);
+      const storage = await storagePromise;
       const car = await storage.createCar(carData, userId);
       res.status(201).json(car);
     } catch (error) {
@@ -74,6 +78,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const carData = insertCarSchema.partial().parse(req.body);
+      const storage = await storagePromise;
       const car = await storage.updateCar(req.params.id, carData, userId);
       res.json(car);
     } catch (error) {
@@ -88,6 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/cars/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const storage = await storagePromise;
       const success = await storage.deleteCar(req.params.id, userId);
       if (!success) {
         return res.status(404).json({ message: "Car not found" });
@@ -103,6 +109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/customers', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const storage = await storagePromise;
       const customers = await storage.getCustomers(userId);
       res.json(customers);
     } catch (error) {
@@ -114,6 +121,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/customers/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const storage = await storagePromise;
       const customer = await storage.getCustomerById(req.params.id, userId);
       if (!customer) {
         return res.status(404).json({ message: "Customer not found" });
@@ -129,6 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const customerData = insertCustomerSchema.parse(req.body);
+      const storage = await storagePromise;
       const customer = await storage.createCustomer(customerData, userId);
       res.status(201).json(customer);
     } catch (error) {
@@ -144,6 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const customerData = insertCustomerSchema.partial().parse(req.body);
+      const storage = await storagePromise;
       const customer = await storage.updateCustomer(req.params.id, customerData, userId);
       res.json(customer);
     } catch (error) {
@@ -158,6 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/customers/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const storage = await storagePromise;
       const success = await storage.deleteCustomer(req.params.id, userId);
       if (!success) {
         return res.status(404).json({ message: "Customer not found" });
@@ -173,6 +184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/contracts', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const storage = await storagePromise;
       const contracts = await storage.getContracts(userId);
       res.json(contracts);
     } catch (error) {
@@ -184,6 +196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/contracts/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const storage = await storagePromise;
       const contract = await storage.getContractById(req.params.id, userId);
       if (!contract) {
         return res.status(404).json({ message: "Contract not found" });
@@ -199,6 +212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const contractData = insertContractSchema.parse(req.body);
+      const storage = await storagePromise;
       const contract = await storage.createContract(contractData, userId);
       res.status(201).json(contract);
     } catch (error) {
@@ -214,6 +228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const contractData = insertContractSchema.partial().parse(req.body);
+      const storage = await storagePromise;
       const contract = await storage.updateContract(req.params.id, contractData, userId);
       res.json(contract);
     } catch (error) {
@@ -228,6 +243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/contracts/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      const storage = await storagePromise;
       const success = await storage.deleteContract(req.params.id, userId);
       if (!success) {
         return res.status(404).json({ message: "Contract not found" });

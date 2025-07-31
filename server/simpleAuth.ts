@@ -1,5 +1,5 @@
 import type { Express, RequestHandler } from "express";
-import { storage } from "./storage";
+import { storagePromise } from "./storage";
 import session from "express-session";
 
 // Simple development authentication bypass
@@ -19,6 +19,7 @@ export function setupSimpleAuth(app: Express) {
   app.get("/api/dev-login", async (req, res) => {
     try {
       // Create or get a test user
+      const storage = await storagePromise;
       const testUser = await storage.upsertUser({
         id: "test-user-123",
         email: "test@forhandlerpro.no",
