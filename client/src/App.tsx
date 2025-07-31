@@ -12,6 +12,13 @@ import Cars from "@/pages/Cars";
 import Customers from "@/pages/Customers";
 import Contracts from "@/pages/Contracts";
 
+// Database configuration - easily switch between Replit DB and Supabase
+const DATABASE_CONFIG = {
+  provider: import.meta.env.VITE_DATABASE_PROVIDER || 'replit', // 'replit' or 'supabase'
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+  supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+};
+
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -33,12 +40,17 @@ function Router() {
 }
 
 function App() {
+  // Log database configuration for debugging
+  console.log('Database Provider:', DATABASE_CONFIG.provider);
+  
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <div className="min-h-screen bg-background">
+            <Router />
+          </div>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

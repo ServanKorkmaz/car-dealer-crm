@@ -237,4 +237,24 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Dynamic storage configuration - easily switch between databases
+function createStorage(): IStorage {
+  const provider = process.env.DATABASE_PROVIDER || 'replit';
+  
+  console.log(`Initializing ${provider} storage provider`);
+  
+  if (provider === 'supabase') {
+    try {
+      const { SupabaseStorage } = require('./supabaseStorage');
+      return new SupabaseStorage();
+    } catch (error) {
+      console.warn('Supabase not configured, falling back to Replit database:', error);
+      return new DatabaseStorage();
+    }
+  }
+  
+  // Default to Replit database
+  return new DatabaseStorage();
+}
+
+export const storage = createStorage();
