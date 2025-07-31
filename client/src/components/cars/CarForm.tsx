@@ -19,10 +19,10 @@ interface CarFormProps {
 }
 
 const carMakes = [
-  "Audi", "BMW", "Mercedes-Benz", "Toyota", "Volkswagen", "Volvo", 
+  "Audi", "BMW", "Mercedes-Benz", "Toyota", "VOLKSWAGEN", "Volvo", 
   "Ford", "Opel", "Nissan", "Hyundai", "Kia", "Mazda", "Subaru",
   "Skoda", "Seat", "Peugeot", "Renault", "Citroen", "Fiat", "Alfa Romeo"
-];
+].sort();
 
 export default function CarForm({ onClose, car }: CarFormProps) {
   const [profit, setProfit] = useState({ amount: 0, percentage: 0 });
@@ -137,7 +137,8 @@ export default function CarForm({ onClose, car }: CarFormProps) {
         // Update form fields with fetched data - be more explicit
         console.log('Setting make:', vehicleData.make);
         if (vehicleData.make) {
-          form.setValue('make', vehicleData.make, { shouldValidate: true });
+          form.setValue('make', vehicleData.make, { shouldValidate: true, shouldDirty: true });
+          form.trigger('make'); // Force re-render of the select field
         }
         
         console.log('Setting model:', vehicleData.model);
@@ -434,6 +435,35 @@ export default function CarForm({ onClose, car }: CarFormProps) {
           </div>
         </div>
 
+        {/* Images */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Bilder</h3>
+          <FormField
+            control={form.control}
+            name="images"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Bildelenker (en per linje)</FormLabel>
+                <FormControl>
+                  <textarea 
+                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder={`https://example.com/car1.jpg\nhttps://example.com/car2.jpg\nhttps://example.com/car3.jpg`}
+                    value={field.value?.join('\n') || ''}
+                    onChange={(e) => {
+                      const urls = e.target.value.split('\n').filter(url => url.trim());
+                      field.onChange(urls);
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+                <p className="text-sm text-muted-foreground">
+                  Legg til lenker til bilbilder, en per linje. Støtter jpg, png, webp formater.
+                </p>
+              </FormItem>
+            )}
+          />
+        </div>
+
         {/* Financial Info */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Økonomisk informasjon</h3>
@@ -510,19 +540,7 @@ export default function CarForm({ onClose, car }: CarFormProps) {
           />
         </div>
 
-        {/* Image Upload */}
-        <div>
-          <Label>Bilder</Label>
-          <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-6 text-center hover:border-primary transition-colors mt-2">
-            <CloudUpload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              Dra og slipp bilder her, eller <span className="text-primary font-medium">klikk for å velge</span>
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
-              PNG, JPG, GIF opp til 10MB
-            </p>
-          </div>
-        </div>
+
 
         {/* Form Actions */}
         <div className="flex items-center justify-end space-x-3 pt-6 border-t border-slate-200 dark:border-slate-700">
