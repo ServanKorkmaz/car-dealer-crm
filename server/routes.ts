@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storagePromise } from "./storage";
-import { setupAuth, authMiddleware } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupSimpleAuth, isSimpleAuthenticated } from "./simpleAuth";
 import { insertCarSchema, insertCustomerSchema, insertContractSchema } from "@shared/schema";
 import { z } from "zod";
@@ -15,7 +15,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Choose the right auth middleware
-  const authMiddleware = process.env.NODE_ENV === "development" ? isSimpleAuthenticated : authMiddleware;
+  const authMiddleware = process.env.NODE_ENV === "development" ? isSimpleAuthenticated : isAuthenticated;
 
   // Dashboard stats
   app.get('/api/dashboard/stats', authMiddleware, async (req: any, res) => {
