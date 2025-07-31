@@ -47,10 +47,18 @@ export const cars = pgTable("cars", {
   model: varchar("model").notNull(),
   year: integer("year").notNull(),
   mileage: integer("mileage").notNull(),
-  costPrice: decimal("cost_price", { precision: 10, scale: 2 }).notNull(),
-  salePrice: decimal("sale_price", { precision: 10, scale: 2 }).notNull(),
+  color: varchar("color"),
+  fuelType: varchar("fuel_type"),
+  transmission: varchar("transmission"),
+  power: varchar("power"), // e.g. "120 kW" 
+  co2Emissions: integer("co2_emissions"), // g/km
+  lastEuControl: timestamp("last_eu_control"),
+  nextEuControl: timestamp("next_eu_control"),
+  vehicleClass: varchar("vehicle_class"),
+  costPrice: varchar("cost_price").notNull(), // Changed to varchar to handle strings
+  salePrice: varchar("sale_price"),
   profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }), // calculated field
-  description: text("description"),
+  notes: text("notes"), // renamed from description for consistency
   images: text("images").array(), // array of image URLs
   status: varchar("status").default("available"), // available, sold, reserved
   createdAt: timestamp("created_at").defaultNow(),

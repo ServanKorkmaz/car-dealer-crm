@@ -105,6 +105,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vehicle lookup API endpoint
+  app.get('/api/vehicle-lookup/:regNumber', authMiddleware, async (req: any, res) => {
+    try {
+      const { regNumber } = req.params;
+      
+      // Validate registration number format (Norwegian)
+      const regNumberClean = regNumber.replace(/\s+/g, '').toUpperCase();
+      if (!/^[A-Z]{2}\d{4,5}$|^[A-Z]\d{4,5}$|^[A-Z]{1,3}\s?\d{2,5}$/.test(regNumberClean)) {
+        return res.status(400).json({ 
+          message: 'Ugyldig registreringsnummer format' 
+        });
+      }
+
+      // Check if API key exists
+      if (!process.env.SVV_API_KEY) {
+        return res.status(503).json({ 
+          message: 'Biloppslag er ikke konfigurert. Kontakt administrator for å sette opp SVV_API_KEY.',
+          configured: false
+        });
+      }
+
+      // Call Statens Vegvesen API for vehicle data
+      const svvResponse = await fetch(
+        `https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata?kjennemerke=${encodeURIComponent(regNumberClean)}`,
+        {
+          headers: {
+            'SVV-Authorization': `Apikey ${process.env.SVV_API_KEY}`,
+            'Accept': 'application/json',
+            'User-Agent': 'ForhandlerPRO/1.0'
+          }
+        }
+      );
+
+      if (!svvResponse.ok) {
+        if (svvResponse.status === 404) {
+          return res.status(404).json({ 
+            message: 'Ingen bil funnet med dette registreringsnummeret' 
+          });
+        }
+        if (svvResponse.status === 403) {
+          return res.status(503).json({ 
+            message: 'API-nøkkel er ugyldig eller utløpt. Kontakt administrator.' 
+          });
+        }
+        if (svvResponse.status === 429) {
+          return res.status(429).json({ 
+            message: 'For mange forespørsler. Prøv igjen senere.' 
+          });
+        }
+        throw new Error(`SVV API returned ${svvResponse.status}`);
+      }
+
+      const vehicleData = await svvResponse.json();
+      
+      // Map SVV data to our car form structure
+      const mappedData = {
+        make: vehicleData.merkeBeskrivelse || '',
+        model: vehicleData.handelsBetegnelse || vehicleData.tekniskKode?.kodeTypeNavn || '',
+        year: vehicleData.forsteRegistreringDato ? 
+          new Date(vehicleData.forsteRegistreringDato).getFullYear() : new Date().getFullYear(),
+        fuelType: vehicleData.drivstoffKode?.kodeBeskrivelse || '',
+        transmission: vehicleData.girkasseKode?.kodeBeskrivelse || '',
+        color: vehicleData.fargeBeskrivelse || '',
+        mileage: vehicleData.kilometerstand || 0,
+        // EU-kontroll data
+        lastEuControl: vehicleData.sistEuKontrollDato || null,
+        nextEuControl: vehicleData.nesteEuKontrollDato || null,
+        // Technical specs
+        power: vehicleData.effekt || null,
+        co2Emissions: vehicleData.co2GramPrKm || null,
+        // Additional useful data
+        vehicleClass: vehicleData.kjoretoyklasseBeskrivelse || '',
+        vehicleType: vehicleData.kjoretoyTypeBeskrivelse || '',
+        registrationDate: vehicleData.forsteRegistreringDato || null,
+        // Raw data for debugging
+        rawData: process.env.NODE_ENV === 'development' ? vehicleData : undefined
+      };
+
+      res.json({
+        success: true,
+        data: mappedData,
+        source: 'Statens Vegvesen'
+      });
+
+    } catch (error) {
+      console.error('Vehicle lookup error:', error);
+      res.status(500).json({ 
+        message: 'Feil ved oppslag av bildata. Prøv igjen senere.',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  });
+
   // Customer routes
   app.get('/api/customers', authMiddleware, async (req: any, res) => {
     try {

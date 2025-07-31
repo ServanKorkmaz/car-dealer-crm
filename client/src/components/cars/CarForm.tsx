@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CloudUpload } from "lucide-react";
+import { CloudUpload, Search, Loader2 } from "lucide-react";
 
 interface CarFormProps {
   onClose: () => void;
@@ -26,6 +26,7 @@ const carMakes = [
 
 export default function CarForm({ onClose, car }: CarFormProps) {
   const [profit, setProfit] = useState({ amount: 0, percentage: 0 });
+  const [isLookingUp, setIsLookingUp] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -39,7 +40,7 @@ export default function CarForm({ onClose, car }: CarFormProps) {
       mileage: 0,
       costPrice: "0",
       salePrice: "0",
-      description: "",
+      notes: "",
       images: [],
       status: "available",
     },
@@ -107,6 +108,82 @@ export default function CarForm({ onClose, car }: CarFormProps) {
     }).format(amount);
   };
 
+  // Vehicle lookup function
+  const lookupVehicle = async (regNumber: string) => {
+    if (!regNumber || regNumber.length < 5) {
+      toast({
+        title: "Ugyldig registreringsnummer",
+        description: "Skriv inn et gyldig registreringsnummer",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLookingUp(true);
+    try {
+      const response = await apiRequest("GET", `/api/vehicle-lookup/${encodeURIComponent(regNumber)}`);
+      const result = await response.json();
+
+      if (result.success) {
+        const vehicleData = result.data;
+        
+        // Update form fields with fetched data
+        if (vehicleData.make) form.setValue('make', vehicleData.make);
+        if (vehicleData.model) form.setValue('model', vehicleData.model);
+        if (vehicleData.year) form.setValue('year', vehicleData.year);
+        if (vehicleData.mileage > 0) form.setValue('mileage', vehicleData.mileage);
+        // Add notes with additional technical info
+        let additionalInfo = '';
+        if (vehicleData.fuelType) additionalInfo += `Drivstoff: ${vehicleData.fuelType}\n`;
+        if (vehicleData.transmission) additionalInfo += `Girkasse: ${vehicleData.transmission}\n`; 
+        if (vehicleData.color) additionalInfo += `Farge: ${vehicleData.color}\n`;
+        if (vehicleData.power) additionalInfo += `Effekt: ${vehicleData.power}\n`;
+        if (vehicleData.co2Emissions) additionalInfo += `CO₂: ${vehicleData.co2Emissions} g/km\n`;
+        if (vehicleData.lastEuControl) additionalInfo += `Siste EU-kontroll: ${new Date(vehicleData.lastEuControl).toLocaleDateString('no-NO')}\n`;
+        if (vehicleData.nextEuControl) additionalInfo += `Neste EU-kontroll: ${new Date(vehicleData.nextEuControl).toLocaleDateString('no-NO')}\n`;
+        if (additionalInfo) {
+          form.setValue('notes', additionalInfo.trim());
+        }
+
+        toast({
+          title: "Bildata hentet",
+          description: `Informasjon om ${vehicleData.make} ${vehicleData.model} er fylt inn automatisk`,
+        });
+      }
+    } catch (error) {
+      if (isUnauthorizedError(error as Error)) {
+        toast({
+          title: "Unauthorized",
+          description: "Du er ikke logget inn. Logger inn på nytt...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+
+      let errorMessage = "Kunne ikke hente bildata";
+      try {
+        const err = error as any;
+        if (err.response) {
+          const errorData = await err.response.json();
+          errorMessage = errorData?.message || errorMessage;
+        }
+      } catch {
+        // Use default message
+      }
+
+      toast({
+        title: "Feil ved biloppslag",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -118,9 +195,33 @@ export default function CarForm({ onClose, car }: CarFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Registreringsnummer</FormLabel>
-                <FormControl>
-                  <Input placeholder="AB 12345" {...field} />
-                </FormControl>
+                <div className="flex space-x-2">
+                  <FormControl>
+                    <Input 
+                      placeholder="AB 12345" 
+                      {...field}
+                      onBlur={() => {
+                        if (field.value && field.value.length >= 5) {
+                          lookupVehicle(field.value);
+                        }
+                      }}
+                    />
+                  </FormControl>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => lookupVehicle(field.value)}
+                    disabled={isLookingUp || !field.value || field.value.length < 5}
+                    title="Hent bildata automatisk"
+                  >
+                    {isLookingUp ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
