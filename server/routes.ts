@@ -159,26 +159,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const vehicleData = await svvResponse.json();
       
+      console.log('Raw SVV API response:', JSON.stringify(vehicleData, null, 2));
+      
+      // Extract vehicle information from the complex response structure
+      const vehicleInfo = vehicleData.kjoretoydataListe?.[0];
+      if (!vehicleInfo) {
+        return res.status(404).json({
+          success: false,
+          error: "Vehicle not found"
+        });
+      }
+
+      // Parse the data structure to extract useful information
+      const tekniskData = vehicleInfo.tekniskGodkjenning?.tekniskGodkjenning;
+      const nasjonalData = tekniskData?.nasjonalGodkjenning?.tekniskGodkjenning;
+      
+      // Extract make (merke) and model
+      let make = "";
+      let model = "";
+      
+      // Try different paths for make/model
+      if (tekniskData?.kjoretoybeskrivelse?.merke) {
+        make = tekniskData.kjoretoybeskrivelse.merke;
+      } else if (nasjonalData?.kjoretoybeskrivelse?.merke) {
+        make = nasjonalData.kjoretoybeskrivelse.merke;
+      }
+      
+      if (tekniskData?.kjoretoybeskrivelse?.handelsbetegnelse) {
+        model = tekniskData.kjoretoybeskrivelse.handelsbetegnelse;
+      } else if (nasjonalData?.kjoretoybeskrivelse?.handelsbetegnelse) {
+        model = nasjonalData.kjoretoybeskrivelse.handelsbetegnelse;
+      }
+      
+      // Extract year from first registration
+      const firstRegDate = vehicleInfo.forstegangsregistrering?.registrertForstegangNorgeDato;
+      const year = firstRegDate ? new Date(firstRegDate).getFullYear() : new Date().getFullYear();
+      
+      // Extract technical data - try both paths
+      const motorData = tekniskData?.motorOgDrivverk?.[0] || nasjonalData?.motorOgDrivverk?.[0];
+      
+      const color = tekniskData?.karosseriOgLasteplan?.karosseri?.[0]?.farge?.kodeBeskrivelse || 
+                   nasjonalData?.karosseriOgLasteplan?.karosseri?.[0]?.farge?.kodeBeskrivelse || "";
+      
+      const fuelType = motorData?.drivstoff?.[0]?.drivstoffKode?.kodeBeskrivelse || "";
+      
+      const transmission = motorData?.girkasse?.girkasseType?.kodeBeskrivelse || "";
+      
+      const power = motorData?.motor?.[0]?.maksEffekt ? `${motorData.motor[0].maksEffekt} kW` : "";
+      
+      // Extract emissions and control dates
+      const co2Emissions = tekniskData?.miljodata?.co2Utslipp || nasjonalData?.miljodata?.co2Utslipp || null;
+      const lastEuControl = vehicleInfo.periodiskKjoretoyKontroll?.kontrolldato || null;
+      const nextEuControl = vehicleInfo.periodiskKjoretoyKontroll?.nesteFrist || null;
+      
+      // Extract vehicle class and type
+      const vehicleClass = tekniskData?.kjoretoyklassifisering?.beskrivelse || 
+                          nasjonalData?.kjoretoyklassifisering?.beskrivelse || "";
+      
+      const vehicleType = tekniskData?.kjoretoyklassifisering?.nasjonalGodkjenning?.tekniskGodkjenning?.kjoretoytype?.kodeBeskrivelse || 
+                         nasjonalData?.kjoretoytype?.kodeBeskrivelse || "";
+
+      // Get mileage from most recent registration
+      const mileage = vehicleInfo.registrering?.kilometerstand || 0;
+
+      console.log('Parsed vehicle data:', { make, model, year, color, fuelType, transmission, power });
+      
       // Map SVV data to our car form structure
       const mappedData = {
-        make: vehicleData.merkeBeskrivelse || '',
-        model: vehicleData.handelsBetegnelse || vehicleData.tekniskKode?.kodeTypeNavn || '',
-        year: vehicleData.forsteRegistreringDato ? 
-          new Date(vehicleData.forsteRegistreringDato).getFullYear() : new Date().getFullYear(),
-        fuelType: vehicleData.drivstoffKode?.kodeBeskrivelse || '',
-        transmission: vehicleData.girkasseKode?.kodeBeskrivelse || '',
-        color: vehicleData.fargeBeskrivelse || '',
-        mileage: vehicleData.kilometerstand || 0,
+        make,
+        model,
+        year,
+        fuelType,
+        transmission,
+        color,
+        mileage,
         // EU-kontroll data
-        lastEuControl: vehicleData.sistEuKontrollDato || null,
-        nextEuControl: vehicleData.nesteEuKontrollDato || null,
+        lastEuControl,
+        nextEuControl,
         // Technical specs
-        power: vehicleData.effekt || null,
-        co2Emissions: vehicleData.co2GramPrKm || null,
+        power,
+        co2Emissions,
         // Additional useful data
-        vehicleClass: vehicleData.kjoretoyklasseBeskrivelse || '',
-        vehicleType: vehicleData.kjoretoyTypeBeskrivelse || '',
-        registrationDate: vehicleData.forsteRegistreringDato || null,
+        vehicleClass,
+        vehicleType,
+        registrationDate: firstRegDate,
         // Raw data for debugging
         rawData: process.env.NODE_ENV === 'development' ? vehicleData : undefined
       };
