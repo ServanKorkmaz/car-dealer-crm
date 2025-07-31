@@ -84,8 +84,10 @@ export async function setupAuth(app: Express) {
     verified(null, user);
   };
 
-  for (const domain of process.env
-    .REPLIT_DOMAINS!.split(",")) {
+  // Register strategies for all possible domains
+  const domains = process.env.REPLIT_DOMAINS!.split(",");
+  
+  for (const domain of domains) {
     const strategy = new Strategy(
       {
         name: `replitauth:${domain}`,
@@ -96,24 +98,46 @@ export async function setupAuth(app: Express) {
       verify,
     );
     passport.use(strategy);
+    console.log(`Registered strategy for domain: ${domain}`);
   }
+  
+  // Also register strategy for localhost (development)
+  const localhostStrategy = new Strategy(
+    {
+      name: `replitauth:localhost:5000`,
+      config,
+      scope: "openid email profile offline_access",
+      callbackURL: `https://${domains[0]}/api/callback`,
+    },
+    verify,
+  );
+  passport.use(localhostStrategy);
+  console.log(`Registered localhost strategy for development`);
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    // Use the first configured domain for authentication
-    const authDomain = process.env.REPLIT_DOMAINS!.split(",")[0];
-    passport.authenticate(`replitauth:${authDomain}`, {
+    // Determine the correct hostname to use
+    const hostname = req.get('host') || req.hostname;
+    const strategy = `replitauth:${hostname}`;
+    
+    console.log(`Attempting login with strategy: ${strategy}`);
+    
+    passport.authenticate(strategy, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
-    // Use the first configured domain for authentication
-    const authDomain = process.env.REPLIT_DOMAINS!.split(",")[0];
-    passport.authenticate(`replitauth:${authDomain}`, {
+    // Determine the correct hostname to use
+    const hostname = req.get('host') || req.hostname;
+    const strategy = `replitauth:${hostname}`;
+    
+    console.log(`Attempting callback with strategy: ${strategy}`);
+    
+    passport.authenticate(strategy, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
     })(req, res, next);
