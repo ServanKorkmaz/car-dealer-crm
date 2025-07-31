@@ -1,8 +1,4 @@
-// Dynamic import for Supabase client - only loaded when needed
-const createClient = async () => {
-  const { createClient } = await import('@supabase/supabase-js');
-  return createClient;
-};
+import { createClient } from '@supabase/supabase-js';
 import type { IStorage } from './storage';
 import type { User, UpsertUser, Car, InsertCar, Customer, InsertCustomer, Contract, InsertContract } from '@shared/schema';
 
@@ -17,13 +13,7 @@ export class SupabaseStorage implements IStorage {
       throw new Error('Supabase URL and Service Role Key must be provided');
     }
 
-    // Use dynamic import to avoid loading Supabase unless needed
-    this.initializeSupabase(supabaseUrl, supabaseServiceKey);
-  }
-
-  private async initializeSupabase(url: string, key: string) {
-    const clientFactory = await createClient();
-    this.supabase = clientFactory(url, key);
+    this.supabase = createClient(supabaseUrl, supabaseServiceKey);
   }
 
   // User operations
@@ -80,7 +70,7 @@ export class SupabaseStorage implements IStorage {
       totalCars: carsResult.count || 0,
       totalCustomers: customersResult.count || 0,
       totalContracts: contractsResult.count || 0,
-      totalRevenue: revenue,
+      monthlyProfit: revenue, // Match the interface - using revenue as monthly profit for now
     };
   }
 
