@@ -27,11 +27,11 @@ export default function CustomerForm({ onClose, customer }: CustomerFormProps) {
     resolver: zodResolver(insertCustomerSchema),
     defaultValues: {
       name: customer?.name || "",
-      email: customer?.email || "",
-      phone: customer?.phone || "",
-      organizationNumber: customer?.organizationNumber || "",
-      personNumber: customer?.personNumber || "",
-      address: customer?.address || "",
+      email: customer?.email || undefined,
+      phone: customer?.phone || undefined,
+      organizationNumber: customer?.organizationNumber || undefined,
+      personNumber: customer?.personNumber || undefined,
+      address: customer?.address || undefined,
       type: customer?.type || "individual",
     },
   });

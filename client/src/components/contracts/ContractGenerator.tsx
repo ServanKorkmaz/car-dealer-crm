@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -38,15 +38,15 @@ export default function ContractGenerator({ onClose, contract }: ContractGenerat
   const queryClient = useQueryClient();
   const isEditing = !!contract;
 
-  const { data: cars = [] } = useQuery({
+  const { data: cars = [] } = useQuery<Car[]>({
     queryKey: ["/api/cars"],
   });
 
-  const { data: customers = [] } = useQuery({
+  const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
   });
 
-  const availableCars = cars.filter((car: Car) => car.status === "available");
+  const availableCars = (cars as Car[]).filter((car: Car) => car.status === "available");
 
   const form = useForm<ContractForm>({
     resolver: zodResolver(contractFormSchema),
@@ -57,7 +57,7 @@ export default function ContractGenerator({ onClose, contract }: ContractGenerat
       salePrice: contract?.salePrice || "0",
       saleDate: contract ? new Date(contract.saleDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       status: contract?.status || "draft",
-      notes: contract?.notes || "",
+      notes: contract?.notes || undefined,
     },
   });
 
