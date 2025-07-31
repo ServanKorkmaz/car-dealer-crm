@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CloudUpload, Search, Loader2 } from "lucide-react";
+import { CloudUpload, Search, Loader2, X, Plus } from "lucide-react";
 
 interface CarFormProps {
   onClose: () => void;
@@ -27,6 +27,8 @@ const carMakes = [
 export default function CarForm({ onClose, car }: CarFormProps) {
   const [profit, setProfit] = useState({ amount: 0, percentage: 0 });
   const [isLookingUp, setIsLookingUp] = useState(false);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -110,6 +112,82 @@ export default function CarForm({ onClose, car }: CarFormProps) {
       currency: 'NOK',
       minimumFractionDigits: 0,
     }).format(amount);
+  };
+
+  // Image upload functions
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    
+    try {
+      const newImageUrls: string[] = [];
+      
+      for (const file of Array.from(files)) {
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          toast({
+            title: "Ugyldig filtype",
+            description: `${file.name} er ikke et bilde`,
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        // Validate file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+          toast({
+            title: "Fil for stor",
+            description: `${file.name} er større enn 10MB`,
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        // Convert to base64/blob URL for preview
+        const reader = new FileReader();
+        const imageUrl = await new Promise<string>((resolve) => {
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+
+        newImageUrls.push(imageUrl);
+      }
+
+      // Update state and form
+      const updatedImages = [...uploadedImages, ...newImageUrls];
+      setUploadedImages(updatedImages);
+      form.setValue('images', updatedImages, { shouldValidate: true });
+
+      if (newImageUrls.length > 0) {
+        toast({
+          title: "Bilder lastet opp",
+          description: `${newImageUrls.length} bilde(r) ble lagt til`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Feil ved opplasting",
+        description: "Kunne ikke laste opp bildene",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset input so same file can be selected again
+      event.target.value = '';
+    }
+  };
+
+  const removeImage = (index: number) => {
+    const updatedImages = uploadedImages.filter((_, i) => i !== index);
+    setUploadedImages(updatedImages);
+    form.setValue('images', updatedImages, { shouldValidate: true });
+    
+    toast({
+      title: "Bilde fjernet",
+      description: "Bildet ble fjernet fra listen",
+    });
   };
 
   // Vehicle lookup function
@@ -438,30 +516,74 @@ export default function CarForm({ onClose, car }: CarFormProps) {
         {/* Images */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold">Bilder</h3>
-          <FormField
-            control={form.control}
-            name="images"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Bildelenker (en per linje)</FormLabel>
-                <FormControl>
-                  <textarea 
-                    className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder={`https://example.com/car1.jpg\nhttps://example.com/car2.jpg\nhttps://example.com/car3.jpg`}
-                    value={field.value?.join('\n') || ''}
-                    onChange={(e) => {
-                      const urls = e.target.value.split('\n').filter(url => url.trim());
-                      field.onChange(urls);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-                <p className="text-sm text-muted-foreground">
-                  Legg til lenker til bilbilder, en per linje. Støtter jpg, png, webp formater.
-                </p>
-              </FormItem>
+          
+          {/* Image Upload Area */}
+          <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-6 text-center hover:border-primary transition-colors">
+            <input
+              type="file"
+              id="image-upload"
+              multiple
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageUpload}
+              disabled={isUploading}
+            />
+            <CloudUpload className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <label htmlFor="image-upload" className="cursor-pointer">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Dra og slipp bilder her, eller <span className="text-primary font-medium">klikk for å velge</span>
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                PNG, JPG, GIF opp til 10MB per bilde
+              </p>
+            </label>
+            {isUploading && (
+              <div className="mt-2">
+                <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                <p className="text-xs text-slate-500 mt-1">Laster opp bilder...</p>
+              </div>
             )}
-          />
+          </div>
+
+          {/* Uploaded Images Preview */}
+          {uploadedImages.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Opplastede bilder:</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {uploadedImages.map((imageUrl, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={imageUrl}
+                      alt={`Bil bilde ${index + 1}`}
+                      className="w-full h-24 object-cover rounded-md border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sync uploaded images with form */}
+          {uploadedImages.length > 0 && (
+            <FormField
+              control={form.control}
+              name="images"
+              render={({ field }) => {
+                // Update form value when uploadedImages changes
+                if (field.value !== uploadedImages) {
+                  field.onChange(uploadedImages);
+                }
+                return null;
+              }}
+            />
+          )}
         </div>
 
         {/* Financial Info */}
