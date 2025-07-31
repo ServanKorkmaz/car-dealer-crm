@@ -38,6 +38,10 @@ export default function CarForm({ onClose, car }: CarFormProps) {
       model: "",
       year: new Date().getFullYear(),
       mileage: 0,
+      color: "",
+      fuelType: "",
+      transmission: "",
+      power: "",
       costPrice: "0",
       salePrice: "0",
       notes: "",
@@ -132,15 +136,20 @@ export default function CarForm({ onClose, car }: CarFormProps) {
         if (vehicleData.model) form.setValue('model', vehicleData.model);
         if (vehicleData.year) form.setValue('year', vehicleData.year);
         if (vehicleData.mileage > 0) form.setValue('mileage', vehicleData.mileage);
-        // Add notes with additional technical info
+        
+        // Fill technical fields
+        if (vehicleData.color) form.setValue('color', vehicleData.color);
+        if (vehicleData.fuelType) form.setValue('fuelType', vehicleData.fuelType);
+        if (vehicleData.transmission) form.setValue('transmission', vehicleData.transmission);
+        if (vehicleData.power) form.setValue('power', vehicleData.power);
+        
+        // Add additional info to notes
         let additionalInfo = '';
-        if (vehicleData.fuelType) additionalInfo += `Drivstoff: ${vehicleData.fuelType}\n`;
-        if (vehicleData.transmission) additionalInfo += `Girkasse: ${vehicleData.transmission}\n`; 
-        if (vehicleData.color) additionalInfo += `Farge: ${vehicleData.color}\n`;
-        if (vehicleData.power) additionalInfo += `Effekt: ${vehicleData.power}\n`;
-        if (vehicleData.co2Emissions) additionalInfo += `CO₂: ${vehicleData.co2Emissions} g/km\n`;
+        if (vehicleData.co2Emissions) additionalInfo += `CO₂-utslipp: ${vehicleData.co2Emissions} g/km\n`;
         if (vehicleData.lastEuControl) additionalInfo += `Siste EU-kontroll: ${new Date(vehicleData.lastEuControl).toLocaleDateString('no-NO')}\n`;
         if (vehicleData.nextEuControl) additionalInfo += `Neste EU-kontroll: ${new Date(vehicleData.nextEuControl).toLocaleDateString('no-NO')}\n`;
+        if (vehicleData.vehicleClass) additionalInfo += `Kjøretøyklasse: ${vehicleData.vehicleClass}\n`;
+        if (vehicleData.vehicleType) additionalInfo += `Kjøretøytype: ${vehicleData.vehicleType}\n`;
         if (additionalInfo) {
           form.setValue('notes', additionalInfo.trim());
         }
@@ -188,6 +197,9 @@ export default function CarForm({ onClose, car }: CarFormProps) {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         {/* Car Basic Info */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Grunnleggende informasjon</h3>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -304,53 +316,146 @@ export default function CarForm({ onClose, car }: CarFormProps) {
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="costPrice"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Kostpris (kr)</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="number" 
-                    placeholder="350000" 
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
 
-          <FormField
-            control={form.control}
-            name="salePrice"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Salgspris (kr)</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="number" 
-                    placeholder="450000" 
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
 
-          <div className="flex items-center justify-center">
-            <div className="text-center">
-              <Label className="text-sm text-slate-600 dark:text-slate-400">Fortjeneste</Label>
-              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                {formatCurrency(profit.amount)}
-              </p>
-              <p className="text-sm text-emerald-600 dark:text-emerald-400">
-                ({profit.percentage.toFixed(1)}%)
-              </p>
+        </div>
+
+        {/* Technical Info */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Teknisk informasjon</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Farge</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Svart" {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="fuelType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Drivstoff</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Bensin" {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="transmission"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Girkasse</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Automat" {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="power"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Effekt</FormLabel>
+                  <FormControl>
+                    <Input placeholder="150 kW" {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        {/* Financial Info */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Økonomisk informasjon</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="costPrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Kostpris (kr)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      placeholder="350000" 
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="salePrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Salgspris (kr)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      placeholder="450000" 
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex items-center justify-center">
+              <div className="text-center">
+                <Label className="text-sm text-slate-600 dark:text-slate-400">Fortjeneste</Label>
+                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(profit.amount)}
+                </p>
+                <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                  ({profit.percentage.toFixed(1)}%)
+                </p>
+              </div>
             </div>
           </div>
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-4">
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notater</FormLabel>
+                <FormControl>
+                  <textarea 
+                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    placeholder="Ekstra informasjon om bilen..."
+                    {...field}
+                    value={field.value || ""}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
         {/* Image Upload */}

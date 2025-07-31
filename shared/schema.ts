@@ -47,16 +47,16 @@ export const cars = pgTable("cars", {
   model: varchar("model").notNull(),
   year: integer("year").notNull(),
   mileage: integer("mileage").notNull(),
-  color: varchar("color"),
-  fuelType: varchar("fuel_type"),
-  transmission: varchar("transmission"),
-  power: varchar("power"), // e.g. "120 kW" 
+  color: varchar("color").default(""),
+  fuelType: varchar("fuel_type").default(""),
+  transmission: varchar("transmission").default(""),
+  power: varchar("power").default(""), // e.g. "120 kW" 
   co2Emissions: integer("co2_emissions"), // g/km
   lastEuControl: timestamp("last_eu_control"),
   nextEuControl: timestamp("next_eu_control"),
   vehicleClass: varchar("vehicle_class"),
-  costPrice: varchar("cost_price").notNull(), // Changed to varchar to handle strings
-  salePrice: varchar("sale_price"),
+  costPrice: varchar("cost_price").notNull().default("0"), // Changed to varchar to handle strings
+  salePrice: varchar("sale_price").default("0"),
   profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }), // calculated field
   notes: text("notes"), // renamed from description for consistency
   images: text("images").array(), // array of image URLs
@@ -147,6 +147,11 @@ export const insertCarSchema = createInsertSchema(cars).omit({
   createdAt: true,
   updatedAt: true,
   userId: true,
+  profitMargin: true,
+  co2Emissions: true,
+  lastEuControl: true,
+  nextEuControl: true,
+  vehicleClass: true,
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({
