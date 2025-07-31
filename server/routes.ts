@@ -1,28 +1,24 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, authMiddleware } from "./replitAuth";
+import { setupSimpleAuth, isSimpleAuthenticated } from "./simpleAuth";
 import { insertCarSchema, insertCustomerSchema, insertContractSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
+  // Use simple auth for development instead of Replit auth
+  if (process.env.NODE_ENV === "development") {
+    setupSimpleAuth(app);
+  } else {
+    await setupAuth(app);
+  }
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
+  // Choose the right auth middleware
+  const authMiddleware = process.env.NODE_ENV === "development" ? isSimpleAuthenticated : authMiddleware;
 
   // Dashboard stats
-  app.get('/api/dashboard/stats', isAuthenticated, async (req: any, res) => {
+  app.get('/api/dashboard/stats', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const stats = await storage.getDashboardStats(userId);
@@ -34,7 +30,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Car routes
-  app.get('/api/cars', isAuthenticated, async (req: any, res) => {
+  app.get('/api/cars', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const cars = await storage.getCars(userId);
@@ -45,7 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/cars/:id', isAuthenticated, async (req: any, res) => {
+  app.get('/api/cars/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const car = await storage.getCarById(req.params.id, userId);
@@ -59,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/cars', isAuthenticated, async (req: any, res) => {
+  app.post('/api/cars', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const carData = insertCarSchema.parse(req.body);
@@ -74,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/cars/:id', isAuthenticated, async (req: any, res) => {
+  app.put('/api/cars/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const carData = insertCarSchema.partial().parse(req.body);
@@ -89,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/cars/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/cars/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const success = await storage.deleteCar(req.params.id, userId);
@@ -104,7 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Customer routes
-  app.get('/api/customers', isAuthenticated, async (req: any, res) => {
+  app.get('/api/customers', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const customers = await storage.getCustomers(userId);
@@ -115,7 +111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/customers/:id', isAuthenticated, async (req: any, res) => {
+  app.get('/api/customers/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const customer = await storage.getCustomerById(req.params.id, userId);
@@ -129,7 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/customers', isAuthenticated, async (req: any, res) => {
+  app.post('/api/customers', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const customerData = insertCustomerSchema.parse(req.body);
@@ -144,7 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/customers/:id', isAuthenticated, async (req: any, res) => {
+  app.put('/api/customers/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const customerData = insertCustomerSchema.partial().parse(req.body);
@@ -159,7 +155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/customers/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/customers/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const success = await storage.deleteCustomer(req.params.id, userId);
@@ -174,7 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contract routes
-  app.get('/api/contracts', isAuthenticated, async (req: any, res) => {
+  app.get('/api/contracts', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const contracts = await storage.getContracts(userId);
@@ -185,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/contracts/:id', isAuthenticated, async (req: any, res) => {
+  app.get('/api/contracts/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const contract = await storage.getContractById(req.params.id, userId);
@@ -199,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/contracts', isAuthenticated, async (req: any, res) => {
+  app.post('/api/contracts', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const contractData = insertContractSchema.parse(req.body);
@@ -214,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/contracts/:id', isAuthenticated, async (req: any, res) => {
+  app.put('/api/contracts/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const contractData = insertContractSchema.partial().parse(req.body);
@@ -229,7 +225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/contracts/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/contracts/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const success = await storage.deleteContract(req.params.id, userId);
