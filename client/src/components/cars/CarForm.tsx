@@ -128,20 +128,46 @@ export default function CarForm({ onClose, car }: CarFormProps) {
       const response = await apiRequest("GET", `/api/vehicle-lookup/${encodeURIComponent(regNumber)}`);
       const result = await response.json();
 
+      console.log('Vehicle lookup result:', result); // Debug log
+
       if (result.success) {
         const vehicleData = result.data;
+        console.log('Vehicle data received:', vehicleData); // Debug log
         
-        // Update form fields with fetched data
-        if (vehicleData.make) form.setValue('make', vehicleData.make);
-        if (vehicleData.model) form.setValue('model', vehicleData.model);
-        if (vehicleData.year) form.setValue('year', vehicleData.year);
-        if (vehicleData.mileage > 0) form.setValue('mileage', vehicleData.mileage);
+        // Update form fields with fetched data - be more explicit
+        console.log('Setting make:', vehicleData.make);
+        if (vehicleData.make) {
+          form.setValue('make', vehicleData.make, { shouldValidate: true });
+        }
+        
+        console.log('Setting model:', vehicleData.model);
+        if (vehicleData.model) {
+          form.setValue('model', vehicleData.model, { shouldValidate: true });
+        }
+        
+        console.log('Setting year:', vehicleData.year);
+        if (vehicleData.year) {
+          form.setValue('year', vehicleData.year, { shouldValidate: true });
+        }
+        
+        console.log('Setting mileage:', vehicleData.mileage);
+        if (vehicleData.mileage && vehicleData.mileage > 0) {
+          form.setValue('mileage', vehicleData.mileage, { shouldValidate: true });
+        }
         
         // Fill technical fields
-        if (vehicleData.color) form.setValue('color', vehicleData.color);
-        if (vehicleData.fuelType) form.setValue('fuelType', vehicleData.fuelType);
-        if (vehicleData.transmission) form.setValue('transmission', vehicleData.transmission);
-        if (vehicleData.power) form.setValue('power', vehicleData.power);
+        if (vehicleData.color) {
+          form.setValue('color', vehicleData.color, { shouldValidate: true });
+        }
+        if (vehicleData.fuelType) {
+          form.setValue('fuelType', vehicleData.fuelType, { shouldValidate: true });
+        }
+        if (vehicleData.transmission) {
+          form.setValue('transmission', vehicleData.transmission, { shouldValidate: true });
+        }
+        if (vehicleData.power) {
+          form.setValue('power', vehicleData.power, { shouldValidate: true });
+        }
         
         // Add additional info to notes
         let additionalInfo = '';
@@ -151,8 +177,11 @@ export default function CarForm({ onClose, car }: CarFormProps) {
         if (vehicleData.vehicleClass) additionalInfo += `Kjøretøyklasse: ${vehicleData.vehicleClass}\n`;
         if (vehicleData.vehicleType) additionalInfo += `Kjøretøytype: ${vehicleData.vehicleType}\n`;
         if (additionalInfo) {
-          form.setValue('notes', additionalInfo.trim());
+          form.setValue('notes', additionalInfo.trim(), { shouldValidate: true });
         }
+
+        // Force form to re-render
+        form.trigger();
 
         toast({
           title: "Bildata hentet",
