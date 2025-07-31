@@ -1,0 +1,87 @@
+🧩 PROJECT OVERVIEW:
+Build the foundational codebase for a modern, secure, and scalable Dealer Management System (DMS) called **ForhandlerPRO**. The system is designed for small to mid-size car dealerships in Norway, handling used cars, customers, contracts, and more.
+
+🧱 GOALS:
+Create a professional MVP that is:
+- Modular and easy to extend
+- Secure by default (with proper auth and access control)
+- Fully responsive and user-friendly
+- Ready for features like workshop, parts inventory, accounting, and market analytics later
+
+---
+
+💡 TECH STACK:
+
+- **Frontend**: Next.js 14 (App Router) + TypeScript + Tailwind CSS + ShadCN UI
+- **State Management**: Zustand or React Context
+- **Backend**: Supabase (PostgreSQL) with Row-Level Security enabled
+- **Authentication**: Supabase Auth (email/password or OTP login)
+- **PDF Generation**: react-pdf or jsPDF
+- **File Storage**: Supabase Storage (for car images and PDFs)
+- **Hosting**: Vercel or Replit Pro
+
+---
+
+📦 MODULES TO IMPLEMENT:
+
+1. **Admin Dashboard**
+   - Summary cards: Total cars, customers, contracts
+   - Responsive design using ShadCN Cards + Grid
+
+2. **Car Management**
+   - Add/edit/delete cars
+   - Fields: reg. number, make, model, mileage, price, cost price, images, profit margin
+   - Automatic price/profit calculation
+   - Upload and store car images in Supabase Storage
+
+3. **Customer Registry**
+   - Add/edit customers: name, email, phone, org/person number
+   - View purchase history and linked contracts
+
+4. **Contract Generator**
+   - Generate PDF sales contracts by linking customer and car
+   - Allow preview and download
+   - Store PDF files in Supabase Storage
+   - Prepared for future e-signature integration
+
+5. **Authentication System**
+   - Secure login using Supabase Auth
+   - Role-based access: Admin / Seller
+   - Private/protected routes with authorization checks
+
+6. **Navigation/Layout**
+   - Use Next.js App Router
+   - ShadCN Sidebar + Topbar layout
+   - Theme toggle (dark/light mode)
+   - Sticky header showing selected car/customer when editing
+
+---
+
+🔒 SECURITY & SCALABILITY:
+
+- Use Supabase RLS to ensure users can only access their own data
+- Input validation using Zod for all forms
+- Protect against SQL injection, XSS, and CSRF
+- Folder structure optimized for modular growth
+
+---
+
+📁 PROJECT STRUCTURE:
+
+- `/app` – All pages and routes (Next.js App Router)
+- `/components` – Reusable UI components
+- `/lib` – API utils, helpers
+- `/types` – Shared TypeScript types
+- `/supabase` – Supabase client and edge functions
+- `/data` – Seed data or test content
+
+---
+
+📈 GOAL:
+A clean, secure, modern DMS MVP built under the name **ForhandlerPRO**.  
+It must be professional, well-documented, and easily extensible for upcoming modules like:
+- Workshop management
+- Parts inventory
+- Price suggestion system (like FINN.no)
+- BankID integration
+- AI assistant module
