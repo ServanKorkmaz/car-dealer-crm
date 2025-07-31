@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+// Note: Install @supabase/supabase-js when using Supabase
+// npm install @supabase/supabase-js
 import type { IStorage } from './storage';
 import type { User, UpsertUser, Car, InsertCar, Customer, InsertCustomer, Contract, InsertContract } from '@shared/schema';
 
