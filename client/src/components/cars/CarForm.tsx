@@ -158,7 +158,7 @@ export default function CarForm({ onClose, car }: CarFormProps) {
       // Update state and form
       const updatedImages = [...uploadedImages, ...newImageUrls];
       setUploadedImages(updatedImages);
-      form.setValue('images', updatedImages, { shouldValidate: true });
+      form.setValue('images', updatedImages, { shouldValidate: true, shouldDirty: true });
 
       if (newImageUrls.length > 0) {
         toast({
@@ -182,7 +182,7 @@ export default function CarForm({ onClose, car }: CarFormProps) {
   const removeImage = (index: number) => {
     const updatedImages = uploadedImages.filter((_, i) => i !== index);
     setUploadedImages(updatedImages);
-    form.setValue('images', updatedImages, { shouldValidate: true });
+    form.setValue('images', updatedImages, { shouldValidate: true, shouldDirty: true });
     
     toast({
       title: "Bilde fjernet",
@@ -570,20 +570,7 @@ export default function CarForm({ onClose, car }: CarFormProps) {
             </div>
           )}
 
-          {/* Sync uploaded images with form */}
-          {uploadedImages.length > 0 && (
-            <FormField
-              control={form.control}
-              name="images"
-              render={({ field }) => {
-                // Update form value when uploadedImages changes
-                if (field.value !== uploadedImages) {
-                  field.onChange(uploadedImages);
-                }
-                return null;
-              }}
-            />
-          )}
+
         </div>
 
         {/* Financial Info */}
