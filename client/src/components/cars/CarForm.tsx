@@ -297,7 +297,7 @@ export default function CarForm({ onClose, car }: CarFormProps) {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Merke</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Velg merke" />
