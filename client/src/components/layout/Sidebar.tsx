@@ -33,12 +33,14 @@ export default function Sidebar() {
       <div className="flex flex-col w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700">
         {/* Logo */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Car className="text-white text-sm" />
+          <Link href="/">
+            <div className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity">
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <Car className="text-white text-sm" />
+              </div>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white">ForhandlerPRO</h1>
             </div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white">ForhandlerPRO</h1>
-          </div>
+          </Link>
           {/* Theme Toggle */}
           <Button
             variant="ghost"
@@ -85,24 +87,14 @@ export default function Sidebar() {
         <div className="p-4 border-t border-slate-200 dark:border-slate-700">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-slate-300 dark:bg-slate-600 rounded-full flex items-center justify-center">
-              {user?.profileImageUrl ? (
-                <img 
-                  src={user.profileImageUrl} 
-                  alt="Profile" 
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              ) : (
-                <User className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-              )}
+              <User className="w-4 h-4 text-slate-600 dark:text-slate-300" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                {user?.firstName && user?.lastName 
-                  ? `${user.firstName} ${user.lastName}` 
-                  : user?.email || "Bruker"}
+                {user && typeof user === 'object' && 'email' in user && user.email ? user.email : "Bruker"}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {user?.role === "admin" ? "Administrator" : "Selger"}
+                Forhandler
               </p>
             </div>
             <Button
