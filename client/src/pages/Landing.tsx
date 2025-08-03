@@ -1,8 +1,17 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Car, Users, FileText, BarChart3 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Landing() {
+  const { refetch } = useAuth();
+
+  const handleLogin = async () => {
+    console.log('Login button clicked');
+    // Navigate to login endpoint
+    window.location.href = '/api/dev-login';
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full">
@@ -17,10 +26,7 @@ export default function Landing() {
             Moderne dealer management system for norske bilforhandlere
           </p>
           <Button 
-            onClick={() => {
-              console.log('Login button clicked');
-              window.location.href = '/api/dev-login';
-            }}
+            onClick={handleLogin}
             size="lg"
             className="bg-primary hover:bg-primary-600 text-white px-8 py-3 text-lg"
             data-testid="button-login"
