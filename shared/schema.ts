@@ -61,6 +61,9 @@ export const cars = pgTable("cars", {
   notes: text("notes"), // renamed from description for consistency
   images: text("images").array(), // array of image URLs
   status: varchar("status").default("available"), // available, sold, reserved
+  soldDate: timestamp("sold_date"),
+  soldPrice: varchar("sold_price"),
+  soldToCustomerId: varchar("sold_to_customer_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   userId: varchar("user_id").notNull().references(() => users.id),

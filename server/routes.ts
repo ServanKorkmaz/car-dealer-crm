@@ -105,6 +105,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mark car as sold
+  app.put('/api/cars/:id/sell', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { soldPrice, customerId } = req.body;
+      
+      const storage = await storagePromise;
+      const updatedCar = await storage.updateCar(req.params.id, {
+        status: "sold",
+        soldDate: new Date(),
+        soldPrice: soldPrice || null,
+        soldToCustomerId: customerId || null,
+      }, userId);
+      
+      if (!updatedCar) {
+        return res.status(404).json({ message: "Car not found" });
+      }
+      
+      res.json(updatedCar);
+    } catch (error) {
+      console.error("Error marking car as sold:", error);
+      res.status(500).json({ message: "Failed to mark car as sold" });
+    }
+  });
+
   // Vehicle lookup API endpoint
   app.get('/api/vehicle-lookup/:regNumber', authMiddleware, async (req: any, res) => {
     try {
