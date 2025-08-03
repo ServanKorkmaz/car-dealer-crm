@@ -5,6 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupSimpleAuth, isSimpleAuthenticated } from "./simpleAuth";
 import { insertCarSchema, insertCustomerSchema, insertContractSchema } from "@shared/schema";
 import { z } from "zod";
+import { generateContractHTML, generatePDF } from "./pdf-generator";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Use simple auth for development instead of Replit auth
@@ -472,43 +473,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PDF generation endpoint
-  app.post('/api/contracts/:id/generate-pdf', authMiddleware, async (req: any, res) => {
+  // Generate PDF for contract
+  app.get('/api/contracts/:id/pdf', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const contractId = req.params.id;
       const storage = await storagePromise;
       
-      const contract = await storage.getContractById(contractId, userId);
+      // Get contract with related data
+      const contract = await storage.getContractById(req.params.id, userId);
       if (!contract) {
         return res.status(404).json({ message: "Contract not found" });
       }
 
-      // In a real implementation, you would:
-      // 1. Generate PDF using a library like PDFKit or Puppeteer
-      // 2. Upload to cloud storage (AWS S3, Google Cloud Storage, etc.)
-      // 3. Update contract with PDF URL
-      
-      // For now, simulate PDF generation
-      const mockPdfUrl = `https://storage.example.com/contracts/${contractId}/contract_${Date.now()}.pdf`;
-      
-      const updatedContract = await storage.updateContract(contractId, {
-        pdfUrl: mockPdfUrl,
-        status: 'signed' // Move to signed status after PDF generation
-      }, userId);
+      const car = await storage.getCarById(contract.carId, userId);
+      const customer = await storage.getCustomerById(contract.customerId, userId);
 
-      console.log(`📄 PDF generated for contract ${contractId}: ${mockPdfUrl}`);
+      if (!car || !customer) {
+        return res.status(404).json({ message: "Related data not found" });
+      }
 
-      res.json({
-        success: true,
-        message: "PDF contract generated successfully",
-        pdfUrl: mockPdfUrl,
-        contract: updatedContract
-      });
+      // Generate PDF
+      const htmlContent = generateContractHTML(contract, car, customer);
+      const pdf = await generatePDF(htmlContent);
 
-    } catch (error: any) {
+      // Set headers for PDF download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="kontrakt-${contract.contractNumber}.pdf"`);
+      res.send(pdf);
+
+    } catch (error) {
       console.error("Error generating PDF:", error);
-      res.status(500).json({ message: "Failed to generate PDF contract" });
+      res.status(500).json({ message: "Failed to generate PDF" });
     }
   });
 

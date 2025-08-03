@@ -193,6 +193,41 @@ export default function Contracts() {
     },
   });
 
+  const downloadPDF = async (contractId: string, contractNumber: string) => {
+    try {
+      const response = await fetch(`/api/contracts/${contractId}/pdf`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `kontrakt-${contractNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Suksess",
+        description: "PDF lastet ned",
+      });
+    } catch (error) {
+      console.error('PDF download error:', error);
+      toast({
+        title: "Feil",
+        description: "Kunne ikke laste ned PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -317,29 +352,15 @@ export default function Contracts() {
                         Rediger
                       </Button>
                       
-                      {contract.status === 'draft' && (
-                        <Button
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => generatePdfMutation.mutate(contract.id)}
-                          disabled={generatePdfMutation.isPending}
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
-                          data-testid={`button-generate-pdf-${contract.id}`}
-                        >
-                          <FileText className="w-4 h-4" />
-                        </Button>
-                      )}
-                      
-                      {contract.pdfUrl && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(contract.pdfUrl!, '_blank')}
-                          data-testid={`button-download-${contract.id}`}
-                        >
-                          <Download className="w-4 h-4" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadPDF(contract.id, contract.contractNumber)}
+                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
+                        data-testid={`button-download-pdf-${contract.id}`}
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
                       
                       <Button
                         variant="outline"
