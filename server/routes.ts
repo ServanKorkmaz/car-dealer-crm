@@ -46,6 +46,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Seed dummy data endpoint
+  app.post('/api/seed-dummy-data', authMiddleware, async (req: any, res) => {
+    try {
+      const { seedDummyData } = await import('./seed-data');
+      const result = await seedDummyData();
+      res.json({
+        success: true,
+        message: "Dummy data created successfully",
+        data: result
+      });
+    } catch (error: any) {
+      console.error("Error seeding dummy data:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to seed dummy data", 
+        error: error.message 
+      });
+    }
+  });
+
   // Car routes
   app.get('/api/cars', authMiddleware, async (req: any, res) => {
     try {
