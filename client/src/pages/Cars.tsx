@@ -291,18 +291,19 @@ export default function Cars() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
-            {filteredCars.map((car: Car) => {
+          <div className="space-y-4 animate-fade-in">
+            {filteredCars.map((car: Car, index) => {
               const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate || undefined);
               const isSold = car.status === "sold";
               
               return (
                 <Card 
                   key={car.id} 
-                  className={`transition-all hover:shadow-md ${
+                  className={`card-hover border-0 shadow-md hover:shadow-xl animate-slide-in-left ${
                     isSold ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' : 
                     'bg-slate-800 dark:bg-slate-900 border-slate-700'
                   }`}
+                  style={{ animationDelay: `${index * 0.1}s` }}
                   data-testid={`card-car-${car.id}`}
                 >
                   <CardHeader className="pb-4">

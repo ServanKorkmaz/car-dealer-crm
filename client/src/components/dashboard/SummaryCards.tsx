@@ -83,25 +83,27 @@ export default function SummaryCards() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {cards.map((card, index) => (
-        <Card key={index} className="hover:shadow-md transition-shadow">
-          <CardContent className="p-6">
+        <Card key={index} className="card-hover group border-0 shadow-md hover:shadow-xl animate-scale-in" style={{ animationDelay: `${index * 0.1}s` }}>
+          <CardContent className="p-6 relative overflow-hidden">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
                   {card.title}
                 </p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white">
+                <p className="text-3xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
                   {card.value}
                 </p>
-                <p className="text-sm text-emerald-600 dark:text-emerald-400 flex items-center mt-1">
-                  <ArrowUp className="w-3 h-3 mr-1" />
+                <p className="text-sm text-emerald-600 dark:text-emerald-400 flex items-center mt-1 group-hover:text-emerald-500 transition-colors">
+                  <ArrowUp className="w-3 h-3 mr-1 group-hover:animate-bounce" />
                   {card.change}
                 </p>
               </div>
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getColorClasses(card.color)}`}>
-                <card.icon className="w-6 h-6" />
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getColorClasses(card.color)} group-hover:scale-110 transition-all duration-300 group-hover:shadow-lg`}>
+                <card.icon className="w-6 h-6 group-hover:rotate-12 transition-transform duration-300" />
               </div>
             </div>
+            {/* Animated background gradient */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
           </CardContent>
         </Card>
       ))}

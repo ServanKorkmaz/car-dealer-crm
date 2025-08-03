@@ -68,19 +68,19 @@ export default function QuickActions() {
             <Button
               key={index}
               variant="outline"
-              className="w-full justify-between p-3 h-auto"
+              className="w-full justify-between p-4 h-auto group hover:shadow-md transition-all duration-200 hover:scale-105 hover:border-primary/50 border-0 shadow-sm"
               onClick={action.onClick}
             >
               <div className="flex items-center space-x-3">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getColorClasses(action.color)}`}>
-                  <action.icon className="w-4 h-4" />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getColorClasses(action.color)} group-hover:scale-110 transition-all duration-200 group-hover:shadow-md`}>
+                  <action.icon className="w-5 h-5 group-hover:rotate-12 transition-transform duration-200" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-medium">{action.name}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{action.description}</p>
+                  <p className="text-sm font-medium group-hover:text-primary transition-colors">{action.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">{action.description}</p>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-primary group-hover:translate-x-1 transition-all duration-200" />
             </Button>
           ))}
         </CardContent>

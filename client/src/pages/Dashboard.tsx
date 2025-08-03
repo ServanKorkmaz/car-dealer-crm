@@ -32,8 +32,8 @@ export default function Dashboard() {
 
   return (
     <MainLayout>
-      <div className="space-y-8">
-        <div>
+      <div className="space-y-8 animate-fade-in">
+        <div className="animate-slide-in-left">
           <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Dashboard</h2>
           <p className="text-slate-600 dark:text-slate-400">Oversikt over ditt bilforhandleri</p>
         </div>
