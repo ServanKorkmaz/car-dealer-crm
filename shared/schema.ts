@@ -192,6 +192,15 @@ export const insertContractSchema = createInsertSchema(contracts).omit({
   signerPhone: true,
   signingMethod: true,
   webhookStatus: true,
+}).extend({
+  // Override field types to match frontend data
+  salePrice: z.union([z.string(), z.number()]).transform(val => val.toString()),
+  saleDate: z.union([z.string(), z.date()]).transform(val => {
+    if (typeof val === 'string') {
+      return new Date(val);
+    }
+    return val;
+  }),
 });
 
 // Types
