@@ -92,9 +92,22 @@ export const contracts = pgTable("contracts", {
   customerId: varchar("customer_id").notNull().references(() => customers.id),
   salePrice: decimal("sale_price", { precision: 10, scale: 2 }).notNull(),
   saleDate: timestamp("sale_date").notNull(),
-  status: varchar("status").default("draft"), // draft, signed, completed
+  status: varchar("status").default("draft"), // draft, pending_signature, signed, completed, rejected
   pdfUrl: varchar("pdf_url"), // stored PDF file URL
   notes: text("notes"),
+  
+  // E-signing fields
+  signingProvider: varchar("signing_provider"), // verified.no, scrive, signant
+  signingDocumentId: varchar("signing_document_id"), // provider's document ID
+  signingUrl: varchar("signing_url"), // link for customer to sign
+  signingStatus: varchar("signing_status").default("not_sent"), // not_sent, pending, signed, rejected, expired
+  signedAt: timestamp("signed_at"),
+  signerName: varchar("signer_name"),
+  signerEmail: varchar("signer_email"),
+  signerPhone: varchar("signer_phone"),
+  signingMethod: varchar("signing_method").default("bankid"), // bankid, nemid, sms
+  webhookStatus: varchar("webhook_status"), // received, processed, error
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   userId: varchar("user_id").notNull().references(() => users.id),
