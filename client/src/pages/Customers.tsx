@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import CustomerForm from "@/components/customers/CustomerForm";
 import { Plus, Search, Edit, Trash2, Users } from "lucide-react";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import type { Customer } from "@shared/schema";
 
@@ -20,6 +21,7 @@ export default function Customers() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -36,7 +38,7 @@ export default function Customers() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: customers = [], isLoading: customersLoading } = useQuery({
+  const { data: customers = [], isLoading: customersLoading } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
     enabled: isAuthenticated,
   });
@@ -76,7 +78,7 @@ export default function Customers() {
     return <div className="min-h-screen bg-slate-50 dark:bg-slate-900" />;
   }
 
-  const filteredCustomers = customers.filter((customer: Customer) =>
+  const filteredCustomers = customers.filter((customer) =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.phone?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -136,7 +138,7 @@ export default function Customers() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCustomers.map((customer: Customer) => (
+            {filteredCustomers.map((customer) => (
               <Card key={customer.id} className="hover:shadow-md transition-shadow">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -152,51 +154,22 @@ export default function Customers() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    {customer.phone && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600 dark:text-slate-400">Telefon:</span>
-                        <span className="font-medium">{customer.phone}</span>
-                      </div>
-                    )}
-                    {customer.organizationNumber && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600 dark:text-slate-400">Org.nr:</span>
-                        <span className="font-medium">{customer.organizationNumber}</span>
-                      </div>
-                    )}
-                    {customer.personNumber && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600 dark:text-slate-400">Pers.nr:</span>
-                        <span className="font-medium">{customer.personNumber}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-600 dark:text-slate-400">Registrert:</span>
-                      <span className="font-medium">
-                        {new Date(customer.createdAt!).toLocaleDateString('no-NO')}
-                      </span>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">
+                        {customer.organizationNumber ? 'Bedriftskunde' : 'Privatkunde'}
+                      </p>
+                      <p className="text-sm text-muted-foreground" data-testid={`text-created-${customer.id}`}>
+                        Opprettet {new Date(customer.createdAt!).toLocaleDateString('no-NO')}
+                      </p>
                     </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2 pt-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1"
-                      onClick={() => setEditingCustomer(customer)}
+                      onClick={() => setLocation(`/customers/${customer.id}`)}
+                      data-testid={`button-view-customer-${customer.id}`}
                     >
-                      <Edit className="w-4 h-4 mr-1" />
-                      Rediger
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteMutation.mutate(customer.id)}
-                      disabled={deleteMutation.isPending}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    >
-                      <Trash2 className="w-4 h-4" />
+                      Se profil
                     </Button>
                   </div>
                 </CardContent>

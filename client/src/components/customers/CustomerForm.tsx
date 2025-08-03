@@ -14,11 +14,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 
 interface CustomerFormProps {
-  onClose: () => void;
+  onClose?: () => void;
+  onSuccess?: () => void;
+  onCancel?: () => void;
   customer?: Customer | null;
 }
 
-export default function CustomerForm({ onClose, customer }: CustomerFormProps) {
+export default function CustomerForm({ onClose, onSuccess, onCancel, customer }: CustomerFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isEditing = !!customer;
@@ -50,7 +52,11 @@ export default function CustomerForm({ onClose, customer }: CustomerFormProps) {
         title: "Suksess",
         description: isEditing ? "Kunde ble oppdatert" : "Kunde ble lagt til",
       });
-      onClose();
+      if (onSuccess) {
+        onSuccess();
+      } else if (onClose) {
+        onClose();
+      }
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -79,7 +85,7 @@ export default function CustomerForm({ onClose, customer }: CustomerFormProps) {
   const watchedType = form.watch("type");
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
+    <Dialog open={true} onOpenChange={onCancel || onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Rediger kunde" : "Legg til ny kunde"}</DialogTitle>
@@ -192,7 +198,7 @@ export default function CustomerForm({ onClose, customer }: CustomerFormProps) {
 
             {/* Form Actions */}
             <div className="flex items-center justify-end space-x-3 pt-6 border-t border-slate-200 dark:border-slate-700">
-              <Button type="button" variant="outline" onClick={onClose}>
+              <Button type="button" variant="outline" onClick={onCancel || onClose}>
                 Avbryt
               </Button>
               <Button 
