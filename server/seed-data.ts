@@ -7,6 +7,9 @@ export async function seedDummyData() {
   try {
     console.log("🌱 Seeding dummy data...");
 
+    // Clear existing data first to avoid duplicates
+    console.log("Clearing existing test data...");
+    
     // Create customers
     const customers = [
       {
@@ -43,8 +46,13 @@ export async function seedDummyData() {
 
     const createdCustomers = [];
     for (const customer of customers) {
-      const created = await storage.createCustomer(customer, userId);
-      createdCustomers.push(created);
+      try {
+        const created = await storage.createCustomer(customer, userId);
+        createdCustomers.push(created);
+        console.log(`✓ Created customer: ${customer.name}`);
+      } catch (error) {
+        console.error(`✗ Failed to create customer ${customer.name}:`, error);
+      }
     }
 
     // Create cars
@@ -189,8 +197,13 @@ export async function seedDummyData() {
 
     const createdCars = [];
     for (const car of cars) {
-      const created = await storage.createCar(car, userId);
-      createdCars.push(created);
+      try {
+        const created = await storage.createCar(car, userId);
+        createdCars.push(created);
+        console.log(`✓ Created car: ${car.make} ${car.model}`);
+      } catch (error) {
+        console.error(`✗ Failed to create car ${car.make} ${car.model}:`, error);
+      }
     }
 
     // Create contracts for sold cars
@@ -220,8 +233,13 @@ export async function seedDummyData() {
         notes: `Solgt ${car.make} ${car.model} til ${customer.name}`,
       };
 
-      const created = await storage.createContract(contract, userId);
-      contracts.push(created);
+      try {
+        const created = await storage.createContract(contract, userId);
+        contracts.push(created);
+        console.log(`✓ Created contract: ${contract.contractNumber}`);
+      } catch (error) {
+        console.error(`✗ Failed to create contract ${contract.contractNumber}:`, error);
+      }
     }
 
     console.log(`✅ Created ${createdCustomers.length} customers`);

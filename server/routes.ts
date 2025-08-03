@@ -49,18 +49,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Seed dummy data endpoint
   app.post('/api/seed-dummy-data', authMiddleware, async (req: any, res) => {
     try {
-      const { seedDummyData } = await import('./seed-data');
-      const result = await seedDummyData();
+      const { createSimpleTestData } = await import('./simple-seed');
+      const result = await createSimpleTestData();
       res.json({
         success: true,
-        message: "Dummy data created successfully",
+        message: "Testdata opprettet!",
         data: result
       });
     } catch (error: any) {
       console.error("Error seeding dummy data:", error);
       res.status(500).json({ 
         success: false,
-        message: "Failed to seed dummy data", 
+        message: "Feil ved oppretting av testdata", 
         error: error.message 
       });
     }
