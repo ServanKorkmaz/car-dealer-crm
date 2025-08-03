@@ -425,7 +425,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/contracts', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      console.log("Contract creation request body:", JSON.stringify(req.body, null, 2));
+      // Debug: log contract creation
+      console.log("Creating contract with data:", JSON.stringify(req.body, null, 2));
       const contractData = insertContractSchema.parse(req.body);
       const storage = await storagePromise;
       const contract = await storage.createContract(contractData, userId);

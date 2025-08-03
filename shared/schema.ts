@@ -89,7 +89,7 @@ export const contracts = pgTable("contracts", {
   contractNumber: varchar("contract_number").notNull().unique(),
   carId: varchar("car_id").notNull().references(() => cars.id),
   customerId: varchar("customer_id").notNull().references(() => customers.id),
-  salePrice: decimal("sale_price", { precision: 10, scale: 2 }).notNull(),
+  salePrice: decimal("sale_price", { precision: 15, scale: 2 }).notNull(),
   saleDate: timestamp("sale_date").notNull(),
   status: varchar("status").default("draft"), // draft, pending_signature, signed, completed, rejected
   pdfUrl: varchar("pdf_url"), // stored PDF file URL
