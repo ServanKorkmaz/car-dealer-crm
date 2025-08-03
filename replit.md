@@ -124,7 +124,8 @@ The database uses PostgreSQL with the following main entities:
 
 ### ✅ Person Number Field Removed
 - **Privacy Compliance**: Removed personnummer field from customer database and forms per user request
-- **Database Update**: Person number column dropped from customers table 
+- **Database Update**: Person number column dropped from customers table
+- **Database Switch**: Moved from Supabase to native Replit PostgreSQL for better stability 
 - **UI Updates**: Customer forms and contract displays no longer show person number
 - **Cleaner Data Model**: Simplified customer schema focusing on essential business information
 
