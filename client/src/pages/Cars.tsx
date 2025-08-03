@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AddCarModal from "@/components/cars/AddCarModal";
 import EditCarModal from "@/components/cars/EditCarModal";
-import { Plus, Search, Edit, Trash2, CheckCircle, Clock } from "lucide-react";
+import { Plus, Search, Edit, Trash2, CheckCircle, Clock, ExternalLink } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
 
@@ -18,6 +18,8 @@ export default function Cars() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
+  const [showFinnImport, setShowFinnImport] = useState(false);
+  const [finnUrl, setFinnUrl] = useState("");
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -105,6 +107,65 @@ export default function Cars() {
     },
   });
 
+  const finnImportMutation = useMutation({
+    mutationFn: async (url: string) => {
+      const response = await apiRequest("POST", "/api/cars/import-from-finn", { url });
+      return response;
+    },
+    onSuccess: (data: any) => {
+      if (data.carData) {
+        // Show the car data in the add modal
+        setShowAddModal(true);
+        setShowFinnImport(false);
+        setFinnUrl("");
+        toast({
+          title: "Suksess",
+          description: "Bildata hentet fra Finn.no. Fyll ut eventuell manglende informasjon.",
+        });
+      }
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorisert",
+          description: "Du er ikke logget inn. Logger inn på nytt...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Feil",
+        description: error.message || "Kunne ikke hente bildata fra Finn.no",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFinnImport = () => {
+    if (!finnUrl.trim()) {
+      toast({
+        title: "Feil",
+        description: "Vennligst skriv inn en gyldig Finn.no URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!finnUrl.includes('finn.no') || !finnUrl.includes('/car/')) {
+      toast({
+        title: "Feil",
+        description: "URL må være en Finn.no bilannonse",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    finnImportMutation.mutate(finnUrl);
+  };
+
   if (isLoading || !isAuthenticated) {
     return <div className="min-h-screen bg-slate-50 dark:bg-slate-900" />;
   }
@@ -173,13 +234,23 @@ export default function Cars() {
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Biler</h2>
             <p className="text-slate-600 dark:text-slate-400">Administrer bilbeholdningen din</p>
           </div>
-          <Button
-            onClick={() => setShowAddModal(true)}
-            className="bg-primary hover:bg-primary-600"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Legg til bil
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowAddModal(true)}
+              className="bg-primary hover:bg-primary-600"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Legg til bil
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowFinnImport(true)}
+              className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 dark:bg-orange-950 dark:border-orange-800 dark:text-orange-300"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Importer fra Finn.no
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center space-x-4">
@@ -222,7 +293,7 @@ export default function Cars() {
         ) : (
           <div className="space-y-4">
             {filteredCars.map((car: Car) => {
-              const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate);
+              const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate || undefined);
               const isSold = car.status === "sold";
               
               return (
@@ -339,6 +410,58 @@ export default function Cars() {
           car={editingCar} 
           onClose={() => setEditingCar(null)} 
         />
+      )}
+
+      {/* Finn.no Import Dialog */}
+      {showFinnImport && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+              Importer bil fra Finn.no
+            </h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+              Lim inn URL-en til en bilannonse på Finn.no for å hente bildata automatisk.
+            </p>
+            <div className="space-y-4">
+              <Input
+                type="url"
+                placeholder="https://www.finn.no/car/used/ad.html?finnkode=..."
+                value={finnUrl}
+                onChange={(e) => setFinnUrl(e.target.value)}
+                className="w-full"
+              />
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowFinnImport(false);
+                    setFinnUrl("");
+                  }}
+                  disabled={finnImportMutation.isPending}
+                >
+                  Avbryt
+                </Button>
+                <Button
+                  onClick={handleFinnImport}
+                  disabled={finnImportMutation.isPending || !finnUrl.trim()}
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  {finnImportMutation.isPending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
+                      Henter data...
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Importer
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </MainLayout>
   );

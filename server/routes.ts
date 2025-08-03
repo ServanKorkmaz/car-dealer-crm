@@ -6,6 +6,7 @@ import { setupSimpleAuth, isSimpleAuthenticated } from "./simpleAuth";
 import { insertCarSchema, insertCustomerSchema, insertContractSchema } from "@shared/schema";
 import { z } from "zod";
 import { generateContractHTML, generatePDF } from "./pdf-generator";
+import { scrapeFinnAd } from "./finn-scraper";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Use simple auth for development instead of Replit auth
@@ -504,6 +505,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating PDF:", error);
       res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
+  // Finn.no scraping endpoint
+  app.post('/api/cars/import-from-finn', authMiddleware, async (req: any, res) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ message: "URL is required" });
+      }
+
+      const carData = await scrapeFinnAd(url);
+      
+      if (!carData) {
+        return res.status(400).json({ message: "Could not extract car data from URL" });
+      }
+
+      res.json({
+        success: true,
+        message: "Car data extracted successfully",
+        carData
+      });
+
+    } catch (error: any) {
+      console.error("Error importing from Finn:", error);
+      res.status(500).json({ 
+        message: "Failed to import car data", 
+        error: error.message 
+      });
     }
   });
 
