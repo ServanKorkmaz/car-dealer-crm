@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AddCarModal from "@/components/cars/AddCarModal";
-import { Plus, Search, Edit, Trash2, Car as CarIcon, CheckCircle, Clock } from "lucide-react";
+import { Plus, Search, Edit, Trash2, CheckCircle, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
 
@@ -216,26 +216,40 @@ export default function Cars() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-4">
             {filteredCars.map((car: Car) => {
               const daysOnStock = calculateDaysOnStock(car.createdAt, car.soldDate);
               const isSold = car.status === "sold";
               
               return (
-                <Card key={car.id} className={`hover:shadow-md transition-shadow ${isSold ? 'opacity-75 border-green-200' : ''}`}>
-                  <CardHeader className="pb-3">
+                <Card 
+                  key={car.id} 
+                  className={`transition-all hover:shadow-md ${
+                    isSold ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' : 
+                    'bg-slate-800 dark:bg-slate-900 border-slate-700'
+                  }`}
+                  data-testid={`card-car-${car.id}`}
+                >
+                  <CardHeader className="pb-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <CardTitle className="text-lg">{car.make} {car.model}</CardTitle>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                        <CardTitle className="text-xl text-white font-bold">
+                          {car.make} {car.model}
+                        </CardTitle>
+                        <p className="text-slate-400 mt-1">
                           {car.registrationNumber} • {car.year}
                         </p>
                       </div>
-                      <div className="flex flex-col items-end space-y-1">
-                        <Badge className={getStatusColor(car.status || 'available')}>
-                          {getStatusText(car.status || 'available')}
+                      <div className="flex flex-col items-end space-y-2">
+                        <Badge 
+                          variant={isSold ? "default" : "secondary"}
+                          className={
+                            isSold ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'
+                          }
+                        >
+                          {isSold ? "Solgt" : "Tilgjengelig"}
                         </Badge>
-                        <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center text-sm text-slate-400">
                           <Clock className="w-3 h-3 mr-1" />
                           {daysOnStock} dag{daysOnStock !== 1 ? 'er' : ''} {isSold ? 'på lager' : 'ute'}
                         </div>
@@ -243,59 +257,62 @@ export default function Cars() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600 dark:text-slate-400">Kilometerstand:</span>
-                        <span className="font-medium">{car.mileage.toLocaleString('no-NO')} km</span>
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <span className="text-slate-400">Kilometerstand:</span>
+                        <p className="font-medium text-white">{car.mileage?.toLocaleString('no-NO') || 'Ukjent'} km</p>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600 dark:text-slate-400">
+                      <div>
+                        <span className="text-slate-400">
                           {isSold ? 'Solgt for:' : 'Salgspris:'}
                         </span>
-                        <span className="font-medium">
+                        <p className="font-medium text-white">
                           {isSold && car.soldPrice ? 
                             formatPrice(car.soldPrice) :
-                            formatPrice(car.salePrice)}
-                        </span>
+                            formatPrice(car.salePrice || "")}
+                        </p>
                       </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600 dark:text-slate-400">Fortjeneste:</span>
-                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                          {car.profitMargin}%
-                        </span>
+                      <div>
+                        <span className="text-slate-400">Fortjeneste:</span>
+                        <p className="font-medium text-green-400">
+                          {car.profitMargin || 0}%
+                        </p>
                       </div>
                     </div>
                     
                     {isSold && car.soldDate && (
-                      <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center bg-green-50 dark:bg-green-900/20 p-2 rounded">
-                        <CheckCircle className="w-3 h-3 mr-1 text-green-600" />
-                        Solgt {new Date(car.soldDate).toLocaleDateString('no')}
+                      <div className="text-sm text-green-600 dark:text-green-400 flex items-center bg-green-100 dark:bg-green-900/20 p-3 rounded-lg">
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Solgt {new Date(car.soldDate).toLocaleDateString('no-NO')}
                       </div>
                     )}
 
-                    <div className="flex items-center space-x-2 pt-2">
+                    <div className="flex items-center space-x-3 pt-2">
                       {!isSold && (
                         <Button
-                          variant="outline"
-                          size="sm"
                           onClick={() => handleSellCar(car)}
                           disabled={sellMutation.isPending}
-                          className="text-green-600 hover:text-green-700 border-green-300 hover:border-green-400 flex-1"
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                          data-testid={`button-sell-${car.id}`}
                         >
-                          <CheckCircle className="w-4 h-4 mr-1" />
+                          <CheckCircle className="w-4 h-4 mr-2" />
                           Marker som solgt
                         </Button>
                       )}
-                      <Button variant="outline" size="sm" className={!isSold ? '' : 'flex-1'}>
-                        <Edit className="w-4 h-4 mr-1" />
+                      <Button 
+                        variant="outline" 
+                        className={`${!isSold ? '' : 'flex-1'} border-slate-600 text-white hover:bg-slate-700`}
+                        data-testid={`button-edit-${car.id}`}
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
                         Rediger
                       </Button>
                       <Button
                         variant="outline"
-                        size="sm"
                         onClick={() => deleteMutation.mutate(car.id)}
                         disabled={deleteMutation.isPending}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        className="border-red-600 text-red-400 hover:bg-red-900/20"
+                        data-testid={`button-delete-${car.id}`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

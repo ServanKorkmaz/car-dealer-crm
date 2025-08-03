@@ -142,6 +142,9 @@ export class SupabaseStorage implements IStorage {
       costPrice: car.cost_price,
       salePrice: car.sale_price,
       status: car.status,
+      soldDate: car.sold_date,
+      soldPrice: car.sold_price,
+      soldToCustomerId: car.sold_to_customer_id,
       images: car.images,
       notes: car.notes,
       createdAt: new Date(car.created_at),
@@ -193,6 +196,9 @@ export class SupabaseStorage implements IStorage {
       costPrice: data.cost_price,
       salePrice: data.sale_price,
       status: data.status,
+      soldDate: data.sold_date,
+      soldPrice: data.sold_price,
+      soldToCustomerId: data.sold_to_customer_id,
       images: data.images,
       notes: data.notes,
       createdAt: new Date(data.created_at),
@@ -201,9 +207,32 @@ export class SupabaseStorage implements IStorage {
   }
 
   async updateCar(id: string, carData: Partial<InsertCar>, userId: string): Promise<Car> {
+    // Map camelCase to snake_case for Supabase
+    const supabaseData: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    // Map fields to snake_case
+    if (carData.registrationNumber !== undefined) supabaseData.registration_number = carData.registrationNumber;
+    if (carData.make !== undefined) supabaseData.make = carData.make;
+    if (carData.model !== undefined) supabaseData.model = carData.model;
+    if (carData.year !== undefined) supabaseData.year = carData.year;
+    if (carData.mileage !== undefined) supabaseData.mileage = carData.mileage;
+    if (carData.color !== undefined) supabaseData.color = carData.color;
+    if (carData.fuelType !== undefined) supabaseData.fuel_type = carData.fuelType;
+    if (carData.transmission !== undefined) supabaseData.transmission = carData.transmission;
+    if (carData.costPrice !== undefined) supabaseData.cost_price = carData.costPrice;
+    if (carData.salePrice !== undefined) supabaseData.sale_price = carData.salePrice;
+    if (carData.status !== undefined) supabaseData.status = carData.status;
+    if (carData.soldDate !== undefined) supabaseData.sold_date = carData.soldDate;
+    if (carData.soldPrice !== undefined) supabaseData.sold_price = carData.soldPrice;
+    if (carData.soldToCustomerId !== undefined) supabaseData.sold_to_customer_id = carData.soldToCustomerId;
+    if (carData.images !== undefined) supabaseData.images = carData.images;
+    if (carData.notes !== undefined) supabaseData.notes = carData.notes;
+
     const { data, error } = await this.supabase
       .from('cars')
-      .update({ ...carData, updated_at: new Date().toISOString() })
+      .update(supabaseData)
       .eq('id', id)
       .eq('user_id', userId)
       .select()
@@ -213,7 +242,29 @@ export class SupabaseStorage implements IStorage {
       throw new Error(`Failed to update car: ${error.message}`);
     }
 
-    return data as Car;
+    // Map snake_case back to camelCase
+    return {
+      id: data.id,
+      userId: data.user_id,
+      registrationNumber: data.registration_number,
+      make: data.make,
+      model: data.model,
+      year: data.year,
+      mileage: data.mileage,
+      color: data.color,
+      fuelType: data.fuel_type,
+      transmission: data.transmission,
+      costPrice: data.cost_price,
+      salePrice: data.sale_price,
+      status: data.status,
+      soldDate: data.sold_date,
+      soldPrice: data.sold_price,
+      soldToCustomerId: data.sold_to_customer_id,
+      images: data.images,
+      notes: data.notes,
+      createdAt: new Date(data.created_at),
+      updatedAt: new Date(data.updated_at),
+    } as Car;
   }
 
   async deleteCar(id: string, userId: string): Promise<boolean> {
