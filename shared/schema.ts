@@ -181,6 +181,17 @@ export const insertContractSchema = createInsertSchema(contracts).omit({
   createdAt: true,
   updatedAt: true,
   userId: true,
+  // Make optional fields truly optional
+  pdfUrl: true,
+  signingProvider: true,
+  signingDocumentId: true,
+  signingUrl: true,
+  signedAt: true,
+  signerName: true,
+  signerEmail: true,
+  signerPhone: true,
+  signingMethod: true,
+  webhookStatus: true,
 });
 
 // Types

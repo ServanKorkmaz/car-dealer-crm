@@ -425,12 +425,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/contracts', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log("Contract creation request body:", JSON.stringify(req.body, null, 2));
       const contractData = insertContractSchema.parse(req.body);
       const storage = await storagePromise;
       const contract = await storage.createContract(contractData, userId);
       res.status(201).json(contract);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Contract validation errors:", error.errors);
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
       console.error("Error creating contract:", error);
