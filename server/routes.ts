@@ -496,10 +496,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const htmlContent = generateContractHTML(contract, car, customer);
       const pdf = await generatePDF(htmlContent);
 
-      // Set headers for PDF download
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="kontrakt-${contract.contractNumber}.pdf"`);
-      res.send(pdf);
+      // Set headers for HTML download that can be printed as PDF
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="kontrakt-${contract.contractNumber}.html"`);
+      res.send(pdf.toString());
 
     } catch (error) {
       console.error("Error generating PDF:", error);

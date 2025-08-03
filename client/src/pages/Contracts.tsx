@@ -195,34 +195,18 @@ export default function Contracts() {
 
   const downloadPDF = async (contractId: string, contractNumber: string) => {
     try {
-      const response = await fetch(`/api/contracts/${contractId}/pdf`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `kontrakt-${contractNumber}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-
+      // Open the contract HTML in a new window for printing/saving as PDF
+      window.open(`/api/contracts/${contractId}/pdf`, '_blank');
+      
       toast({
-        title: "Suksess",
-        description: "PDF lastet ned",
+        title: "Kontrakt åpnet",
+        description: "Bruk Ctrl+P for å skrive ut eller lagre som PDF",
       });
     } catch (error) {
       console.error('PDF download error:', error);
       toast({
         title: "Feil",
-        description: "Kunne ikke laste ned PDF",
+        description: "Kunne ikke åpne kontrakt",
         variant: "destructive",
       });
     }

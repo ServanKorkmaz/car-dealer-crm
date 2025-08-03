@@ -1,4 +1,3 @@
-import * as htmlPdf from 'html-pdf-node';
 import type { Contract, Car, Customer } from '@shared/schema';
 
 export function generateContractHTML(contract: Contract, car: Car, customer: Customer): string {
@@ -257,14 +256,45 @@ export function generateContractHTML(contract: Contract, car: Car, customer: Cus
         @media print {
           body {
             padding: 20px;
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
           }
           .page-break {
             page-break-before: always;
+          }
+          .no-print {
+            display: none;
+          }
+        }
+
+        /* Add a print button for easy access */
+        .print-controls {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 1000;
+          background: white;
+          padding: 15px;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        @media print {
+          .print-controls {
+            display: none;
           }
         }
       </style>
     </head>
     <body>
+      <div class="print-controls no-print">
+        <button onclick="window.print()" style="background: #2563eb; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 500; margin-right: 8px;">
+          🖨️ Skriv ut / Lagre som PDF
+        </button>
+        <button onclick="window.close()" style="background: #64748b; color: white; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-weight: 500;">
+          ✕ Lukk
+        </button>
+      </div>
       <div class="header">
         <div class="logo">ForhandlerPRO</div>
         <div class="subtitle">Profesjonelt bilsalg</div>
@@ -363,7 +393,7 @@ export function generateContractHTML(contract: Contract, car: Car, customer: Cus
             </div>
             <div class="info-row">
               <span class="info-label">Effekt:</span>
-              <span class="info-value">${car.power ? car.power + ' hk' : 'Ikke oppgitt'}</span>
+              <span class="info-value">${car.power ? String(car.power) + ' hk' : 'Ikke oppgitt'}</span>
             </div>
             <div class="info-row">
               <span class="info-label">Chassisnummer:</span>
@@ -418,32 +448,13 @@ export function generateContractHTML(contract: Contract, car: Car, customer: Cus
   `;
 }
 
+// For now, we'll return the HTML content as a temporary solution
+// In production, you would integrate with a PDF service like:
+// - PDFShift API
+// - ILovePDF API  
+// - DocRaptor
+// - Or use a cloud function with Chrome
 export async function generatePDF(htmlContent: string): Promise<Buffer> {
-  const options = {
-    format: 'A4',
-    margin: {
-      top: '20mm',
-      right: '15mm',
-      bottom: '20mm',
-      left: '15mm'
-    },
-    printBackground: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu',
-      '--disable-web-security',
-      '--allow-running-insecure-content'
-    ]
-  };
-
-  try {
-    const file = { content: htmlContent };
-    const pdfBuffer = await htmlPdf.generatePdf(file, options);
-    return pdfBuffer;
-  } catch (error) {
-    console.error('PDF generation error:', error);
-    throw new Error('Failed to generate PDF');
-  }
+  // Return HTML as bytes for now - browser can print this as PDF
+  return Buffer.from(htmlContent, 'utf-8');
 }
