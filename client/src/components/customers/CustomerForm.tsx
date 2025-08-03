@@ -168,21 +168,7 @@ export default function CustomerForm({ onClose, customer }: CustomerFormProps) {
                     </FormItem>
                   )}
                 />
-              ) : (
-                <FormField
-                  control={form.control}
-                  name="personNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Personnummer</FormLabel>
-                      <FormControl>
-                        <Input placeholder="12345678901" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+              ) : null}
             </div>
 
             {/* Address */}

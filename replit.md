@@ -120,7 +120,15 @@ The database uses PostgreSQL with the following main entities:
 - Replit-specific configuration for authentication
 - Support for both Replit and external hosting
 
-## Recent Changes (2025-01-31)
+## Recent Changes (2025-02-03)
+
+### ✅ Person Number Field Removed
+- **Privacy Compliance**: Removed personnummer field from customer database and forms per user request
+- **Database Update**: Person number column dropped from customers table 
+- **UI Updates**: Customer forms and contract displays no longer show person number
+- **Cleaner Data Model**: Simplified customer schema focusing on essential business information
+
+## Previous Changes (2025-01-31)
 
 ### ✅ Supabase Database Migration Complete
 - **Successful Migration**: ForhandlerPRO now fully operational with external Supabase database

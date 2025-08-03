@@ -76,7 +76,6 @@ export const customers = pgTable("customers", {
   email: varchar("email"),
   phone: varchar("phone"),
   organizationNumber: varchar("organization_number"), // for companies
-  personNumber: varchar("person_number"), // for individuals
   address: text("address"),
   type: varchar("type").default("individual"), // individual, company
   createdAt: timestamp("created_at").defaultNow(),
