@@ -493,14 +493,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Related data not found" });
       }
 
-      // Generate PDF
+      // Generate HTML content for viewing/printing
       const htmlContent = generateContractHTML(contract, car, customer);
-      const pdf = await generatePDF(htmlContent);
 
-      // Set headers for HTML download that can be printed as PDF
+      // Set headers for HTML viewing
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.setHeader('Content-Disposition', `inline; filename="kontrakt-${contract.contractNumber}.html"`);
-      res.send(pdf.toString());
+      res.send(htmlContent);
 
     } catch (error) {
       console.error("Error generating PDF:", error);

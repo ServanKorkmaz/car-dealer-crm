@@ -193,17 +193,25 @@ export default function Contracts() {
     },
   });
 
-  const downloadPDF = async (contractId: string, contractNumber: string) => {
+  const viewContract = async (contractId: string, contractNumber: string) => {
     try {
-      // Open the contract HTML in a new window for printing/saving as PDF
-      window.open(`/api/contracts/${contractId}/pdf`, '_blank');
+      // Open the contract HTML in a new window for viewing
+      const contractWindow = window.open(`/api/contracts/${contractId}/pdf`, '_blank');
       
-      toast({
-        title: "Kontrakt åpnet",
-        description: "Bruk Ctrl+P for å skrive ut eller lagre som PDF",
-      });
+      if (contractWindow) {
+        toast({
+          title: "Kontrakt åpnet",
+          description: "Du kan nå se kontrakten i et nytt vindu. Bruk Ctrl+P for å skrive ut eller lagre som PDF",
+        });
+      } else {
+        toast({
+          title: "Blokkert",
+          description: "Popup-blokkering hindrer åpning av kontrakt. Tillat popup-vinduer for denne siden.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
-      console.error('PDF download error:', error);
+      console.error('Contract view error:', error);
       toast({
         title: "Feil",
         description: "Kunne ikke åpne kontrakt",
@@ -329,21 +337,21 @@ export default function Contracts() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1"
-                        onClick={() => setEditingContract(contract)}
+                        onClick={() => viewContract(contract.id, contract.contractNumber)}
+                        className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
+                        data-testid={`button-view-contract-${contract.id}`}
                       >
-                        <Edit className="w-4 h-4 mr-1" />
-                        Rediger
+                        <FileText className="w-4 h-4 mr-1" />
+                        Se kontrakt
                       </Button>
                       
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => downloadPDF(contract.id, contract.contractNumber)}
-                        className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800"
-                        data-testid={`button-download-pdf-${contract.id}`}
+                        onClick={() => setEditingContract(contract)}
+                        data-testid={`button-edit-${contract.id}`}
                       >
-                        <Download className="w-4 h-4" />
+                        <Edit className="w-4 h-4" />
                       </Button>
                       
                       <Button
