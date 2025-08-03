@@ -215,13 +215,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (motorData) {
         // Get fuel type from first motor with drivstoff
-        const motorWithFuel = motorData.motor?.find(m => m.drivstoff?.length > 0);
+        const motorWithFuel = motorData.motor?.find((m: any) => m.drivstoff?.length > 0);
         if (motorWithFuel?.drivstoff?.[0]?.drivstoffKode?.kodeBeskrivelse) {
           fuelType = motorWithFuel.drivstoff[0].drivstoffKode.kodeBeskrivelse;
         }
         
         // Get power from first motor with maksNettoEffekt
-        const motorWithPower = motorData.motor?.find(m => m.drivstoff?.[0]?.maksNettoEffekt);
+        const motorWithPower = motorData.motor?.find((m: any) => m.drivstoff?.[0]?.maksNettoEffekt);
         if (motorWithPower?.drivstoff?.[0]?.maksNettoEffekt) {
           power = `${motorWithPower.drivstoff[0].maksNettoEffekt} kW`;
         }

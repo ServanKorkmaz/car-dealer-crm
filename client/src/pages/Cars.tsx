@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import AddCarModal from "@/components/cars/AddCarModal";
+import EditCarModal from "@/components/cars/EditCarModal";
 import { Plus, Search, Edit, Trash2, CheckCircle, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
@@ -16,6 +17,7 @@ import type { Car } from "@shared/schema";
 export default function Cars() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingCar, setEditingCar] = useState<Car | null>(null);
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -35,7 +37,7 @@ export default function Cars() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: cars = [], isLoading: carsLoading } = useQuery({
+  const { data: cars = [], isLoading: carsLoading } = useQuery<Car[]>({
     queryKey: ["/api/cars"],
     enabled: isAuthenticated,
   });
@@ -200,7 +202,9 @@ export default function Cars() {
         ) : filteredCars.length === 0 ? (
           <Card className="text-center py-12">
             <CardContent>
-              <CarIcon className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+              <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                <Plus className="w-6 h-6 text-slate-400" />
+              </div>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
                 Ingen biler funnet
               </h3>
@@ -218,7 +222,7 @@ export default function Cars() {
         ) : (
           <div className="space-y-4">
             {filteredCars.map((car: Car) => {
-              const daysOnStock = calculateDaysOnStock(car.createdAt, car.soldDate);
+              const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate);
               const isSold = car.status === "sold";
               
               return (
@@ -301,6 +305,7 @@ export default function Cars() {
                       )}
                       <Button 
                         variant="outline" 
+                        onClick={() => setEditingCar(car)}
                         className={`${!isSold ? '' : 'flex-1'} border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white`}
                         data-testid={`button-edit-${car.id}`}
                       >
@@ -327,6 +332,13 @@ export default function Cars() {
 
       {showAddModal && (
         <AddCarModal onClose={() => setShowAddModal(false)} />
+      )}
+
+      {editingCar && (
+        <EditCarModal 
+          car={editingCar} 
+          onClose={() => setEditingCar(null)} 
+        />
       )}
     </MainLayout>
   );
