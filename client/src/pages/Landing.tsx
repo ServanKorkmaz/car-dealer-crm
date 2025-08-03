@@ -17,9 +17,13 @@ export default function Landing() {
             Moderne dealer management system for norske bilforhandlere
           </p>
           <Button 
-            onClick={() => window.location.href = '/api/dev-login'}
+            onClick={() => {
+              console.log('Login button clicked');
+              window.location.href = '/api/dev-login';
+            }}
             size="lg"
             className="bg-primary hover:bg-primary-600 text-white px-8 py-3 text-lg"
+            data-testid="button-login"
           >
             Logg inn (Demo)
           </Button>
