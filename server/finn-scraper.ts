@@ -22,9 +22,9 @@ interface FinnCarData {
 
 export async function scrapeFinnAd(url: string): Promise<Partial<InsertCar> | null> {
   try {
-    // Validate that this is a Finn.no car ad URL
-    if (!url.includes('finn.no') || !url.includes('/car/')) {
-      throw new Error('URL må være en Finn.no bilannonse');
+    // Validate that this is a Finn.no vehicle ad URL
+    if (!url.includes('finn.no') || (!url.includes('/car/') && !url.includes('/mobility/'))) {
+      throw new Error('URL må være en Finn.no bil- eller kjøretøyannonse');
     }
 
     console.log(`Scraping Finn.no ad: ${url}`);
@@ -82,27 +82,35 @@ function parseCarDataFromHTML(html: string): FinnCarData {
     // Extract title - usually contains make, model, and year
     const titleMatch = html.match(/<title[^>]*>([^<]+)</i);
     if (titleMatch) {
-      carData.title = titleMatch[1].trim();
+      carData.title = titleMatch[1].trim().replace(' - FINN.no', '');
       parseCarInfoFromTitle(carData.title, carData);
     }
 
-    // Extract price
-    const priceMatch = html.match(/(?:"price":\s*(\d+))|(?:kr\s*([\d\s]+))/i);
+    // Extract price - try multiple patterns
+    let priceMatch = html.match(/data-testid="price"[^>]*>([^<]+)/i) || 
+                     html.match(/"price":\s*(\d+)/i) ||
+                     html.match(/kr\s*([\d\s]+)/i);
+    
     if (priceMatch) {
-      const priceStr = priceMatch[1] || priceMatch[2]?.replace(/\s/g, '');
-      carData.price = parseInt(priceStr || '0');
+      let priceStr = priceMatch[1]?.replace(/[^\d]/g, '') || '0';
+      carData.price = parseInt(priceStr);
     }
 
-    // Extract year
-    const yearMatch = html.match(/(?:årsmodell|year)[^>]*>?\s*(\d{4})/i);
+    // Extract year - try multiple patterns
+    const yearMatch = html.match(/(?:årsmodell|year|årgang)[^>]*>?\s*(\d{4})/i) ||
+                      html.match(/(\d{4})\s*(?:årsmodell|årgang)/i) ||
+                      html.match(/data-testid="year"[^>]*>([^<]+)/i);
     if (yearMatch) {
-      carData.year = parseInt(yearMatch[1]);
+      const yearStr = yearMatch[1].replace(/[^\d]/g, '');
+      carData.year = parseInt(yearStr);
     }
 
-    // Extract mileage
-    const mileageMatch = html.match(/(?:kilometer|km)[^>]*>?\s*([\d\s]+)/i);
+    // Extract mileage - try multiple patterns
+    const mileageMatch = html.match(/(?:kilometer|km|kjørelengde)[^>]*>?\s*([\d\s]+)/i) ||
+                         html.match(/data-testid="mileage"[^>]*>([^<]+)/i);
     if (mileageMatch) {
-      carData.mileage = parseInt(mileageMatch[1].replace(/\s/g, ''));
+      const mileageStr = mileageMatch[1].replace(/[^\d]/g, '');
+      carData.mileage = parseInt(mileageStr);
     }
 
     // Extract fuel type
@@ -162,20 +170,61 @@ function parseCarDataFromHTML(html: string): FinnCarData {
 
 function parseCarInfoFromTitle(title: string, carData: FinnCarData) {
   try {
-    // Common patterns for Norwegian car titles
-    // Examples: "BMW 320d xDrive 2019", "Volvo XC90 T6 AWD 2020", "Mercedes-Benz C220 2018"
+    // Handle FINN.no title patterns like "Bruktbil til salgs: Volkswagen Passat - 2018 - Grå - 218 hk - Stasjonsvogn"
+    let cleanTitle = title.replace(/^Bruktbil til salgs:\s*/i, '').trim();
     
-    // Extract year (4 digits at the end)
-    const yearMatch = title.match(/(\d{4})(?:\s|$)/);
-    if (yearMatch) {
-      carData.year = parseInt(yearMatch[1]);
-    }
+    // Split by " - " to get parts
+    const parts = cleanTitle.split(' - ');
+    
+    if (parts.length >= 2) {
+      // First part should be make and model
+      const makeModelPart = parts[0].trim();
+      const makeModelMatch = makeModelPart.match(/^([A-Za-z-]+)\s+(.+)/);
+      if (makeModelMatch) {
+        carData.make = makeModelMatch[1].trim();
+        carData.model = makeModelMatch[2].trim();
+      }
+      
+      // Look for year in the parts
+      for (const part of parts) {
+        const yearMatch = part.match(/(\d{4})/);
+        if (yearMatch) {
+          const year = parseInt(yearMatch[1]);
+          if (year >= 1950 && year <= new Date().getFullYear() + 1) {
+            carData.year = year;
+            break;
+          }
+        }
+      }
+      
+      // Look for color
+      const colorPart = parts.find(part => 
+        /^(svart|hvit|grå|rød|blå|grønn|gul|sølv|bronse|brun|oransje|fiolett|rosa)/i.test(part.trim())
+      );
+      if (colorPart) {
+        carData.color = colorPart.trim();
+      }
+      
+      // Look for power (hk/hp)
+      const powerPart = parts.find(part => /\d+\s*(hk|hp)/i.test(part));
+      if (powerPart) {
+        const powerMatch = powerPart.match(/(\d+)\s*(hk|hp)/i);
+        if (powerMatch) {
+          carData.power = powerMatch[1];
+        }
+      }
+    } else {
+      // Fallback to original parsing for other formats
+      const yearMatch = title.match(/(\d{4})(?:\s|$)/);
+      if (yearMatch) {
+        carData.year = parseInt(yearMatch[1]);
+      }
 
-    // Extract make and model
-    const makeModelMatch = title.match(/^([A-Za-z-]+)\s+([A-Za-z0-9\s-]+?)(?:\s+\d{4}|$)/);
-    if (makeModelMatch) {
-      carData.make = makeModelMatch[1].trim();
-      carData.model = makeModelMatch[2].trim();
+      const makeModelMatch = title.match(/^([A-Za-z-]+)\s+([A-Za-z0-9\s-]+?)(?:\s+\d{4}|$)/);
+      if (makeModelMatch) {
+        carData.make = makeModelMatch[1].trim();
+        carData.model = makeModelMatch[2].trim();
+      }
     }
 
     // Clean up common Norwegian car terms

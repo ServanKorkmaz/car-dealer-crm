@@ -154,10 +154,10 @@ export default function Cars() {
       return;
     }
 
-    if (!finnUrl.includes('finn.no') || !finnUrl.includes('/car/')) {
+    if (!finnUrl.includes('finn.no') || (!finnUrl.includes('/car/') && !finnUrl.includes('/mobility/'))) {
       toast({
         title: "Feil",
-        description: "URL må være en Finn.no bilannonse",
+        description: "URL må være en Finn.no bil- eller kjøretøyannonse",
         variant: "destructive",
       });
       return;
@@ -420,12 +420,12 @@ export default function Cars() {
               Importer bil fra Finn.no
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-              Lim inn URL-en til en bilannonse på Finn.no for å hente bildata automatisk.
+              Lim inn URL-en til en bil- eller kjøretøyannonse på Finn.no for å hente data automatisk.
             </p>
             <div className="space-y-4">
               <Input
                 type="url"
-                placeholder="https://www.finn.no/car/used/ad.html?finnkode=..."
+                placeholder="https://www.finn.no/car/used/ad.html?finnkode=... eller /mobility/..."
                 value={finnUrl}
                 onChange={(e) => setFinnUrl(e.target.value)}
                 className="w-full"
