@@ -42,12 +42,51 @@ export interface IStorage {
   updateContract(id: string, contract: Partial<InsertContract>, userId: string): Promise<Contract>;
   deleteContract(id: string, userId: string): Promise<boolean>;
   
-  // Dashboard stats
+  // Dashboard stats and analytics
   getDashboardStats(userId: string): Promise<{
     totalCars: number;
     totalCustomers: number;
     totalContracts: number;
     monthlyProfit: number;
+  }>;
+  
+  getAdvancedAnalytics(userId: string, timeRange?: string): Promise<{
+    revenue: {
+      thisMonth: number;
+      thisYear: number;
+      lastMonth: number;
+      lastYear: number;
+    };
+    sales: {
+      thisMonth: number;
+      thisYear: number;
+      averageSalePrice: number;
+    };
+    profitMargin: {
+      gross: number;
+      net: number;
+    };
+    inventory: {
+      averageDaysOnLot: number;
+      totalValue: number;
+      fastMoving: number;
+      slowMoving: number;
+    };
+    monthlyTrends: Array<{
+      month: string;
+      revenue: number;
+      sales: number;
+      profit: number;
+    }>;
+    salesByMake: Array<{
+      make: string;
+      count: number;
+      revenue: number;
+    }>;
+    inventoryAging: Array<{
+      ageRange: string;
+      count: number;
+    }>;
   }>;
 }
 
@@ -233,6 +272,206 @@ export class DatabaseStorage implements IStorage {
       totalCustomers: totalCustomers.length,
       totalContracts: totalContracts.length,
       monthlyProfit,
+    };
+  }
+
+  async getAdvancedAnalytics(userId: string, timeRange = '30'): Promise<{
+    revenue: {
+      thisMonth: number;
+      thisYear: number;
+      lastMonth: number;
+      lastYear: number;
+    };
+    sales: {
+      thisMonth: number;
+      thisYear: number;
+      averageSalePrice: number;
+    };
+    profitMargin: {
+      gross: number;
+      net: number;
+    };
+    inventory: {
+      averageDaysOnLot: number;
+      totalValue: number;
+      fastMoving: number;
+      slowMoving: number;
+    };
+    monthlyTrends: Array<{
+      month: string;
+      revenue: number;
+      sales: number;
+      profit: number;
+    }>;
+    salesByMake: Array<{
+      make: string;
+      count: number;
+      revenue: number;
+    }>;
+    inventoryAging: Array<{
+      ageRange: string;
+      count: number;
+    }>;
+  }> {
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const thisYear = new Date(now.getFullYear(), 0, 1);
+    const lastYear = new Date(now.getFullYear() - 1, 0, 1);
+
+    // Get all contracts for analysis
+    const allContracts = await db
+      .select()
+      .from(contracts)
+      .where(eq(contracts.userId, userId));
+
+    const completedContracts = allContracts.filter(c => c.status === 'completed');
+
+    // Revenue calculations
+    const thisMonthRevenue = completedContracts
+      .filter(c => new Date(c.createdAt!) >= thisMonth)
+      .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+
+    const thisYearRevenue = completedContracts
+      .filter(c => new Date(c.createdAt!) >= thisYear)
+      .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+
+    const lastMonthRevenue = completedContracts
+      .filter(c => {
+        const date = new Date(c.createdAt!);
+        return date >= lastMonth && date < thisMonth;
+      })
+      .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+
+    const lastYearRevenue = completedContracts
+      .filter(c => {
+        const date = new Date(c.createdAt!);
+        return date >= lastYear && date < thisYear;
+      })
+      .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+
+    // Sales calculations
+    const thisMonthSales = completedContracts.filter(c => new Date(c.createdAt!) >= thisMonth).length;
+    const thisYearSales = completedContracts.filter(c => new Date(c.createdAt!) >= thisYear).length;
+    const averageSalePrice = completedContracts.length > 0 
+      ? completedContracts.reduce((sum, c) => sum + parseFloat(c.salePrice), 0) / completedContracts.length 
+      : 0;
+
+    // Profit margin calculations
+    const totalRevenue = completedContracts.reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+    const totalCost = completedContracts.reduce((sum, c) => sum + (parseFloat(c.purchasePrice) || 0), 0);
+    const grossProfit = totalRevenue - totalCost;
+    const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+
+    // Get all cars for inventory analysis
+    const allCars = await db.select().from(cars).where(eq(cars.userId, userId));
+    const availableCars = allCars.filter(c => c.status === 'available');
+
+    // Inventory calculations
+    const totalInventoryValue = availableCars.reduce((sum, c) => sum + parseFloat(c.price), 0);
+    const averageDaysOnLot = availableCars.length > 0 
+      ? availableCars.reduce((sum, c) => {
+          const daysSince = Math.floor((now.getTime() - new Date(c.createdAt!).getTime()) / (1000 * 60 * 60 * 24));
+          return sum + daysSince;
+        }, 0) / availableCars.length
+      : 0;
+
+    const fastMoving = availableCars.filter(c => {
+      const daysSince = Math.floor((now.getTime() - new Date(c.createdAt!).getTime()) / (1000 * 60 * 60 * 24));
+      return daysSince <= 30;
+    }).length;
+
+    const slowMoving = availableCars.filter(c => {
+      const daysSince = Math.floor((now.getTime() - new Date(c.createdAt!).getTime()) / (1000 * 60 * 60 * 24));
+      return daysSince > 90;
+    }).length;
+
+    // Monthly trends (last 12 months)
+    const monthlyTrends = [];
+    for (let i = 11; i >= 0; i--) {
+      const month = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      
+      const monthContracts = completedContracts.filter(c => {
+        const date = new Date(c.createdAt!);
+        return date >= month && date < nextMonth;
+      });
+
+      const revenue = monthContracts.reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+      const cost = monthContracts.reduce((sum, c) => sum + (parseFloat(c.purchasePrice) || 0), 0);
+
+      monthlyTrends.push({
+        month: month.toLocaleDateString('no-NO', { month: 'short', year: 'numeric' }),
+        revenue,
+        sales: monthContracts.length,
+        profit: revenue - cost
+      });
+    }
+
+    // Sales by make
+    const makeStats = new Map<string, { count: number; revenue: number }>();
+    
+    for (const contract of completedContracts) {
+      const car = allCars.find(c => c.id === contract.carId);
+      const make = car?.make || 'Ukjent';
+      
+      if (!makeStats.has(make)) {
+        makeStats.set(make, { count: 0, revenue: 0 });
+      }
+      
+      const stats = makeStats.get(make)!;
+      stats.count++;
+      stats.revenue += parseFloat(contract.salePrice);
+    }
+
+    const salesByMake = Array.from(makeStats.entries()).map(([make, stats]) => ({
+      make,
+      count: stats.count,
+      revenue: stats.revenue
+    })).sort((a, b) => b.revenue - a.revenue);
+
+    // Inventory aging
+    const agingRanges = [
+      { range: '0-30 dager', min: 0, max: 30 },
+      { range: '31-60 dager', min: 31, max: 60 },
+      { range: '61-90 dager', min: 61, max: 90 },
+      { range: '91+ dager', min: 91, max: Infinity }
+    ];
+
+    const inventoryAging = agingRanges.map(({ range, min, max }) => {
+      const count = availableCars.filter(c => {
+        const daysSince = Math.floor((now.getTime() - new Date(c.createdAt!).getTime()) / (1000 * 60 * 60 * 24));
+        return daysSince >= min && daysSince <= max;
+      }).length;
+
+      return { ageRange: range, count };
+    });
+
+    return {
+      revenue: {
+        thisMonth: thisMonthRevenue,
+        thisYear: thisYearRevenue,
+        lastMonth: lastMonthRevenue,
+        lastYear: lastYearRevenue
+      },
+      sales: {
+        thisMonth: thisMonthSales,
+        thisYear: thisYearSales,
+        averageSalePrice
+      },
+      profitMargin: {
+        gross: grossMargin,
+        net: grossMargin * 0.8
+      },
+      inventory: {
+        averageDaysOnLot,
+        totalValue: totalInventoryValue,
+        fastMoving,
+        slowMoving
+      },
+      monthlyTrends,
+      salesByMake,
+      inventoryAging
     };
   }
 }

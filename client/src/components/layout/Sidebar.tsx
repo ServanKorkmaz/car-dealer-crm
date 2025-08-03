@@ -17,10 +17,10 @@ import {
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: BarChart3 },
+  { name: "Pro Dashboard", href: "/dashboard-pro", icon: TrendingUp },
   { name: "Biler", href: "/cars", icon: Car },
   { name: "Kunder", href: "/customers", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
-  { name: "Rapporter", href: "/reports", icon: TrendingUp },
 ];
 
 export default function Sidebar() {

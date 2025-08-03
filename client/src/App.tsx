@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
+import ProfessionalDashboard from "@/pages/ProfessionalDashboard";
 import Cars from "@/pages/Cars";
 import Customers from "@/pages/Customers";
 import CustomerProfile from "@/pages/CustomerProfile";
@@ -30,6 +31,7 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Dashboard} />
+          <Route path="/dashboard-pro" component={ProfessionalDashboard} />
           <Route path="/cars" component={Cars} />
           <Route path="/customers" component={Customers} />
           <Route path="/customers/:id" component={CustomerProfile} />

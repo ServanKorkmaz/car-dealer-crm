@@ -32,6 +32,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Advanced dashboard analytics
+  app.get('/api/dashboard/analytics', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const timeRange = req.query.timeRange as string || '30';
+      const storage = await storagePromise;
+      const analytics = await storage.getAdvancedAnalytics(userId, timeRange);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching dashboard analytics:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard analytics" });
+    }
+  });
+
   // Car routes
   app.get('/api/cars', authMiddleware, async (req: any, res) => {
     try {
