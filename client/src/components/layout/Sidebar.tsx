@@ -34,11 +34,11 @@ export default function Sidebar() {
         {/* Logo */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200 dark:border-slate-700">
           <Link href="/">
-            <div className="flex items-center space-x-3 cursor-pointer hover:opacity-80 transition-opacity">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <div className="flex items-center space-x-3 cursor-pointer group px-2 py-1 rounded-lg transition-all duration-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:scale-105">
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center group-hover:shadow-lg transition-all duration-200 group-hover:bg-primary-600">
                 <Car className="text-white text-sm" />
               </div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white">ForhandlerPRO</h1>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors duration-200">ForhandlerPRO</h1>
             </div>
           </Link>
           {/* Theme Toggle */}
@@ -62,22 +62,29 @@ export default function Sidebar() {
             const isActive = location === item.href;
             return (
               <Link key={item.name} href={item.href}>
-                <a
+                <div
                   className={cn(
-                    "flex items-center px-3 py-2 text-sm font-medium rounded-lg group transition-colors",
+                    "flex items-center px-3 py-2 text-sm font-medium rounded-lg group transition-all duration-200 relative cursor-pointer",
                     isActive
-                      ? "text-primary bg-primary/10 dark:bg-primary/20"
-                      : "text-slate-700 dark:text-slate-300 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700"
+                      ? "text-primary bg-primary/10 dark:bg-primary/20 shadow-sm"
+                      : "text-slate-700 dark:text-slate-300 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700 hover:shadow-sm hover:translate-x-1"
                   )}
                 >
                   <item.icon className={cn(
-                    "mr-3 w-5 h-5",
+                    "mr-3 w-5 h-5 transition-all duration-200",
                     isActive 
                       ? "text-primary" 
-                      : "text-slate-400 group-hover:text-primary"
+                      : "text-slate-400 group-hover:text-primary group-hover:scale-110"
                   )} />
                   {item.name}
-                </a>
+                  {/* Subtle highlight bar */}
+                  {!isActive && (
+                    <div className="absolute left-0 top-0 bottom-0 w-0 bg-primary rounded-r-full transition-all duration-200 group-hover:w-1 opacity-0 group-hover:opacity-100" />
+                  )}
+                  {isActive && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full" />
+                  )}
+                </div>
               </Link>
             );
           })}
