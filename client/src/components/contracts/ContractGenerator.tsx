@@ -54,7 +54,7 @@ export default function ContractGenerator({ onClose, contract }: ContractGenerat
       contractNumber: contract?.contractNumber || `KONTRAKT-${Date.now()}`,
       carId: contract?.carId || "",
       customerId: contract?.customerId || "",
-      salePrice: contract?.salePrice || "0",
+      salePrice: contract?.salePrice?.toString() || "0",
       saleDate: contract ? new Date(contract.saleDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       status: contract?.status || "draft",
       notes: contract?.notes || undefined,
@@ -66,12 +66,12 @@ export default function ContractGenerator({ onClose, contract }: ContractGenerat
       const contractData = {
         ...data,
         saleDate: new Date(data.saleDate),
+        salePrice: parseFloat(data.salePrice),
       };
       
-      const url = isEditing ? `/api/contracts/${contract.id}` : "/api/contracts";
+      const url = isEditing ? `/api/contracts/${contract!.id}` : "/api/contracts";
       const method = isEditing ? "PUT" : "POST";
-      const response = await apiRequest(method, url, contractData);
-      return response.json();
+      return await apiRequest(method, url, contractData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
@@ -112,20 +112,20 @@ export default function ContractGenerator({ onClose, contract }: ContractGenerat
   const watchedSalePrice = form.watch("salePrice");
 
   // Update selected car when form changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (watchedCarId) {
-      const car = cars.find((c:Car) => c.id === watchedCarId);
+      const car = (cars as Car[]).find((c: Car) => c.id === watchedCarId);
       setSelectedCar(car || null);
       if (car && !form.getValues("salePrice")) {
-        form.setValue("salePrice", car.salePrice);
+        form.setValue("salePrice", car.salePrice || "0");
       }
     }
   }, [watchedCarId, cars, form]);
 
   // Update selected customer when form changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (watchedCustomerId) {
-      const customer = customers.find((c: Customer) => c.id === watchedCustomerId);
+      const customer = (customers as Customer[]).find((c: Customer) => c.id === watchedCustomerId);
       setSelectedCustomer(customer || null);
     }
   }, [watchedCustomerId, customers]);
@@ -470,6 +470,7 @@ export default function ContractGenerator({ onClose, contract }: ContractGenerat
                           className="resize-none"
                           rows={3}
                           {...field}
+                          value={field.value || ""}
                         />
                       </FormControl>
                       <FormMessage />

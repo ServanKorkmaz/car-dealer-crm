@@ -9,8 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import ContractGenerator from "@/components/contracts/ContractGenerator";
-import SigningModal from "@/components/contracts/SigningModal";
-import { Plus, Search, Edit, Trash2, FileText, Download, Send, ExternalLink, CheckCircle } from "lucide-react";
+import { Plus, Search, Edit, Trash2, FileText, Download, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Contract, Customer } from "@shared/schema";
 
@@ -18,7 +17,7 @@ export default function Contracts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showGenerator, setShowGenerator] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
-  const [signingContract, setSigningContract] = useState<Contract | null>(null);
+
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -130,20 +129,16 @@ export default function Contracts() {
     }
   };
 
-  const sendForSigningMutation = useMutation({
-    mutationFn: async ({ contractId, signerData }: { contractId: string, signerData: any }) => {
-      return await apiRequest("POST", "/api/send-contract-for-signing", {
-        contractId,
-        ...signerData
-      });
+  const generatePdfMutation = useMutation({
+    mutationFn: async (contractId: string) => {
+      return await apiRequest("POST", `/api/contracts/${contractId}/generate-pdf`);
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
       toast({
         title: "Suksess",
-        description: "Kontrakt sendt for signering",
+        description: "PDF-kontrakt generert og klar for nedlasting",
       });
-      console.log("Signing URL:", data.signingUrl);
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
@@ -159,7 +154,40 @@ export default function Contracts() {
       }
       toast({
         title: "Feil",
-        description: "Kunne ikke sende kontrakt for signering",
+        description: "Kunne ikke generere PDF-kontrakt",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const markCompletedMutation = useMutation({
+    mutationFn: async (contractId: string) => {
+      return await apiRequest("PUT", `/api/contracts/${contractId}`, {
+        status: "completed"
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
+      toast({
+        title: "Suksess",
+        description: "Kontrakt markert som fullført",
+      });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorisert",
+          description: "Du er ikke logget inn. Logger inn på nytt...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Feil",
+        description: "Kunne ikke oppdatere kontrakt",
         variant: "destructive",
       });
     },
@@ -249,29 +277,30 @@ export default function Contracts() {
                   </div>
 
                   <div className="space-y-2 pt-2">
-                    {/* Signing Status Display */}
-                    {contract.signingUrl && contract.signingStatus === 'pending' && (
-                      <div className="flex items-center justify-between p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                    {/* Contract Status Display */}
+                    {contract.status === 'signed' && (
+                      <div className="flex items-center justify-between p-2 bg-amber-50 dark:bg-amber-900/20 rounded">
                         <div className="flex items-center space-x-2">
-                          <ExternalLink className="w-4 h-4 text-blue-600" />
-                          <span className="text-xs text-blue-800 dark:text-blue-400">Sendt for signering</span>
+                          <CheckCircle className="w-4 h-4 text-amber-600" />
+                          <span className="text-xs text-amber-800 dark:text-amber-400">Signert - klar for fullføring</span>
                         </div>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => window.open(contract.signingUrl!, '_blank')}
-                          className="h-6 px-2 text-blue-600 hover:text-blue-700"
+                          onClick={() => markCompletedMutation.mutate(contract.id)}
+                          disabled={markCompletedMutation.isPending}
+                          className="h-6 px-2 text-amber-600 hover:text-amber-700"
                         >
-                          <ExternalLink className="w-3 h-3" />
+                          <CheckCircle className="w-3 h-3" />
                         </Button>
                       </div>
                     )}
                     
-                    {contract.signingStatus === 'signed' && (
+                    {contract.status === 'completed' && (
                       <div className="flex items-center space-x-2 p-2 bg-green-50 dark:bg-green-900/20 rounded">
                         <CheckCircle className="w-4 h-4 text-green-600" />
                         <span className="text-xs text-green-800 dark:text-green-400">
-                          Signert {contract.signedAt ? new Date(contract.signedAt).toLocaleDateString('no-NO') : ''}
+                          Fullført {contract.updatedAt ? new Date(contract.updatedAt).toLocaleDateString('no-NO') : ''}
                         </span>
                       </div>
                     )}
@@ -292,11 +321,12 @@ export default function Contracts() {
                         <Button
                           variant="outline" 
                           size="sm"
-                          onClick={() => setSigningContract(contract)}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                          data-testid={`button-sign-${contract.id}`}
+                          onClick={() => generatePdfMutation.mutate(contract.id)}
+                          disabled={generatePdfMutation.isPending}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20"
+                          data-testid={`button-generate-pdf-${contract.id}`}
                         >
-                          <Send className="w-4 h-4" />
+                          <FileText className="w-4 h-4" />
                         </Button>
                       )}
                       
@@ -340,18 +370,7 @@ export default function Contracts() {
         />
       )}
 
-      {signingContract && (
-        <SigningModal
-          contract={signingContract}
-          customer={customers.find((c: Customer) => c.id === signingContract.customerId) || {} as Customer}
-          onClose={() => setSigningContract(null)}
-          onSendForSigning={(contractId, signerData) => {
-            sendForSigningMutation.mutate({ contractId, signerData });
-            setSigningContract(null);
-          }}
-          isLoading={sendForSigningMutation.isPending}
-        />
-      )}
+
     </MainLayout>
   );
 }

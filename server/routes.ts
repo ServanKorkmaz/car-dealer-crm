@@ -469,118 +469,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // E-signing endpoints
-  app.post('/api/send-contract-for-signing', authMiddleware, async (req: any, res) => {
+  // PDF generation endpoint
+  app.post('/api/contracts/:id/generate-pdf', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { contractId, signerName, signerEmail, signerPhone, signingMethod = 'bankid' } = req.body;
-      
-      if (!contractId || !signerName || !signerEmail) {
-        return res.status(400).json({ message: "Contract ID, signer name, and email are required" });
-      }
-
+      const contractId = req.params.id;
       const storage = await storagePromise;
-      const contract = await storage.getContractById(contractId, userId);
       
+      const contract = await storage.getContractById(contractId, userId);
       if (!contract) {
         return res.status(404).json({ message: "Contract not found" });
       }
 
-      // Simulate Verified.no API integration
-      const mockVerifiedResponse = {
-        success: true,
-        documentId: `verified_${Date.now()}`,
-        signingUrl: `https://sign.verified.no/document/${Date.now()}?token=${Math.random().toString(36).substr(2, 9)}`,
-        status: 'pending'
-      };
-
-      // Update contract with signing information
+      // In a real implementation, you would:
+      // 1. Generate PDF using a library like PDFKit or Puppeteer
+      // 2. Upload to cloud storage (AWS S3, Google Cloud Storage, etc.)
+      // 3. Update contract with PDF URL
+      
+      // For now, simulate PDF generation
+      const mockPdfUrl = `https://storage.example.com/contracts/${contractId}/contract_${Date.now()}.pdf`;
+      
       const updatedContract = await storage.updateContract(contractId, {
-        signingProvider: 'verified.no',
-        signingDocumentId: mockVerifiedResponse.documentId,
-        signingUrl: mockVerifiedResponse.signingUrl,
-        signingStatus: 'pending',
-        signerName,
-        signerEmail,
-        signerPhone,
-        signingMethod,
-        status: 'pending_signature'
+        pdfUrl: mockPdfUrl,
+        status: 'signed' // Move to signed status after PDF generation
       }, userId);
 
-      // In a real implementation, you would:
-      // 1. Generate or fetch the contract PDF
-      // 2. Upload it to Verified.no via their API
-      // 3. Set up the signer with BankID authentication
-      // 4. Get back the actual signing URL
-
-      console.log(`📋 Contract ${contractId} sent for signing to ${signerEmail}`);
-      console.log(`🔗 Signing URL: ${mockVerifiedResponse.signingUrl}`);
+      console.log(`📄 PDF generated for contract ${contractId}: ${mockPdfUrl}`);
 
       res.json({
         success: true,
-        message: "Contract sent for signing",
-        signingUrl: mockVerifiedResponse.signingUrl,
-        documentId: mockVerifiedResponse.documentId,
+        message: "PDF contract generated successfully",
+        pdfUrl: mockPdfUrl,
         contract: updatedContract
       });
 
     } catch (error: any) {
-      console.error("Error sending contract for signing:", error);
-      res.status(500).json({ message: "Failed to send contract for signing" });
-    }
-  });
-
-  // Webhook endpoint for signing status updates
-  app.post('/api/contract-signing-callback', async (req, res) => {
-    try {
-      const { documentId, status, signedAt, signerInfo } = req.body;
-      
-      console.log('📥 Received signing webhook:', { documentId, status, signedAt });
-
-      // Find contract by signing document ID
-      const storage = await storagePromise;
-      // Note: We need to add a method to find by signingDocumentId
-      // For now, we'll simulate this
-      
-      const mockContractUpdate = {
-        signingStatus: status, // 'signed', 'rejected', 'expired'
-        signedAt: status === 'signed' ? new Date(signedAt) : null,
-        status: status === 'signed' ? 'signed' : 'draft',
-        webhookStatus: 'received'
-      };
-
-      console.log('✅ Contract signing status updated:', mockContractUpdate);
-
-      res.json({ success: true, message: "Webhook processed successfully" });
-
-    } catch (error: any) {
-      console.error("Error processing signing webhook:", error);
-      res.status(500).json({ message: "Webhook processing failed" });
-    }
-  });
-
-  // Get signing status for a contract
-  app.get('/api/contracts/:id/signing-status', authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const storage = await storagePromise;
-      const contract = await storage.getContractById(req.params.id, userId);
-      
-      if (!contract) {
-        return res.status(404).json({ message: "Contract not found" });
-      }
-
-      res.json({
-        signingStatus: contract.signingStatus || 'not_sent',
-        signingUrl: contract.signingUrl,
-        signedAt: contract.signedAt,
-        signerName: contract.signerName,
-        signerEmail: contract.signerEmail
-      });
-
-    } catch (error: any) {
-      console.error("Error fetching signing status:", error);
-      res.status(500).json({ message: "Failed to fetch signing status" });
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ message: "Failed to generate PDF contract" });
     }
   });
 
