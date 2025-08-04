@@ -72,7 +72,8 @@ export default function ProfessionalDashboard() {
       count: number;
     }>;
   }>({
-    queryKey: ['/api/dashboard/analytics', timeRange],
+    queryKey: [`/api/dashboard/analytics/${timeRange}`],
+    enabled: isAuthenticated,
     retry: false,
   });
 
@@ -203,7 +204,7 @@ export default function ProfessionalDashboard() {
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             <p className="mt-2 text-slate-600 dark:text-slate-400">Laster dashboard-data...</p>
           </div>
-        ) : analytics ? (
+        ) : analytics && analytics.revenue ? (
           <>
             {/* Key Metrics Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-slide-in-up">

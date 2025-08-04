@@ -33,12 +33,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Advanced dashboard analytics
-  app.get('/api/dashboard/analytics', authMiddleware, async (req: any, res) => {
+  app.get('/api/dashboard/analytics/:timeRange', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const timeRange = req.query.timeRange as string || '30';
+      const timeRange = req.params.timeRange || '30';
       const storage = await storagePromise;
       const analytics = await storage.getAdvancedAnalytics(userId, timeRange);
+      console.log('Analytics response for user:', userId, 'timeRange:', timeRange);
+      console.log('Analytics data keys:', Object.keys(analytics));
       res.json(analytics);
     } catch (error) {
       console.error("Error fetching dashboard analytics:", error);
