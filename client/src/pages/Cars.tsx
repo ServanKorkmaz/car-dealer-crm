@@ -119,21 +119,24 @@ export default function Cars() {
       const response = await apiRequest("POST", "/api/cars/import-from-finn", { url });
       return response;
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
       if (data.carData) {
-        // Force immediate refresh of car list
-        queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
-        queryClient.refetchQueries({ queryKey: ['/api/cars'] });
-        
-        // Update dashboard stats
-        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/30'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/7'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/365'] });
-        
-        // Close import dialog and show success message
+        // Close import dialog first
         setShowFinnImport(false);
         setFinnUrl("");
+        
+        // Force complete cache refresh with delay to ensure data is properly stored
+        setTimeout(async () => {
+          await queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+          await queryClient.refetchQueries({ queryKey: ['/api/cars'] });
+          
+          // Update dashboard stats
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/30'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/7'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/365'] });
+        }, 500);
+        
         toast({
           title: "Suksess", 
           description: `Bil importert: ${data.carData.make} ${data.carData.model}`,

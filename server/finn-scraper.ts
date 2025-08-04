@@ -180,10 +180,16 @@ function parseCarDataFromHTML(html: string): FinnCarData {
       }
     }
 
-    // Extract mileage - try multiple patterns
-    const mileageMatch = html.match(/(?:kilometer|km|kjørelengde|mil)[^>]*>?\s*([\d\s\.]+)/i) ||
-                         html.match(/data-testid="mileage"[^>]*>([^<]+)/i) ||
-                         html.match(/([\d\s\.]+)\s*(?:km|kilometer|mil)/i);
+    // Extract mileage - try multiple patterns and title
+    let mileageMatch = html.match(/(?:kilometer|km|kjørelengde|mil)[^>]*>?\s*([\d\s\.]+)/i) ||
+                       html.match(/data-testid="mileage"[^>]*>([^<]+)/i) ||
+                       html.match(/([\d\s\.]+)\s*(?:km|kilometer|mil)/i);
+    
+    // Also try to extract from title if available
+    if (!mileageMatch && carData.title) {
+      mileageMatch = carData.title.match(/([\d\s\.]+)\s*(?:km|mil)/i);
+    }
+    
     if (mileageMatch) {
       const mileageStr = mileageMatch[1].replace(/[^\d]/g, '');
       const mileage = parseInt(mileageStr);
@@ -192,29 +198,41 @@ function parseCarDataFromHTML(html: string): FinnCarData {
       }
     }
 
-    // Extract fuel type - try multiple patterns
-    const fuelMatch = html.match(/(?:drivstoff|fuel|bensin|diesel|hybrid|el)[^>]*>?\s*([^<>\n]+)/i) ||
-                      html.match(/(?:petrol|gasoline|electric|hybrid)/i);
+    // Extract fuel type - try multiple patterns including specific text searches
+    let fuelMatch = html.match(/(?:drivstoff|fuel)[^>]*>?\s*([^<>\n]+)/i) ||
+                    html.match(/(?:bensin|diesel|hybrid|elektrisk|el-bil)/i) ||
+                    html.match(/(?:petrol|gasoline|electric)/i);
+    
+    // Also check title for fuel type indicators
+    if (!fuelMatch && carData.title) {
+      fuelMatch = carData.title.match(/(?:bensin|diesel|hybrid|elektrisk|el-bil)/i);
+    }
+    
     if (fuelMatch) {
       let fuelType = fuelMatch[1] || fuelMatch[0];
       // Normalize common fuel types
       fuelType = fuelType.replace(/bensin/i, 'Bensin')
-                        .replace(/diesel/i, 'Diesel')
+                        .replace(/diesel/i, 'Diesel') 
                         .replace(/hybrid/i, 'Hybrid')
-                        .replace(/electric|elektrisk/i, 'Elektrisk');
+                        .replace(/elektrisk|el-bil|electric/i, 'Elektrisk')
+                        .replace(/petrol|gasoline/i, 'Bensin');
       carData.fuelType = fuelType.trim();
     }
 
-    // Extract transmission - try multiple patterns
-    const transmissionMatch = html.match(/(?:girkasse|transmission|automat|manuell)[^>]*>?\s*([^<>\n]+)/i) ||
-                             html.match(/(?:automatic|manual)/i);
+    // Extract transmission - try multiple patterns including title
+    let transmissionMatch = html.match(/(?:girkasse|transmission)[^>]*>?\s*([^<>\n]+)/i) ||
+                           html.match(/(?:automat|manuell|automatic|manual)/i);
+    
+    // Also check title for transmission indicators
+    if (!transmissionMatch && carData.title) {
+      transmissionMatch = carData.title.match(/(?:automat|manuell|automatic|manual)/i);
+    }
+    
     if (transmissionMatch) {
       let transmission = transmissionMatch[1] || transmissionMatch[0];
       // Normalize transmission types
-      transmission = transmission.replace(/automat/i, 'Automat')
-                                .replace(/manuell/i, 'Manuell')
-                                .replace(/automatic/i, 'Automat')
-                                .replace(/manual/i, 'Manuell');
+      transmission = transmission.replace(/automat|automatic/i, 'Automat')
+                                .replace(/manuell|manual/i, 'Manuell');
       carData.transmission = transmission.trim();
     }
 
@@ -224,10 +242,19 @@ function parseCarDataFromHTML(html: string): FinnCarData {
       carData.color = colorMatch[1].trim();
     }
 
-    // Extract power
-    const powerMatch = html.match(/(?:effekt|power)[^>]*>?\s*(\d+)\s*(?:hk|hp)/i);
+    // Extract power - try multiple patterns including title
+    let powerMatch = html.match(/(?:effekt|power)[^>]*>?\s*(\d+)\s*(?:hk|hp|kw)/i) ||
+                     html.match(/(\d+)\s*(?:hk|hp|kw)/i);
+    
+    // Also check title for power indicators
+    if (!powerMatch && carData.title) {
+      powerMatch = carData.title.match(/(\d+)\s*(?:hk|hp|kw)/i);
+    }
+    
     if (powerMatch) {
-      carData.power = powerMatch[1];
+      let powerValue = powerMatch[1];
+      const powerUnit = powerMatch[0].toLowerCase().includes('kw') ? ' kW' : ' hk';
+      carData.power = powerValue + powerUnit;
     }
 
     // Extract registration number - try multiple patterns
