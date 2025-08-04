@@ -20,7 +20,10 @@ async function lookupVehicleData(regNumber: string) {
 
     if (!response.ok) return null;
     
-    const data = await response.json();
+    const responseText = await response.text();
+    if (!responseText.trim()) return null;
+    
+    const data = JSON.parse(responseText);
     const vehicleInfo = data.kjoretoydataListe?.[0];
     if (!vehicleInfo) return null;
 
@@ -91,23 +94,39 @@ export async function scrapeFinnAd(url: string): Promise<Partial<InsertCar> | nu
     
     // If we couldn't extract make/model or other key data from Finn.no,
     // try to get it from registration number via SVV API
-    if (!carData.make || !carData.model || !carData.year || !carData.fuelType) {
+    if ((!carData.make || !carData.model || !carData.year || !carData.fuelType || !carData.mileage) && carData.registrationNumber) {
       console.log('Missing key data from Finn.no, attempting SVV lookup...');
-      if (carData.registrationNumber) {
-        try {
-          const svvData = await lookupVehicleData(carData.registrationNumber);
-          if (svvData) {
-            carData.make = carData.make || svvData.make;
-            carData.model = carData.model || svvData.model;
-            carData.year = carData.year || svvData.year;
-            carData.fuelType = carData.fuelType || svvData.fuelType;
-            carData.transmission = carData.transmission || svvData.transmission;
-            carData.color = carData.color || svvData.color;
-            carData.power = carData.power || svvData.power;
-          }
-        } catch (error) {
-          console.error('SVV lookup failed:', error);
+      try {
+        const svvData = await lookupVehicleData(carData.registrationNumber);
+        if (svvData) {
+          carData.make = carData.make || svvData.make;
+          carData.model = carData.model || svvData.model;
+          carData.year = carData.year || svvData.year;
+          carData.fuelType = carData.fuelType || svvData.fuelType;
+          carData.transmission = carData.transmission || svvData.transmission;
+          carData.color = carData.color || svvData.color;
+          carData.power = carData.power || svvData.power;
+          console.log('SVV data successfully retrieved and merged');
         }
+      } catch (error) {
+        console.error('SVV lookup failed:', error);
+      }
+    }
+
+    // Set more reasonable defaults if extraction failed
+    if (!carData.year) {
+      // Try to extract year from title one more time
+      const titleYearMatch = carData.title?.match(/20\d{2}/);
+      carData.year = titleYearMatch ? parseInt(titleYearMatch[0]) : new Date().getFullYear() - 5;
+    }
+    
+    if (!carData.mileage) {
+      // Try to extract mileage from title one more time with broader patterns
+      const titleMileageMatch = carData.title?.match(/(\d{1,3})[.\s]?(\d{3})\s*km/i);
+      if (titleMileageMatch) {
+        carData.mileage = parseInt(titleMileageMatch[1] + titleMileageMatch[2]);
+      } else {
+        carData.mileage = 0;
       }
     }
 

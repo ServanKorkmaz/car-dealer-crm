@@ -84,11 +84,12 @@ export default function Cars() {
       await apiRequest("PUT", `/api/cars/${carId}/sell`, { soldPrice });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/30"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/7"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/365"] });
+      // Force immediate refresh of all relevant data
+      queryClient.refetchQueries({ queryKey: ["/api/cars"] });
+      queryClient.refetchQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.refetchQueries({ queryKey: ["/api/dashboard/analytics/30"] });
+      queryClient.refetchQueries({ queryKey: ["/api/dashboard/analytics/7"] });
+      queryClient.refetchQueries({ queryKey: ["/api/dashboard/analytics/365"] });
       toast({
         title: "Suksess",
         description: "Bil markert som solgt",
@@ -127,15 +128,15 @@ export default function Cars() {
         
         // Force complete cache refresh with delay to ensure data is properly stored
         setTimeout(async () => {
-          await queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+          // Force refetch cars list
           await queryClient.refetchQueries({ queryKey: ['/api/cars'] });
           
-          // Update dashboard stats
-          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/30'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/7'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/365'] });
-        }, 500);
+          // Force refetch dashboard data
+          await queryClient.refetchQueries({ queryKey: ['/api/dashboard/stats'] });
+          await queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics/30'] });
+          await queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics/7'] });
+          await queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics/365'] });
+        }, 1000);
         
         toast({
           title: "Suksess", 
