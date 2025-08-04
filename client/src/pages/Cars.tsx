@@ -429,17 +429,10 @@ export default function Cars() {
         setShowFinnImport(false);
         setFinnUrl("");
         
-        // Force complete cache refresh with delay to ensure data is properly stored
-        setTimeout(async () => {
-          // Force refetch cars list
-          await queryClient.refetchQueries({ queryKey: ['/api/cars'] });
-          
-          // Force refetch dashboard data
-          await queryClient.refetchQueries({ queryKey: ['/api/dashboard/stats'] });
-          await queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics/30'] });
-          await queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics/7'] });
-          await queryClient.refetchQueries({ queryKey: ['/api/dashboard/analytics/365'] });
-        }, 1000);
+        // Immediate cache invalidation for faster refresh
+        queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/30'] });
         
         toast({
           title: "Suksess", 
