@@ -92,12 +92,12 @@ export async function scrapeFinnAd(url: string): Promise<Partial<InsertCar> | nu
     // Parse the HTML to extract car data
     const carData = parseCarDataFromHTML(html);
     
-    // Always attempt SVV lookup if we have a registration number, even if we have some data
-    // This provides more accurate and complete vehicle information
+    // Always attempt SVV lookup if we have a registration number
+    let svvData = null;
     if (carData.registrationNumber) {
       console.log(`Attempting SVV lookup for registration: ${carData.registrationNumber}`);
       try {
-        const svvData = await lookupVehicleData(carData.registrationNumber);
+        svvData = await lookupVehicleData(carData.registrationNumber);
         if (svvData) {
           // Use SVV data as primary source, fallback to Finn.no data if SVV is missing info
           carData.make = svvData.make || carData.make;
@@ -331,28 +331,36 @@ function parseCarDataFromHTML(html: string): FinnCarData {
     // Simplified comprehensive image extraction
     const allImages: string[] = [];
     
-    // Extract ALL finncdn.no images from the HTML - comprehensive approach
-    const imageRegex = /https:\/\/images\.finncdn\.no\/[^"\s<>]+\.(?:jpg|jpeg|png|webp)/g;
-    const matches = html.match(imageRegex) || [];
+    // Extract ALL finncdn.no images from HTML using multiple strategies
+    const patterns = [
+      // Direct image URLs in any context
+      /https:\/\/images\.finncdn\.no\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/g,
+      // Images in src attributes
+      /src="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/g,
+      // Images in data attributes (lazy loading)
+      /data-[^=]*src="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/g,
+      // Images in JSON data
+      /"(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/g
+    ];
     
-    console.log(`Found ${matches.length} finncdn images in total`);
+    console.log('Scanning HTML for images with multiple patterns...');
     
-    // Add all found images
-    matches.forEach(url => {
-      if (!allImages.includes(url)) {
-        allImages.push(url);
-      }
-    });
-    
-    // Also look for images in src and data attributes specifically
-    const srcRegex = /(?:src|data-src|data-lazy)="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp)[^"]*)"/g;
-    let srcMatch;
-    while ((srcMatch = srcRegex.exec(html)) !== null) {
-      const imageUrl = srcMatch[1];
-      if (!allImages.includes(imageUrl)) {
-        allImages.push(imageUrl);
-      }
+    for (const pattern of patterns) {
+      const matches = html.match(pattern) || [];
+      console.log(`Pattern found ${matches.length} matches`);
+      
+      matches.forEach(match => {
+        // Extract URL from match (may have quotes)
+        const url = match.includes('src="') ? match.split('"')[1] : 
+                   match.includes('://') ? match : match.replace(/"/g, '');
+        
+        if (url && url.startsWith('https://images.finncdn.no/') && !allImages.includes(url)) {
+          allImages.push(url);
+        }
+      });
     }
+    
+    console.log(`Total unique images extracted: ${allImages.length}`);
     
     // Strategy 2: Look for structured data with images
     const structuredDataMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/s);
