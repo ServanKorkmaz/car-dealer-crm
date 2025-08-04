@@ -560,11 +560,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import the car into the database
       const userId = req.user.claims.sub;
       const storage = await storagePromise;
+      
+      // Check if car with same registration number already exists
+      if (carData.registrationNumber) {
+        const existingCars = await storage.getCars(userId);
+        const existingCar = existingCars.find(car => 
+          car.registrationNumber === carData.registrationNumber
+        );
+        
+        if (existingCar) {
+          return res.status(409).json({
+            success: false,
+            message: `Bil med registreringsnummer ${carData.registrationNumber} eksisterer allerede i systemet`,
+            existingCarId: existingCar.id
+          });
+        }
+      }
+      
       const importedCar = await storage.createCar(carData, userId);
 
       res.json({
         success: true,
-        message: "Car imported successfully from Finn.no",
+        message: "Bil importert fra Finn.no",
         carData: importedCar
       });
 

@@ -136,9 +136,21 @@ export default function Cars() {
         }, 500);
         return;
       }
+      let errorMessage = "Kunne ikke hente bildata fra Finn.no";
+      
+      if (error.message) {
+        if (error.message.includes("eksisterer allerede")) {
+          errorMessage = error.message;
+        } else if (error.message.includes("duplicate key")) {
+          errorMessage = "Denne bilen er allerede registrert i systemet";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
-        title: "Feil",
-        description: error.message || "Kunne ikke hente bildata fra Finn.no",
+        title: "Import feilet",
+        description: errorMessage,
         variant: "destructive",
       });
     },
