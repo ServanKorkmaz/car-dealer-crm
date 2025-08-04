@@ -50,6 +50,10 @@ export default function Cars() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/30"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/7"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/365"] });
       toast({
         title: "Suksess",
         description: "Bil ble slettet",
@@ -82,6 +86,9 @@ export default function Cars() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/30"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/7"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/365"] });
       toast({
         title: "Suksess",
         description: "Bil markert som solgt",
@@ -114,9 +121,12 @@ export default function Cars() {
     },
     onSuccess: (data: any) => {
       if (data.carData) {
-        // Invalidate queries to refresh the list and dashboard stats
+        // Invalidate all relevant queries to refresh data everywhere
         queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
         queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/30'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/7'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/365'] });
         
         // Close import dialog and show success message
         setShowFinnImport(false);
@@ -308,7 +318,7 @@ export default function Cars() {
         ) : (
           <div className="space-y-4 animate-fade-in">
             {filteredCars.map((car: Car, index) => {
-              const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate || undefined);
+              const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate ? new Date(car.soldDate).toISOString() : undefined);
               const isSold = car.status === "sold";
               
               return (

@@ -163,10 +163,6 @@ export const insertCarSchema = createInsertSchema(cars).omit({
   updatedAt: true,
   userId: true,
   profitMargin: true,
-  co2Emissions: true,
-  lastEuControl: true,
-  nextEuControl: true,
-  vehicleClass: true,
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({
