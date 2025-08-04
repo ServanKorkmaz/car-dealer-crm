@@ -13,13 +13,15 @@ export default function SeedDataButton() {
     mutationFn: async () => {
       return await apiRequest("POST", "/api/seed-dummy-data");
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       // Invalidate all queries to refresh data
       queryClient.invalidateQueries();
       
       toast({
         title: "Testdata opprettet!",
-        description: `Opprettet ${data.data.customers} kunder, ${data.data.cars} biler og ${data.data.contracts} kontrakter`,
+        description: data?.data ? 
+          `Opprettet ${data.data.customers || 0} kunder, ${data.data.cars || 0} biler og ${data.data.contracts || 0} kontrakter` :
+          "Testdata opprettet successfullt!",
       });
     },
     onError: (error: any) => {

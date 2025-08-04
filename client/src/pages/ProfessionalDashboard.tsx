@@ -322,7 +322,7 @@ export default function ProfessionalDashboard() {
                 <CardContent>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={analytics.monthlyTrends}>
+                      <LineChart data={analytics.monthlyTrends || []}>
                         <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                         <XAxis dataKey="month" />
                         <YAxis tickFormatter={(value) => formatCurrency(value)} />
@@ -361,7 +361,7 @@ export default function ProfessionalDashboard() {
                 <CardContent>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analytics.monthlyTrends}>
+                      <BarChart data={analytics.monthlyTrends || []}>
                         <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                         <XAxis dataKey="month" />
                         <YAxis />
@@ -386,7 +386,7 @@ export default function ProfessionalDashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={analytics.salesByMake}
+                          data={analytics.salesByMake || []}
                           cx="50%"
                           cy="50%"
                           labelLine={false}
@@ -395,7 +395,7 @@ export default function ProfessionalDashboard() {
                           fill="#8884d8"
                           dataKey="count"
                         >
-                          {analytics.salesByMake.map((entry: any, index: number) => (
+                          {(analytics.salesByMake || []).map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
@@ -414,7 +414,7 @@ export default function ProfessionalDashboard() {
                 <CardContent>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analytics.inventoryAging} layout="horizontal">
+                      <BarChart data={analytics.inventoryAging || []} layout="horizontal">
                         <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                         <XAxis type="number" />
                         <YAxis dataKey="ageRange" type="category" width={100} />
@@ -447,8 +447,8 @@ export default function ProfessionalDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {analytics.salesByMake.map((make: any, index: number) => {
-                        const totalSales = analytics.salesByMake.reduce((sum: number, m: any) => sum + m.count, 0);
+                      {(analytics.salesByMake || []).map((make: any, index: number) => {
+                        const totalSales = (analytics.salesByMake || []).reduce((sum: number, m: any) => sum + m.count, 0);
                         const marketShare = totalSales > 0 ? (make.count / totalSales) * 100 : 0;
                         const avgPrice = make.count > 0 ? make.revenue / make.count : 0;
                         
