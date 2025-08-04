@@ -8,11 +8,297 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import AddCarModal from "@/components/cars/AddCarModal";
 import EditCarModal from "@/components/cars/EditCarModal";
-import { Plus, Search, Edit, Trash2, CheckCircle, Clock, ExternalLink } from "lucide-react";
+import { 
+  Plus, Search, Edit, Trash2, CheckCircle, Clock, ExternalLink, 
+  Filter, SortAsc, Car as CarIcon, Calendar, Gauge, MapPin,
+  Eye, DollarSign, Settings
+} from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
+
+// Grid Card Component for modern card layout
+function GridCarCard({ 
+  car, 
+  onEdit, 
+  onSell, 
+  onDelete, 
+  isDeleting, 
+  isSelling, 
+  calculateDaysOnStock, 
+  formatPrice, 
+  getStatusColor, 
+  getStatusText 
+}: {
+  car: Car;
+  onEdit: () => void;
+  onSell: () => void;
+  onDelete: () => void;
+  isDeleting: boolean;
+  isSelling: boolean;
+  calculateDaysOnStock: (createdAt: string, soldDate?: string | null) => number;
+  formatPrice: (price: string) => string;
+  getStatusColor: (status: string) => string;
+  getStatusText: (status: string) => string;
+}) {
+  const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate);
+  const hasImage = car.images && car.images.length > 0;
+
+  return (
+    <Card className="group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white dark:bg-slate-800 border-0 shadow-lg overflow-hidden" data-testid={`card-car-${car.id}`}>
+      {/* Car Image */}
+      <div className="relative h-48 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 overflow-hidden">
+        {hasImage ? (
+          <img 
+            src={car.images[0]} 
+            alt={`${car.make} ${car.model}`}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+            }}
+          />
+        ) : null}
+        <div className={`${hasImage ? 'hidden' : 'flex'} absolute inset-0 items-center justify-center`}>
+          <div className="text-center">
+            <CarIcon className="w-16 h-16 text-slate-400 mx-auto mb-2" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">Ingen bilde</p>
+          </div>
+        </div>
+        
+        {/* Status Badge */}
+        <div className="absolute top-3 right-3">
+          <Badge className={`${getStatusColor(car.status)} shadow-lg`}>
+            {getStatusText(car.status)}
+          </Badge>
+        </div>
+
+        {/* Days on stock */}
+        <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded-md text-xs flex items-center">
+          <Clock className="w-3 h-3 mr-1" />
+          {daysOnStock} dager
+        </div>
+      </div>
+
+      <CardContent className="p-4">
+        {/* Title and Year */}
+        <div className="mb-3">
+          <h3 className="font-bold text-lg text-slate-900 dark:text-white truncate">
+            {car.make} {car.model}
+          </h3>
+          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            <Calendar className="w-3 h-3" />
+            <span>{car.year}</span>
+            <span>•</span>
+            <MapPin className="w-3 h-3" />
+            <span>{car.registrationNumber}</span>
+          </div>
+        </div>
+
+        {/* Key Info */}
+        <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
+          <div className="flex items-center gap-1">
+            <Gauge className="w-3 h-3 text-slate-400" />
+            <span className="text-slate-600 dark:text-slate-400">
+              {car.mileage?.toLocaleString('no-NO') || '0'} km
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Settings className="w-3 h-3 text-slate-400" />
+            <span className="text-slate-600 dark:text-slate-400">
+              {car.transmission || 'Auto'}
+            </span>
+          </div>
+        </div>
+
+        {/* Price */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between">
+            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+              {formatPrice(car.status === 'sold' && car.soldPrice ? car.soldPrice : car.salePrice || "0")}
+            </span>
+            <div className="text-right text-xs text-slate-500">
+              {car.status === 'sold' ? 'Solgt for' : 'Salgspris'}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onEdit}
+            className="flex-1"
+            data-testid={`button-edit-${car.id}`}
+          >
+            <Edit className="w-3 h-3 mr-1" />
+            Rediger
+          </Button>
+          
+          {car.status === 'available' && (
+            <Button
+              size="sm"
+              onClick={onSell}
+              disabled={isSelling}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              data-testid={`button-sell-${car.id}`}
+            >
+              <CheckCircle className="w-3 h-3 mr-1" />
+              Selg
+            </Button>
+          )}
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDelete}
+            disabled={isDeleting}
+            className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+            data-testid={`button-delete-${car.id}`}
+          >
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// List Card Component for compact list view
+function ListCarCard({ 
+  car, 
+  onEdit, 
+  onSell, 
+  onDelete, 
+  isDeleting, 
+  isSelling, 
+  calculateDaysOnStock, 
+  formatPrice, 
+  getStatusColor, 
+  getStatusText 
+}: {
+  car: Car;
+  onEdit: () => void;
+  onSell: () => void;
+  onDelete: () => void;
+  isDeleting: boolean;
+  isSelling: boolean;
+  calculateDaysOnStock: (createdAt: string, soldDate?: string | null) => number;
+  formatPrice: (price: string) => string;
+  getStatusColor: (status: string) => string;
+  getStatusText: (status: string) => string;
+}) {
+  const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate);
+  const hasImage = car.images && car.images.length > 0;
+
+  return (
+    <Card className="hover:shadow-lg transition-all duration-200 bg-white dark:bg-slate-800 border-0 shadow-md" data-testid={`card-car-${car.id}`}>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-4">
+          {/* Thumbnail */}
+          <div className="w-20 h-16 flex-shrink-0 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-lg overflow-hidden">
+            {hasImage ? (
+              <img 
+                src={car.images[0]} 
+                alt={`${car.make} ${car.model}`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                }}
+              />
+            ) : null}
+            <div className={`${hasImage ? 'hidden' : 'flex'} w-full h-full items-center justify-center`}>
+              <CarIcon className="w-6 h-6 text-slate-400" />
+            </div>
+          </div>
+
+          {/* Car Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <h3 className="font-semibold text-lg text-slate-900 dark:text-white truncate">
+                  {car.make} {car.model}
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  {car.year} • {car.registrationNumber} • {car.mileage?.toLocaleString('no-NO')} km
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Badge className={getStatusColor(car.status)}>
+                  {getStatusText(car.status)}
+                </Badge>
+                <div className="text-right">
+                  <div className="text-xl font-bold text-slate-900 dark:text-white">
+                    {formatPrice(car.status === 'sold' && car.soldPrice ? car.soldPrice : car.salePrice || "0")}
+                  </div>
+                  <div className="text-xs text-slate-500 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {daysOnStock} dager
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Details */}
+            <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400 mb-3">
+              <span>{car.fuelType || 'Ukjent drivstoff'}</span>
+              <span>•</span>
+              <span>{car.transmission || 'Ukjent girkasse'}</span>
+              {car.color && (
+                <>
+                  <span>•</span>
+                  <span>{car.color}</span>
+                </>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onEdit}
+                data-testid={`button-edit-${car.id}`}
+              >
+                <Edit className="w-3 h-3 mr-1" />
+                Rediger
+              </Button>
+              
+              {car.status === 'available' && (
+                <Button
+                  size="sm"
+                  onClick={onSell}
+                  disabled={isSelling}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  data-testid={`button-sell-${car.id}`}
+                >
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Marker som solgt
+                </Button>
+              )}
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onDelete}
+                disabled={isDeleting}
+                className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                data-testid={`button-delete-${car.id}`}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Cars() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,6 +306,10 @@ export default function Cars() {
   const [editingCar, setEditingCar] = useState<Car | null>(null);
   const [showFinnImport, setShowFinnImport] = useState(false);
   const [finnUrl, setFinnUrl] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterMake, setFilterMake] = useState("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -202,11 +492,49 @@ export default function Cars() {
     return <div className="min-h-screen bg-slate-50 dark:bg-slate-900" />;
   }
 
-  const filteredCars = cars.filter((car: Car) =>
-    car.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    car.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    car.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Get unique makes for filter dropdown
+  const uniqueMakes = Array.from(new Set(cars.map(car => car.make))).sort();
+
+  // Filter and sort cars
+  let filteredCars = cars.filter((car: Car) => {
+    const matchesSearch = 
+      car.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      car.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      car.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      car.chassisNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      `${car.make} ${car.model}`.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = filterStatus === "all" || car.status === filterStatus;
+    const matchesMake = filterMake === "all" || car.make === filterMake;
+    
+    return matchesSearch && matchesStatus && matchesMake;
+  });
+
+  // Sort cars
+  filteredCars = [...filteredCars].sort((a, b) => {
+    switch (sortBy) {
+      case "newest":
+        return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+      case "oldest":
+        return new Date(a.createdAt || '').getTime() - new Date(b.createdAt || '').getTime();
+      case "price-high":
+        return parseFloat(b.salePrice || '0') - parseFloat(a.salePrice || '0');
+      case "price-low":
+        return parseFloat(a.salePrice || '0') - parseFloat(b.salePrice || '0');
+      case "mileage-low":
+        return (a.mileage || 0) - (b.mileage || 0);
+      case "mileage-high":
+        return (b.mileage || 0) - (a.mileage || 0);
+      case "year-new":
+        return (b.year || 0) - (a.year || 0);
+      case "year-old":
+        return (a.year || 0) - (b.year || 0);
+      case "make":
+        return a.make.localeCompare(b.make);
+      default:
+        return 0;
+    }
+  });
 
   // Calculate days on stock
   const calculateDaysOnStock = (createdAt: string, soldDate?: string | null) => {
@@ -269,7 +597,8 @@ export default function Cars() {
           <div className="flex gap-2">
             <Button
               onClick={() => setShowAddModal(true)}
-              className="bg-primary hover:bg-primary-600"
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              data-testid="button-add-car"
             >
               <Plus className="w-4 h-4 mr-2" />
               Legg til bil
@@ -277,7 +606,8 @@ export default function Cars() {
             <Button 
               variant="outline" 
               onClick={() => setShowFinnImport(true)}
-              className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 dark:bg-orange-950 dark:border-orange-800 dark:text-orange-300"
+              className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 dark:bg-orange-950 dark:border-orange-800 dark:text-orange-300 shadow-md hover:shadow-lg transition-all duration-200"
+              data-testid="button-import-finn"
             >
               <ExternalLink className="w-4 h-4 mr-2" />
               Importer fra Finn.no
@@ -285,15 +615,97 @@ export default function Cars() {
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <Input
-              placeholder="Søk etter biler..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+        {/* Search and Filters */}
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex flex-col sm:flex-row gap-3 flex-1">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+              <Input
+                placeholder="Søk etter reg.nr, merke, modell, chassisnummer..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-cars"
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[140px]" data-testid="select-filter-status">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle statuser</SelectItem>
+                  <SelectItem value="available">Tilgjengelig</SelectItem>
+                  <SelectItem value="sold">Solgt</SelectItem>
+                  <SelectItem value="reserved">Reservert</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={filterMake} onValueChange={setFilterMake}>
+                <SelectTrigger className="w-[130px]" data-testid="select-filter-make">
+                  <SelectValue placeholder="Merke" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Alle merker</SelectItem>
+                  {uniqueMakes.map(make => (
+                    <SelectItem key={make} value={make}>{make}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[140px]" data-testid="select-sort">
+                  <SelectValue placeholder="Sorter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Nyeste først</SelectItem>
+                  <SelectItem value="oldest">Eldste først</SelectItem>
+                  <SelectItem value="price-high">Høyeste pris</SelectItem>
+                  <SelectItem value="price-low">Laveste pris</SelectItem>
+                  <SelectItem value="mileage-low">Lavest km</SelectItem>
+                  <SelectItem value="mileage-high">Høyest km</SelectItem>
+                  <SelectItem value="year-new">Nyeste årsmodell</SelectItem>
+                  <SelectItem value="year-old">Eldste årsmodell</SelectItem>
+                  <SelectItem value="make">Merke A-Å</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-600 dark:text-slate-400">
+              {filteredCars.length} av {cars.length} biler
+            </span>
+            <div className="flex border rounded-md">
+              <Button
+                variant={viewMode === "grid" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("grid")}
+                className="rounded-r-none"
+                data-testid="button-view-grid"
+              >
+                <div className="grid grid-cols-2 gap-0.5 w-3 h-3">
+                  <div className="bg-current w-1 h-1 rounded-[1px]"></div>
+                  <div className="bg-current w-1 h-1 rounded-[1px]"></div>
+                  <div className="bg-current w-1 h-1 rounded-[1px]"></div>
+                  <div className="bg-current w-1 h-1 rounded-[1px]"></div>
+                </div>
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+                className="rounded-l-none"
+                data-testid="button-view-list"
+              >
+                <div className="flex flex-col gap-0.5 w-3 h-3">
+                  <div className="bg-current w-3 h-0.5 rounded-[1px]"></div>
+                  <div className="bg-current w-3 h-0.5 rounded-[1px]"></div>
+                  <div className="bg-current w-3 h-0.5 rounded-[1px]"></div>
+                </div>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -323,113 +735,41 @@ export default function Cars() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4 animate-fade-in">
-            {filteredCars.map((car: Car, index) => {
-              const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate ? new Date(car.soldDate).toISOString() : undefined);
-              const isSold = car.status === "sold";
-              
-              return (
-                <Card 
+          <div className={viewMode === "grid" 
+            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" 
+            : "space-y-4"
+          }>
+            {filteredCars.map((car: Car) => (
+              viewMode === "grid" ? (
+                <GridCarCard 
                   key={car.id} 
-                  className={`card-hover border-0 shadow-md hover:shadow-xl animate-slide-in-left ${
-                    isSold ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' : 
-                    'bg-slate-800 dark:bg-slate-900 border-slate-700'
-                  }`}
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                  data-testid={`card-car-${car.id}`}
-                >
-                  <CardHeader className="pb-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-xl text-white font-bold">
-                          {car.make} {car.model}
-                        </CardTitle>
-                        <p className="text-slate-400 mt-1">
-                          {car.registrationNumber} • {car.year}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end space-y-2">
-                        <Badge 
-                          variant={isSold ? "default" : "secondary"}
-                          className={
-                            isSold ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'
-                          }
-                        >
-                          {isSold ? "Solgt" : "Tilgjengelig"}
-                        </Badge>
-                        <div className="flex items-center text-sm text-slate-400">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {daysOnStock} dag{daysOnStock !== 1 ? 'er' : ''} {isSold ? 'på lager' : 'ute'}
-                        </div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4 text-sm">
-                      <div>
-                        <span className="text-slate-400">Kilometerstand:</span>
-                        <p className="font-medium text-white">{car.mileage?.toLocaleString('no-NO') || 'Ukjent'} km</p>
-                      </div>
-                      <div>
-                        <span className="text-slate-400">
-                          {isSold ? 'Solgt for:' : 'Salgspris:'}
-                        </span>
-                        <p className="font-medium text-white">
-                          {isSold && car.soldPrice ? 
-                            formatPrice(car.soldPrice) :
-                            formatPrice(car.salePrice || "")}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-slate-400">Fortjeneste:</span>
-                        <p className="font-medium text-green-400">
-                          {car.profitMargin || 0}%
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {isSold && car.soldDate && (
-                      <div className="text-sm text-green-600 dark:text-green-400 flex items-center bg-green-100 dark:bg-green-900/20 p-3 rounded-lg">
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Solgt {new Date(car.soldDate).toLocaleDateString('no-NO')}
-                      </div>
-                    )}
-
-                    <div className="flex items-center space-x-3 pt-2">
-                      {!isSold && (
-                        <Button
-                          onClick={() => handleSellCar(car)}
-                          disabled={sellMutation.isPending}
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                          data-testid={`button-sell-${car.id}`}
-                        >
-                          <CheckCircle className="w-4 h-4 mr-2" />
-                          Marker som solgt
-                        </Button>
-                      )}
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setEditingCar(car)}
-                        className={`${!isSold ? '' : 'flex-1'} border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white`}
-                        data-testid={`button-edit-${car.id}`}
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Rediger  
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => deleteMutation.mutate(car.id)}
-                        disabled={deleteMutation.isPending}
-                        className="border-red-600 text-red-400 hover:bg-red-900/20"
-                        data-testid={`button-delete-${car.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  car={car} 
+                  onEdit={() => setEditingCar(car)}
+                  onSell={() => handleSellCar(car)}
+                  onDelete={() => deleteMutation.mutate(car.id)}
+                  isDeleting={deleteMutation.isPending}
+                  isSelling={sellMutation.isPending}
+                  calculateDaysOnStock={calculateDaysOnStock}
+                  formatPrice={formatPrice}
+                  getStatusColor={getStatusColor}
+                  getStatusText={getStatusText}
+                />
+              ) : (
+                <ListCarCard 
+                  key={car.id} 
+                  car={car} 
+                  onEdit={() => setEditingCar(car)}
+                  onSell={() => handleSellCar(car)}
+                  onDelete={() => deleteMutation.mutate(car.id)}
+                  isDeleting={deleteMutation.isPending}
+                  isSelling={sellMutation.isPending}
+                  calculateDaysOnStock={calculateDaysOnStock}
+                  formatPrice={formatPrice}
+                  getStatusColor={getStatusColor}
+                  getStatusText={getStatusText}
+                />
+              )
+            ))}
           </div>
         )}
       </div>
