@@ -157,7 +157,7 @@ export async function scrapeFinnAd(url: string): Promise<Partial<InsertCar> | nu
       images: carData.images?.filter(img => img !== null) || [],
       notes: `Importert fra Finn.no: ${carData.description || 'Ingen beskrivelse'}`,
       registrationNumber: carData.registrationNumber || '',
-      chassisNumber: carData.chassisNumber || '',
+
       power: carData.power || '',
       engine: carData.engine || '',
       condition: 'used',
@@ -331,25 +331,49 @@ function parseCarDataFromHTML(html: string): FinnCarData {
     // Enhanced image extraction for Finn.no - multiple strategies
     const allImages: string[] = [];
     
-    // Strategy 1: Direct image URL extraction with multiple patterns
-    const imagePatterns = [
-      // Main Finn.no CDN images
-      /https:\/\/images\.finncdn\.no\/dynamic\/[^"'\s)]+\.(?:jpg|jpeg|png|webp)/gi,
-      /https:\/\/images\.finncdn\.no\/[^"'\s)]+\.(?:jpg|jpeg|png|webp)/gi,
-      // Image attributes
-      /src="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/gi,
-      /data-src="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/gi,
-      /data-lazy="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/gi,
-      // Background images
-      /background-image:\s*url\(['"]?(https:\/\/images\.finncdn\.no\/[^'")\s]+\.(?:jpg|jpeg|png|webp))['"]?\)/gi
+    // Strategy 1: Focus on car gallery images - look for specific gallery containers first
+    const galleryImagePatterns = [
+      // Look for images inside gallery or carousel containers
+      /<div[^>]*(?:gallery|carousel|image-container|photo)[^>]*>[\s\S]*?src="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"[\s\S]*?<\/div>/g,
+      // Look for image elements with gallery-related classes or data attributes
+      /<img[^>]*(?:class="[^"]*(?:gallery|carousel|photo|vehicle)[^"]*"|data-[^=]*(?:gallery|photo)[^=]*="[^"]*")[^>]*src="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/g,
+      // Standard image patterns but with size filtering
+      /src="(https:\/\/images\.finncdn\.no\/dynamic\/[^"]+\.(?:jpg|jpeg|png|webp))"/g,
+      /data-src="(https:\/\/images\.finncdn\.no\/dynamic\/[^"]+\.(?:jpg|jpeg|png|webp))"/g,
+      /data-lazy="(https:\/\/images\.finncdn\.no\/dynamic\/[^"]+\.(?:jpg|jpeg|png|webp))"/g
     ];
     
-    for (const pattern of imagePatterns) {
+    // Extract images with gallery preference
+    for (const pattern of galleryImagePatterns) {
       let match;
       while ((match = pattern.exec(html)) !== null) {
         const imageUrl = match[1] || match[0];
         if (imageUrl && imageUrl.startsWith('https://images.finncdn.no/')) {
-          allImages.push(imageUrl);
+          // Prioritize larger images by checking if they have size parameters
+          const hasLargeSize = imageUrl.includes('width=') ? 
+            parseInt(imageUrl.match(/width=(\d+)/)?.[1] || '0') >= 400 : true;
+          if (hasLargeSize) {
+            allImages.push(imageUrl);
+          }
+        }
+      }
+    }
+    
+    // Fallback: look for any remaining car images if we don't have enough
+    if (allImages.length < 3) {
+      const fallbackPatterns = [
+        /https:\/\/images\.finncdn\.no\/dynamic\/[^"'\s)]+\.(?:jpg|jpeg|png|webp)/g,
+        /https:\/\/images\.finncdn\.no\/[^"'\s)]*(?:car|vehicle|bil)[^"'\s)]*\.(?:jpg|jpeg|png|webp)/g
+      ];
+      
+      for (const pattern of fallbackPatterns) {
+        let match;
+        while ((match = pattern.exec(html)) !== null) {
+          const imageUrl = match[0];
+          if (imageUrl && imageUrl.startsWith('https://images.finncdn.no/') && 
+              !allImages.includes(imageUrl)) {
+            allImages.push(imageUrl);
+          }
         }
       }
     }
@@ -361,7 +385,7 @@ function parseCarDataFromHTML(html: string): FinnCarData {
         const jsonData = JSON.parse(structuredDataMatch[1]);
         if (jsonData.image) {
           if (Array.isArray(jsonData.image)) {
-            allImages.push(...jsonData.image.filter(img => typeof img === 'string' && img.includes('finncdn.no')));
+            allImages.push(...jsonData.image.filter((img: any) => typeof img === 'string' && img.includes('finncdn.no')));
           } else if (typeof jsonData.image === 'string') {
             allImages.push(jsonData.image);
           }
@@ -371,23 +395,43 @@ function parseCarDataFromHTML(html: string): FinnCarData {
       }
     }
     
-    // Clean and deduplicate images
-    const cleanImages = [...new Set(allImages)]
-      .filter(url => 
-        url && 
-        url.startsWith('https://images.finncdn.no/') &&
-        !url.includes('width=50') &&
-        !url.includes('height=50') &&
-        !url.includes('width=100') &&
-        !url.includes('height=100') &&
-        !url.includes('thumbnail') &&
-        !url.includes('icon') &&
-        (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.webp'))
-      )
+    // Clean and deduplicate images with better filtering
+    const uniqueImages = Array.from(new Set(allImages));
+    const cleanImages = uniqueImages
+      .filter(url => {
+        if (!url || !url.startsWith('https://images.finncdn.no/')) return false;
+        
+        // Filter out very small images (thumbnails, icons)
+        if (url.includes('width=50') || url.includes('height=50') ||
+            url.includes('width=100') || url.includes('height=100') ||
+            url.includes('width=150') || url.includes('height=150')) return false;
+        
+        // Filter out known non-car image types
+        if (url.includes('thumbnail') || url.includes('icon') || 
+            url.includes('logo') || url.includes('brand') ||
+            url.includes('dealer') || url.includes('company') ||
+            url.includes('profile') || url.includes('avatar')) return false;
+        
+        // Only include actual image files
+        if (!(url.includes('.jpg') || url.includes('.jpeg') || 
+              url.includes('.png') || url.includes('.webp'))) return false;
+        
+        // Filter out very small file sizes in URL (if specified)
+        if (url.match(/[?&]w=([0-9]+)/)) {
+          const width = parseInt(url.match(/[?&]w=([0-9]+)/)?.[1] || '0');
+          if (width > 0 && width < 200) return false;
+        }
+        if (url.match(/[?&]h=([0-9]+)/)) {
+          const height = parseInt(url.match(/[?&]h=([0-9]+)/)?.[1] || '0');
+          if (height > 0 && height < 200) return false;
+        }
+        
+        return true;
+      })
       .slice(0, 15);
     
     carData.images = cleanImages;
-    console.log(`Enhanced extraction found ${cleanImages.length} images from Finn.no ad`);
+    console.log(`Enhanced extraction found ${cleanImages.length} car images from Finn.no ad (filtered out ${allImages.length - cleanImages.length} non-car images)`);
 
     // Extract description
     const descMatch = html.match(/<meta[^>]+(?:description|content)[^>]*content="([^"]+)"/i);
