@@ -557,10 +557,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Could not extract car data from URL" });
       }
 
+      // Import the car into the database
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const importedCar = await storage.createCar(carData, userId);
+
       res.json({
         success: true,
-        message: "Car data extracted successfully",
-        carData
+        message: "Car imported successfully from Finn.no",
+        carData: importedCar
       });
 
     } catch (error: any) {

@@ -54,14 +54,14 @@ export async function scrapeFinnAd(url: string): Promise<Partial<InsertCar> | nu
       model: carData.model,
       year: carData.year || new Date().getFullYear(),
       mileage: carData.mileage || 0,
-      price: carData.price || 0,
+      salePrice: carData.price?.toString() || '0',
+      costPrice: carData.price ? (carData.price * 0.8).toString() : '0', // Estimate cost as 80% of sale price
       fuelType: carData.fuelType,
       transmission: carData.transmission,
       color: carData.color,
-      images: carData.images || [],
-      description: carData.description || '',
+      images: carData.images?.filter(img => img !== null) || [],
+      notes: `Importert fra Finn.no: ${carData.description || 'Ingen beskrivelse'}`,
       registrationNumber: carData.registrationNumber || '',
-      vin: carData.vin || '',
       chassisNumber: carData.chassisNumber || '',
       power: carData.power || '',
       engine: carData.engine || '',
@@ -151,7 +151,7 @@ function parseCarDataFromHTML(html: string): FinnCarData {
           const urlMatch = match.match(/(?:src|data-src)="([^"]*)"/);
           return urlMatch ? urlMatch[1] : null;
         })
-        .filter(url => url && url.includes('finn') && (url.includes('jpg') || url.includes('jpeg') || url.includes('png') || url.includes('webp')))
+        .filter((url): url is string => url !== null && url.includes('finn') && (url.includes('jpg') || url.includes('jpeg') || url.includes('png') || url.includes('webp')))
         .slice(0, 10); // Limit to 10 images
     }
 
