@@ -327,32 +327,32 @@ export class DatabaseStorage implements IStorage {
 
     const completedContracts = allContracts.filter(c => c.status === 'completed');
 
-    // Revenue calculations
+    // Revenue calculations - use saleDate instead of createdAt for historical data
     const thisMonthRevenue = completedContracts
-      .filter(c => new Date(c.createdAt!) >= thisMonth)
+      .filter(c => new Date(c.saleDate!) >= thisMonth)
       .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
 
     const thisYearRevenue = completedContracts
-      .filter(c => new Date(c.createdAt!) >= thisYear)
+      .filter(c => new Date(c.saleDate!) >= thisYear)
       .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
 
     const lastMonthRevenue = completedContracts
       .filter(c => {
-        const date = new Date(c.createdAt!);
+        const date = new Date(c.saleDate!);
         return date >= lastMonth && date < thisMonth;
       })
       .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
 
     const lastYearRevenue = completedContracts
       .filter(c => {
-        const date = new Date(c.createdAt!);
+        const date = new Date(c.saleDate!);
         return date >= lastYear && date < thisYear;
       })
       .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
 
-    // Sales calculations
-    const thisMonthSales = completedContracts.filter(c => new Date(c.createdAt!) >= thisMonth).length;
-    const thisYearSales = completedContracts.filter(c => new Date(c.createdAt!) >= thisYear).length;
+    // Sales calculations - use saleDate for historical data
+    const thisMonthSales = completedContracts.filter(c => new Date(c.saleDate!) >= thisMonth).length;
+    const thisYearSales = completedContracts.filter(c => new Date(c.saleDate!) >= thisYear).length;
     const averageSalePrice = completedContracts.length > 0 
       ? completedContracts.reduce((sum, c) => sum + parseFloat(c.salePrice), 0) / completedContracts.length 
       : 0;
@@ -393,7 +393,7 @@ export class DatabaseStorage implements IStorage {
       const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
       
       const monthContracts = completedContracts.filter(c => {
-        const date = new Date(c.createdAt!);
+        const date = new Date(c.saleDate!);
         return date >= month && date < nextMonth;
       });
 
