@@ -303,54 +303,47 @@ export class DatabaseStorage implements IStorage {
     const thisYear = new Date(now.getFullYear(), 0, 1);
     const lastYear = new Date(now.getFullYear() - 1, 0, 1);
 
-    // Get all contracts for analysis
-    const allContracts = await db
+    // Get all sold cars for analysis (this includes direct car sales, not just contracts)
+    const allSoldCars = await db
       .select()
-      .from(contracts)
-      .where(eq(contracts.userId, userId));
+      .from(cars)
+      .where(and(eq(cars.userId, userId), eq(cars.status, 'sold')));
 
-    const completedContracts = allContracts.filter(c => c.status === 'completed');
+    const soldCarsWithDates = allSoldCars.filter(c => c.soldDate);
 
-    // Revenue calculations - use saleDate instead of createdAt for historical data
-    const thisMonthRevenue = completedContracts
-      .filter(c => new Date(c.saleDate!) >= thisMonth)
-      .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+    // Revenue calculations - use soldDate from cars table
+    const thisMonthRevenue = soldCarsWithDates
+      .filter(c => new Date(c.soldDate!) >= thisMonth)
+      .reduce((sum, c) => sum + parseFloat(c.soldPrice || '0'), 0);
 
-    const thisYearRevenue = completedContracts
-      .filter(c => new Date(c.saleDate!) >= thisYear)
-      .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+    const thisYearRevenue = soldCarsWithDates
+      .filter(c => new Date(c.soldDate!) >= thisYear)
+      .reduce((sum, c) => sum + parseFloat(c.soldPrice || '0'), 0);
 
-    const lastMonthRevenue = completedContracts
+    const lastMonthRevenue = soldCarsWithDates
       .filter(c => {
-        const date = new Date(c.saleDate!);
+        const date = new Date(c.soldDate!);
         return date >= lastMonth && date < thisMonth;
       })
-      .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+      .reduce((sum, c) => sum + parseFloat(c.soldPrice || '0'), 0);
 
-    const lastYearRevenue = completedContracts
+    const lastYearRevenue = soldCarsWithDates
       .filter(c => {
-        const date = new Date(c.saleDate!);
+        const date = new Date(c.soldDate!);
         return date >= lastYear && date < thisYear;
       })
-      .reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+      .reduce((sum, c) => sum + parseFloat(c.soldPrice || '0'), 0);
 
-    // Sales calculations - use saleDate for historical data
-    const thisMonthSales = completedContracts.filter(c => new Date(c.saleDate!) >= thisMonth).length;
-    const thisYearSales = completedContracts.filter(c => new Date(c.saleDate!) >= thisYear).length;
-    const averageSalePrice = completedContracts.length > 0 
-      ? completedContracts.reduce((sum, c) => sum + parseFloat(c.salePrice), 0) / completedContracts.length 
+    // Sales calculations - use soldDate from cars table
+    const thisMonthSales = soldCarsWithDates.filter(c => new Date(c.soldDate!) >= thisMonth).length;
+    const thisYearSales = soldCarsWithDates.filter(c => new Date(c.soldDate!) >= thisYear).length;
+    const averageSalePrice = soldCarsWithDates.length > 0 
+      ? soldCarsWithDates.reduce((sum, c) => sum + parseFloat(c.soldPrice || '0'), 0) / soldCarsWithDates.length 
       : 0;
 
-    // Profit margin calculations - get cost from cars table
-    let totalCost = 0;
-    for (const contract of completedContracts) {
-      const car = await this.getCarById(contract.carId, userId);
-      if (car && car.costPrice) {
-        totalCost += parseFloat(car.costPrice);
-      }
-    }
-    
-    const totalRevenue = completedContracts.reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
+    // Profit margin calculations - use sold cars data
+    const totalCost = soldCarsWithDates.reduce((sum, car) => sum + parseFloat(car.costPrice || '0'), 0);
+    const totalRevenue = soldCarsWithDates.reduce((sum, car) => sum + parseFloat(car.soldPrice || '0'), 0);
     const grossProfit = totalRevenue - totalCost;
     const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
@@ -377,42 +370,33 @@ export class DatabaseStorage implements IStorage {
       return daysSince > 90;
     }).length;
 
-    // Monthly trends (last 12 months)
+    // Monthly trends (last 12 months) - use sold cars data
     const monthlyTrends = [];
     for (let i = 11; i >= 0; i--) {
       const month = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
       
-      const monthContracts = completedContracts.filter(c => {
-        const date = new Date(c.saleDate!);
+      const monthCars = soldCarsWithDates.filter(car => {
+        const date = new Date(car.soldDate!);
         return date >= month && date < nextMonth;
       });
 
-      const revenue = monthContracts.reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
-      
-      // Calculate cost by looking up car cost prices
-      let cost = 0;
-      for (const contract of monthContracts) {
-        const car = await this.getCarById(contract.carId, userId);
-        if (car && car.costPrice) {
-          cost += parseFloat(car.costPrice);
-        }
-      }
+      const revenue = monthCars.reduce((sum, car) => sum + parseFloat(car.soldPrice || '0'), 0);
+      const cost = monthCars.reduce((sum, car) => sum + parseFloat(car.costPrice || '0'), 0);
 
       monthlyTrends.push({
         month: month.toLocaleDateString('no-NO', { month: 'short', year: 'numeric' }),
         revenue,
-        sales: monthContracts.length,
+        sales: monthCars.length,
         profit: revenue - cost
       });
     }
 
-    // Sales by make
+    // Sales by make - use sold cars data
     const makeStats = new Map<string, { count: number; revenue: number }>();
     
-    for (const contract of completedContracts) {
-      const car = allCars.find(c => c.id === contract.carId);
-      const make = car?.make || 'Ukjent';
+    for (const car of soldCarsWithDates) {
+      const make = car.make || 'Ukjent';
       
       if (!makeStats.has(make)) {
         makeStats.set(make, { count: 0, revenue: 0 });
@@ -420,7 +404,7 @@ export class DatabaseStorage implements IStorage {
       
       const stats = makeStats.get(make)!;
       stats.count++;
-      stats.revenue += parseFloat(contract.salePrice);
+      stats.revenue += parseFloat(car.soldPrice || '0');
     }
 
     const salesByMake = Array.from(makeStats.entries()).map(([make, stats]) => ({
