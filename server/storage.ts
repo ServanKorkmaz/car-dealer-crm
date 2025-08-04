@@ -123,16 +123,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCar(car: InsertCar, userId: string): Promise<Car> {
-    // Calculate profit margin
-    const costPrice = parseFloat(car.costPrice);
-    const salePrice = parseFloat(car.salePrice);
-    const profitMargin = ((salePrice - costPrice) / costPrice * 100).toFixed(2);
-
     const [newCar] = await db
       .insert(cars)
       .values({
         ...car,
-        profitMargin,
         userId,
       })
       .returning();
@@ -140,22 +134,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCar(id: string, car: Partial<InsertCar>, userId: string): Promise<Car> {
-    let updateData = { ...car, updatedAt: new Date() };
-
-    // Recalculate profit margin if cost or sale price changed
-    if (car.costPrice || car.salePrice) {
-      const existingCar = await this.getCarById(id, userId);
-      if (existingCar) {
-        const costPrice = parseFloat(car.costPrice || existingCar.costPrice);
-        const salePrice = parseFloat(car.salePrice || existingCar.salePrice);
-        const profitMargin = ((salePrice - costPrice) / costPrice * 100).toFixed(2);
-        updateData.profitMargin = profitMargin;
-      }
-    }
-
     const [updatedCar] = await db
       .update(cars)
-      .set(updateData)
+      .set({ 
+        ...car, 
+        updatedAt: new Date()
+      })
       .where(and(eq(cars.id, id), eq(cars.userId, userId)))
       .returning();
     return updatedCar;
@@ -163,7 +147,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCar(id: string, userId: string): Promise<boolean> {
     const result = await db.delete(cars).where(and(eq(cars.id, id), eq(cars.userId, userId)));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   // Customer operations
@@ -198,7 +182,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCustomer(id: string, userId: string): Promise<boolean> {
     const result = await db.delete(customers).where(and(eq(customers.id, id), eq(customers.userId, userId)));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   // Contract operations
@@ -233,7 +217,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteContract(id: string, userId: string): Promise<boolean> {
     const result = await db.delete(contracts).where(and(eq(contracts.id, id), eq(contracts.userId, userId)));
-    return result.rowCount > 0;
+    return (result.rowCount || 0) > 0;
   }
 
   // Dashboard stats
@@ -357,9 +341,16 @@ export class DatabaseStorage implements IStorage {
       ? completedContracts.reduce((sum, c) => sum + parseFloat(c.salePrice), 0) / completedContracts.length 
       : 0;
 
-    // Profit margin calculations
+    // Profit margin calculations - get cost from cars table
+    let totalCost = 0;
+    for (const contract of completedContracts) {
+      const car = await this.getCarById(contract.carId, userId);
+      if (car && car.costPrice) {
+        totalCost += parseFloat(car.costPrice);
+      }
+    }
+    
     const totalRevenue = completedContracts.reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
-    const totalCost = completedContracts.reduce((sum, c) => sum + (parseFloat(c.purchasePrice) || 0), 0);
     const grossProfit = totalRevenue - totalCost;
     const grossMargin = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
 
@@ -367,8 +358,8 @@ export class DatabaseStorage implements IStorage {
     const allCars = await db.select().from(cars).where(eq(cars.userId, userId));
     const availableCars = allCars.filter(c => c.status === 'available');
 
-    // Inventory calculations
-    const totalInventoryValue = availableCars.reduce((sum, c) => sum + parseFloat(c.price), 0);
+    // Inventory calculations - use salePrice instead of price
+    const totalInventoryValue = availableCars.reduce((sum, c) => sum + parseFloat(c.salePrice || '0'), 0);
     const averageDaysOnLot = availableCars.length > 0 
       ? availableCars.reduce((sum, c) => {
           const daysSince = Math.floor((now.getTime() - new Date(c.createdAt!).getTime()) / (1000 * 60 * 60 * 24));
@@ -398,7 +389,15 @@ export class DatabaseStorage implements IStorage {
       });
 
       const revenue = monthContracts.reduce((sum, c) => sum + parseFloat(c.salePrice), 0);
-      const cost = monthContracts.reduce((sum, c) => sum + (parseFloat(c.purchasePrice) || 0), 0);
+      
+      // Calculate cost by looking up car cost prices
+      let cost = 0;
+      for (const contract of monthContracts) {
+        const car = await this.getCarById(contract.carId, userId);
+        if (car && car.costPrice) {
+          cost += parseFloat(car.costPrice);
+        }
+      }
 
       monthlyTrends.push({
         month: month.toLocaleDateString('no-NO', { month: 'short', year: 'numeric' }),
