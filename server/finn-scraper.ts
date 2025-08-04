@@ -92,25 +92,35 @@ export async function scrapeFinnAd(url: string): Promise<Partial<InsertCar> | nu
     // Parse the HTML to extract car data
     const carData = parseCarDataFromHTML(html);
     
-    // If we couldn't extract make/model or other key data from Finn.no,
-    // try to get it from registration number via SVV API
-    if ((!carData.make || !carData.model || !carData.year || !carData.fuelType || !carData.mileage) && carData.registrationNumber) {
-      console.log('Missing key data from Finn.no, attempting SVV lookup...');
+    // Always attempt SVV lookup if we have a registration number, even if we have some data
+    // This provides more accurate and complete vehicle information
+    if (carData.registrationNumber) {
+      console.log(`Attempting SVV lookup for registration: ${carData.registrationNumber}`);
       try {
         const svvData = await lookupVehicleData(carData.registrationNumber);
         if (svvData) {
-          carData.make = carData.make || svvData.make;
-          carData.model = carData.model || svvData.model;
-          carData.year = carData.year || svvData.year;
-          carData.fuelType = carData.fuelType || svvData.fuelType;
-          carData.transmission = carData.transmission || svvData.transmission;
-          carData.color = carData.color || svvData.color;
-          carData.power = carData.power || svvData.power;
-          console.log('SVV data successfully retrieved and merged');
+          // Use SVV data as primary source, fallback to Finn.no data if SVV is missing info
+          carData.make = svvData.make || carData.make;
+          carData.model = svvData.model || carData.model;
+          carData.year = svvData.year || carData.year;
+          carData.fuelType = svvData.fuelType || carData.fuelType;
+          carData.transmission = svvData.transmission || carData.transmission;
+          carData.color = svvData.color || carData.color;
+          carData.power = svvData.power || carData.power;
+          console.log('SVV data successfully retrieved and merged:', {
+            make: svvData.make,
+            model: svvData.model,
+            year: svvData.year,
+            fuelType: svvData.fuelType
+          });
+        } else {
+          console.log('SVV lookup returned no data');
         }
       } catch (error) {
         console.error('SVV lookup failed:', error);
       }
+    } else {
+      console.log('No registration number found - cannot perform SVV lookup');
     }
 
     // Set more reasonable defaults if extraction failed
@@ -276,25 +286,108 @@ function parseCarDataFromHTML(html: string): FinnCarData {
       carData.power = powerValue + powerUnit;
     }
 
-    // Extract registration number - try multiple patterns
-    const regMatch = html.match(/(?:reg\.nr|registration|skiltnummer)[^>]*>?\s*([A-Z]{1,2}\s*\d{4,5})/i) ||
-                     html.match(/([A-Z]{1,2}\s*\d{4,5})(?:\s|<|$)/i) ||
-                     html.match(/\b([A-Z]{2}\d{4,5})\b/i);
-    if (regMatch) {
-      carData.registrationNumber = regMatch[1].trim().replace(/\s+/g, '');
+    // Extract registration number - enhanced patterns for Norwegian reg numbers
+    const regPatterns = [
+      // Look for structured data with registration number
+      /"registrationNumber"[^"]*"([^"]+)"/i,
+      // Look for Norwegian registration format in various contexts
+      /(?:reg\.?\s*nr\.?|registration|skiltnummer|regnr)[^>]*>?\s*([A-Z]{1,2}\s*\d{4,5})/i,
+      // Direct pattern matching for Norwegian format
+      /\b([A-Z]{2}\s?\d{5})\b/g,
+      /\b([A-Z]{1}\s?\d{4,5})\b/g,
+      // In title or heading text
+      />([A-Z]{2}\s?\d{4,5})</g,
+      // Meta tags or data attributes
+      /content="[^"]*([A-Z]{2}\s?\d{4,5})[^"]*"/i
+    ];
+    
+    for (const pattern of regPatterns) {
+      const matches = html.match(pattern);
+      if (matches) {
+        // For global patterns, check all matches
+        if (pattern.global) {
+          let match;
+          pattern.lastIndex = 0; // Reset regex
+          while ((match = pattern.exec(html)) !== null) {
+            const regNumber = match[1].replace(/\s+/g, '').toUpperCase();
+            if (/^[A-Z]{1,2}\d{4,5}$/.test(regNumber)) {
+              carData.registrationNumber = regNumber;
+              console.log(`Found registration number: ${regNumber}`);
+              break;
+            }
+          }
+        } else {
+          const regNumber = matches[1]?.replace(/\s+/g, '').toUpperCase();
+          if (regNumber && /^[A-Z]{1,2}\d{4,5}$/.test(regNumber)) {
+            carData.registrationNumber = regNumber;
+            console.log(`Found registration number: ${regNumber}`);
+            break;
+          }
+        }
+        if (carData.registrationNumber) break;
+      }
     }
 
-    // Extract images
-    const imageMatches = html.match(/(?:src|data-src)="([^"]*(?:jpg|jpeg|png|webp)[^"]*)"/gi);
-    if (imageMatches) {
-      carData.images = imageMatches
-        .map(match => {
-          const urlMatch = match.match(/(?:src|data-src)="([^"]*)"/);
-          return urlMatch ? urlMatch[1] : null;
-        })
-        .filter((url): url is string => url !== null && url.includes('finn') && (url.includes('jpg') || url.includes('jpeg') || url.includes('png') || url.includes('webp')))
-        .slice(0, 10); // Limit to 10 images
+    // Enhanced image extraction for Finn.no - multiple strategies
+    const allImages: string[] = [];
+    
+    // Strategy 1: Direct image URL extraction with multiple patterns
+    const imagePatterns = [
+      // Main Finn.no CDN images
+      /https:\/\/images\.finncdn\.no\/dynamic\/[^"'\s)]+\.(?:jpg|jpeg|png|webp)/gi,
+      /https:\/\/images\.finncdn\.no\/[^"'\s)]+\.(?:jpg|jpeg|png|webp)/gi,
+      // Image attributes
+      /src="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/gi,
+      /data-src="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/gi,
+      /data-lazy="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/gi,
+      // Background images
+      /background-image:\s*url\(['"]?(https:\/\/images\.finncdn\.no\/[^'")\s]+\.(?:jpg|jpeg|png|webp))['"]?\)/gi
+    ];
+    
+    for (const pattern of imagePatterns) {
+      let match;
+      while ((match = pattern.exec(html)) !== null) {
+        const imageUrl = match[1] || match[0];
+        if (imageUrl && imageUrl.startsWith('https://images.finncdn.no/')) {
+          allImages.push(imageUrl);
+        }
+      }
     }
+    
+    // Strategy 2: Look for structured data with images
+    const structuredDataMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/s);
+    if (structuredDataMatch) {
+      try {
+        const jsonData = JSON.parse(structuredDataMatch[1]);
+        if (jsonData.image) {
+          if (Array.isArray(jsonData.image)) {
+            allImages.push(...jsonData.image.filter(img => typeof img === 'string' && img.includes('finncdn.no')));
+          } else if (typeof jsonData.image === 'string') {
+            allImages.push(jsonData.image);
+          }
+        }
+      } catch (e) {
+        // Ignore JSON parse errors
+      }
+    }
+    
+    // Clean and deduplicate images
+    const cleanImages = [...new Set(allImages)]
+      .filter(url => 
+        url && 
+        url.startsWith('https://images.finncdn.no/') &&
+        !url.includes('width=50') &&
+        !url.includes('height=50') &&
+        !url.includes('width=100') &&
+        !url.includes('height=100') &&
+        !url.includes('thumbnail') &&
+        !url.includes('icon') &&
+        (url.includes('.jpg') || url.includes('.jpeg') || url.includes('.png') || url.includes('.webp'))
+      )
+      .slice(0, 15);
+    
+    carData.images = cleanImages;
+    console.log(`Enhanced extraction found ${cleanImages.length} images from Finn.no ad`);
 
     // Extract description
     const descMatch = html.match(/<meta[^>]+(?:description|content)[^>]*content="([^"]+)"/i);

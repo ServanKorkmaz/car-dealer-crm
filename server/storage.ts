@@ -122,11 +122,6 @@ export class DatabaseStorage implements IStorage {
     return car;
   }
 
-  async getCarById(id: string, userId: string): Promise<Car | undefined> {
-    const [car] = await db.select().from(cars).where(and(eq(cars.id, id), eq(cars.userId, userId)));
-    return car;
-  }
-
   async createCar(car: InsertCar, userId: string): Promise<Car> {
     const [newCar] = await db
       .insert(cars)
