@@ -1,5 +1,49 @@
 import type { InsertCar } from '@shared/schema';
 
+// SVV API lookup function
+async function lookupVehicleData(regNumber: string) {
+  try {
+    if (!process.env.SVV_API_KEY) {
+      return null;
+    }
+
+    const regNumberClean = regNumber.replace(/\s+/g, '').toUpperCase();
+    const response = await fetch(
+      `https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata?kjennemerke=${encodeURIComponent(regNumberClean)}`,
+      {
+        headers: {
+          'SVV-Authorization': `Apikey ${process.env.SVV_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) return null;
+    
+    const data = await response.json();
+    const vehicleInfo = data.kjoretoydataListe?.[0];
+    if (!vehicleInfo) return null;
+
+    const tekniskData = vehicleInfo.godkjenning?.tekniskGodkjenning?.tekniskeData;
+    const genereltData = tekniskData?.generelt;
+    
+    return {
+      make: genereltData?.merke?.[0]?.merke || "",
+      model: genereltData?.handelsbetegnelse?.[0] || "",
+      year: vehicleInfo.forstegangsregistrering?.registrertForstegangNorgeDato ? 
+            new Date(vehicleInfo.forstegangsregistrering.registrertForstegangNorgeDato).getFullYear() : 
+            new Date().getFullYear(),
+      fuelType: tekniskData?.motorOgDrivverk?.motor?.[0]?.drivstoff?.[0]?.drivstoffKode?.kodeBeskrivelse || "",
+      transmission: tekniskData?.motorOgDrivverk?.girkasse?.girkasseType?.kodeBeskrivelse || "",
+      color: tekniskData?.karosseriOgLasteplan?.karosseri?.[0]?.farge?.kodeBeskrivelse || "",
+      power: tekniskData?.motorOgDrivverk?.motor?.[0]?.drivstoff?.[0]?.maksNettoEffekt || "",
+    };
+  } catch (error) {
+    console.error('SVV lookup error:', error);
+    return null;
+  }
+}
+
 interface FinnCarData {
   title?: string;
   price?: number;
@@ -45,8 +89,30 @@ export async function scrapeFinnAd(url: string): Promise<Partial<InsertCar> | nu
     // Parse the HTML to extract car data
     const carData = parseCarDataFromHTML(html);
     
+    // If we couldn't extract make/model or other key data from Finn.no,
+    // try to get it from registration number via SVV API
+    if (!carData.make || !carData.model || !carData.year || !carData.fuelType) {
+      console.log('Missing key data from Finn.no, attempting SVV lookup...');
+      if (carData.registrationNumber) {
+        try {
+          const svvData = await lookupVehicleData(carData.registrationNumber);
+          if (svvData) {
+            carData.make = carData.make || svvData.make;
+            carData.model = carData.model || svvData.model;
+            carData.year = carData.year || svvData.year;
+            carData.fuelType = carData.fuelType || svvData.fuelType;
+            carData.transmission = carData.transmission || svvData.transmission;
+            carData.color = carData.color || svvData.color;
+            carData.power = carData.power || svvData.power;
+          }
+        } catch (error) {
+          console.error('SVV lookup failed:', error);
+        }
+      }
+    }
+
     if (!carData.make || !carData.model) {
-      throw new Error('Kunne ikke finne bilmerke og modell i annonsen');
+      throw new Error('Kunne ikke finne bilmerke og modell i annonsen eller via registreringsnummer');
     }
 
     return {
@@ -96,33 +162,60 @@ function parseCarDataFromHTML(html: string): FinnCarData {
       carData.price = parseInt(priceStr);
     }
 
-    // Extract year - try multiple patterns
-    const yearMatch = html.match(/(?:årsmodell|year|årgang)[^>]*>?\s*(\d{4})/i) ||
-                      html.match(/(\d{4})\s*(?:årsmodell|årgang)/i) ||
-                      html.match(/data-testid="year"[^>]*>([^<]+)/i);
+    // Extract year - try multiple patterns including title parsing
+    let yearMatch = html.match(/(?:årsmodell|year|årgang)[^>]*>?\s*(\d{4})/i) ||
+                    html.match(/(\d{4})\s*(?:årsmodell|årgang)/i) ||
+                    html.match(/data-testid="year"[^>]*>([^<]+)/i);
+    
+    // Also try to extract year from title if available
+    if (!yearMatch && carData.title) {
+      yearMatch = carData.title.match(/(\d{4})/);
+    }
+    
     if (yearMatch) {
       const yearStr = yearMatch[1].replace(/[^\d]/g, '');
-      carData.year = parseInt(yearStr);
+      const year = parseInt(yearStr);
+      if (year >= 1900 && year <= new Date().getFullYear() + 1) {
+        carData.year = year;
+      }
     }
 
     // Extract mileage - try multiple patterns
-    const mileageMatch = html.match(/(?:kilometer|km|kjørelengde)[^>]*>?\s*([\d\s]+)/i) ||
-                         html.match(/data-testid="mileage"[^>]*>([^<]+)/i);
+    const mileageMatch = html.match(/(?:kilometer|km|kjørelengde|mil)[^>]*>?\s*([\d\s\.]+)/i) ||
+                         html.match(/data-testid="mileage"[^>]*>([^<]+)/i) ||
+                         html.match(/([\d\s\.]+)\s*(?:km|kilometer|mil)/i);
     if (mileageMatch) {
       const mileageStr = mileageMatch[1].replace(/[^\d]/g, '');
-      carData.mileage = parseInt(mileageStr);
+      const mileage = parseInt(mileageStr);
+      if (mileage && mileage > 0) {
+        carData.mileage = mileage;
+      }
     }
 
-    // Extract fuel type
-    const fuelMatch = html.match(/(?:drivstoff|fuel)[^>]*>?\s*([^<>\n]+)/i);
+    // Extract fuel type - try multiple patterns
+    const fuelMatch = html.match(/(?:drivstoff|fuel|bensin|diesel|hybrid|el)[^>]*>?\s*([^<>\n]+)/i) ||
+                      html.match(/(?:petrol|gasoline|electric|hybrid)/i);
     if (fuelMatch) {
-      carData.fuelType = fuelMatch[1].trim();
+      let fuelType = fuelMatch[1] || fuelMatch[0];
+      // Normalize common fuel types
+      fuelType = fuelType.replace(/bensin/i, 'Bensin')
+                        .replace(/diesel/i, 'Diesel')
+                        .replace(/hybrid/i, 'Hybrid')
+                        .replace(/electric|elektrisk/i, 'Elektrisk');
+      carData.fuelType = fuelType.trim();
     }
 
-    // Extract transmission
-    const transmissionMatch = html.match(/(?:girkasse|transmission)[^>]*>?\s*([^<>\n]+)/i);
+    // Extract transmission - try multiple patterns
+    const transmissionMatch = html.match(/(?:girkasse|transmission|automat|manuell)[^>]*>?\s*([^<>\n]+)/i) ||
+                             html.match(/(?:automatic|manual)/i);
     if (transmissionMatch) {
-      carData.transmission = transmissionMatch[1].trim();
+      let transmission = transmissionMatch[1] || transmissionMatch[0];
+      // Normalize transmission types
+      transmission = transmission.replace(/automat/i, 'Automat')
+                                .replace(/manuell/i, 'Manuell')
+                                .replace(/automatic/i, 'Automat')
+                                .replace(/manual/i, 'Manuell');
+      carData.transmission = transmission.trim();
     }
 
     // Extract color
@@ -137,10 +230,12 @@ function parseCarDataFromHTML(html: string): FinnCarData {
       carData.power = powerMatch[1];
     }
 
-    // Extract registration number
-    const regMatch = html.match(/(?:reg\.nr|registration)[^>]*>?\s*([A-Z]{2}\s*\d{5})/i);
+    // Extract registration number - try multiple patterns
+    const regMatch = html.match(/(?:reg\.nr|registration|skiltnummer)[^>]*>?\s*([A-Z]{1,2}\s*\d{4,5})/i) ||
+                     html.match(/([A-Z]{1,2}\s*\d{4,5})(?:\s|<|$)/i) ||
+                     html.match(/\b([A-Z]{2}\d{4,5})\b/i);
     if (regMatch) {
-      carData.registrationNumber = regMatch[1].trim();
+      carData.registrationNumber = regMatch[1].trim().replace(/\s+/g, '');
     }
 
     // Extract images
@@ -172,6 +267,12 @@ function parseCarInfoFromTitle(title: string, carData: FinnCarData) {
   try {
     // Handle FINN.no title patterns like "Bruktbil til salgs: Volkswagen Passat - 2018 - Grå - 218 hk - Stasjonsvogn"
     let cleanTitle = title.replace(/^Bruktbil til salgs:\s*/i, '').trim();
+    
+    // Extract registration number from title if present
+    const regInTitle = cleanTitle.match(/\b([A-Z]{1,2}\s*\d{4,5})\b/i);
+    if (regInTitle && !carData.registrationNumber) {
+      carData.registrationNumber = regInTitle[1].replace(/\s+/g, '');
+    }
     
     // Split by " - " to get parts
     const parts = cleanTitle.split(' - ');

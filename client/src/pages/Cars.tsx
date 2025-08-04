@@ -121,8 +121,11 @@ export default function Cars() {
     },
     onSuccess: (data: any) => {
       if (data.carData) {
-        // Invalidate all relevant queries to refresh data everywhere
+        // Force immediate refresh of car list
         queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+        queryClient.refetchQueries({ queryKey: ['/api/cars'] });
+        
+        // Update dashboard stats
         queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
         queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/30'] });
         queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/7'] });
@@ -133,7 +136,7 @@ export default function Cars() {
         setFinnUrl("");
         toast({
           title: "Suksess", 
-          description: "Bil importert fra Finn.no og lagt til i systemet",
+          description: `Bil importert: ${data.carData.make} ${data.carData.model}`,
         });
       }
     },

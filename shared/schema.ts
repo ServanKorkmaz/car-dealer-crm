@@ -163,6 +163,23 @@ export const insertCarSchema = createInsertSchema(cars).omit({
   updatedAt: true,
   userId: true,
   profitMargin: true,
+}).extend({
+  // Allow more flexible data types for imports and updates
+  power: z.union([z.string(), z.number()]).transform(val => val?.toString() || ""),
+  lastEuControl: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val || val === null) return null;
+    if (typeof val === 'string') return new Date(val);
+    return val;
+  }),
+  nextEuControl: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val || val === null) return null;
+    if (typeof val === 'string') return new Date(val);
+    return val;
+  }),
+  co2Emissions: z.union([z.number(), z.string(), z.null()]).optional().transform(val => {
+    if (!val || val === null) return null;
+    return typeof val === 'string' ? parseInt(val) || null : val;
+  }),
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({
