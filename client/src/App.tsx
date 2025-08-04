@@ -10,6 +10,7 @@ import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import ProfessionalDashboard from "@/pages/ProfessionalDashboard";
 import Cars from "@/pages/Cars";
+import CarDetail from "@/pages/CarDetail";
 import Customers from "@/pages/Customers";
 import CustomerProfile from "@/pages/CustomerProfile";
 import Contracts from "@/pages/Contracts";
@@ -33,6 +34,7 @@ function Router() {
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard-pro" component={ProfessionalDashboard} />
           <Route path="/cars" component={Cars} />
+          <Route path="/cars/:id" component={CarDetail} />
           <Route path="/customers" component={Customers} />
           <Route path="/customers/:id" component={CustomerProfile} />
           <Route path="/contracts" component={Contracts} />

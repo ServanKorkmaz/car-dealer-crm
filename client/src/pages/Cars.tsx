@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
+import { Link } from "wouter";
 
 // Grid Card Component for modern card layout
 function GridCarCard({ 
@@ -44,16 +45,16 @@ function GridCarCard({
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
 }) {
-  const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate);
+  const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate || null);
   const hasImage = car.images && car.images.length > 0;
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white dark:bg-slate-800 border-0 shadow-lg overflow-hidden" data-testid={`card-car-${car.id}`}>
+    <Card className="group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white dark:bg-slate-800 border-0 shadow-lg overflow-hidden cursor-pointer" data-testid={`card-car-${car.id}`}>
       {/* Car Image */}
       <div className="relative h-48 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 overflow-hidden">
         {hasImage ? (
           <img 
-            src={car.images[0]} 
+            src={car.images![0]} 
             alt={`${car.make} ${car.model}`}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={(e) => {
@@ -86,9 +87,11 @@ function GridCarCard({
       <CardContent className="p-4">
         {/* Title and Year */}
         <div className="mb-3">
-          <h3 className="font-bold text-lg text-slate-900 dark:text-white truncate">
-            {car.make} {car.model}
-          </h3>
+          <Link href={`/cars/${car.id}`}>
+            <h3 className="font-bold text-lg text-slate-900 dark:text-white truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+              {car.make} {car.model}
+            </h3>
+          </Link>
           <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
             <Calendar className="w-3 h-3" />
             <span>{car.year}</span>
@@ -128,15 +131,25 @@ function GridCarCard({
 
         {/* Action Buttons */}
         <div className="flex gap-2">
+          <Link href={`/cars/${car.id}`} className="flex-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              data-testid={`button-view-${car.id}`}
+            >
+              <Eye className="w-3 h-3 mr-1" />
+              Se detaljer
+            </Button>
+          </Link>
+          
           <Button
             variant="outline"
             size="sm"
             onClick={onEdit}
-            className="flex-1"
             data-testid={`button-edit-${car.id}`}
           >
-            <Edit className="w-3 h-3 mr-1" />
-            Rediger
+            <Edit className="w-3 h-3" />
           </Button>
           
           {car.status === 'available' && (
@@ -192,7 +205,7 @@ function ListCarCard({
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
 }) {
-  const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate);
+  const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate || null);
   const hasImage = car.images && car.images.length > 0;
 
   return (
@@ -203,7 +216,7 @@ function ListCarCard({
           <div className="w-20 h-16 flex-shrink-0 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-lg overflow-hidden">
             {hasImage ? (
               <img 
-                src={car.images[0]} 
+                src={car.images![0]} 
                 alt={`${car.make} ${car.model}`}
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -501,7 +514,7 @@ export default function Cars() {
       car.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
       car.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
       car.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      car.chassisNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (car as any).chassisNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       `${car.make} ${car.model}`.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = filterStatus === "all" || car.status === filterStatus;
