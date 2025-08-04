@@ -209,21 +209,35 @@ function parseCarDataFromHTML(html: string): FinnCarData {
       }
     }
 
-    // Extract mileage - try multiple patterns and title
-    let mileageMatch = html.match(/(?:kilometer|km|kjørelengde|mil)[^>]*>?\s*([\d\s\.]+)/i) ||
-                       html.match(/data-testid="mileage"[^>]*>([^<]+)/i) ||
-                       html.match(/([\d\s\.]+)\s*(?:km|kilometer|mil)/i);
+    // Enhanced mileage extraction - Norwegian format (space-separated thousands)
+    const mileagePatterns = [
+      // JSON data patterns
+      /"mileage"[^"]*"([^"]+)"/i,
+      /"kilometer"[^"]*"([^"]+)"/i,
+      // HTML content patterns - look for space-separated numbers followed by km
+      /(\d{1,3}(?:\s\d{3})*)\s*km/i,
+      // Test ID patterns
+      /data-testid="[^"]*(?:mileage|km)[^"]*"[^>]*>([^<]+)/i,
+      // Label patterns
+      /(?:kilometer|km|kjørelengde|mil)[^>]*>?\s*([\d\s\.]+)/i,
+      // Title patterns
+      /(\d{1,3}(?:\s\d{3})*)\s*km/i
+    ];
     
-    // Also try to extract from title if available
-    if (!mileageMatch && carData.title) {
-      mileageMatch = carData.title.match(/([\d\s\.]+)\s*(?:km|mil)/i);
-    }
+    console.log('Extracting mileage with enhanced patterns...');
     
-    if (mileageMatch) {
-      const mileageStr = mileageMatch[1].replace(/[^\d]/g, '');
-      const mileage = parseInt(mileageStr);
-      if (mileage && mileage > 0) {
-        carData.mileage = mileage;
+    for (const pattern of mileagePatterns) {
+      const mileageMatch = html.match(pattern) || (carData.title && carData.title.match(pattern));
+      if (mileageMatch) {
+        let mileageStr = mileageMatch[1];
+        // Handle Norwegian format with spaces (e.g., "15 000" -> "15000")
+        mileageStr = mileageStr.replace(/\s+/g, '').replace(/[^\d]/g, '');
+        const mileage = parseInt(mileageStr);
+        if (mileage && mileage > 0 && mileage < 2000000) { // Reasonable limit
+          carData.mileage = mileage;
+          console.log(`Found mileage: ${mileage} km`);
+          break;
+        }
       }
     }
 
@@ -286,79 +300,85 @@ function parseCarDataFromHTML(html: string): FinnCarData {
       carData.power = powerValue + powerUnit;
     }
 
-    // Extract registration number - enhanced patterns for Norwegian reg numbers
+    // Enhanced registration number extraction for Norwegian plates
+    console.log('Extracting registration number...');
+    
     const regPatterns = [
-      // Look for structured data with registration number
-      /"registrationNumber"[^"]*"([^"]+)"/i,
-      // Look for Norwegian registration format in various contexts
-      /(?:reg\.?\s*nr\.?|registration|skiltnummer|regnr)[^>]*>?\s*([A-Z]{1,2}\s*\d{4,5})/i,
-      // Direct pattern matching for Norwegian format
-      /\b([A-Z]{2}\s?\d{5})\b/g,
-      /\b([A-Z]{1}\s?\d{4,5})\b/g,
-      // In title or heading text
-      />([A-Z]{2}\s?\d{4,5})</g,
-      // Meta tags or data attributes
-      /content="[^"]*([A-Z]{2}\s?\d{4,5})[^"]*"/i
+      // JSON data patterns  
+      /"registrationNumber"[^"]*"([A-Z]{1,2}\d{4,6})"/i,
+      /"vehicleIdentificationNumber"[^"]*"([A-Z]{1,2}\d{4,6})"/i,
+      // HTML content patterns - look for Norwegian license plate formats
+      /\b([A-Z]{2}\d{5,6})\b/g,  // New format: EV12345, AB123456
+      /\b([A-Z]{1,2}\s?\d{4,5})\b/g,  // Old format: A1234, AB1234
+      // In structured text
+      /(?:reg\.?\s*nr\.?|registration|skiltnummer|regnr)[^>]*>?\s*([A-Z]{1,2}\s*\d{4,6})/i,
+      // In title or URLs
+      /\/([A-Z]{1,2}\d{4,6})\//g,
+      // Meta content
+      /content="[^"]*([A-Z]{1,2}\d{4,6})[^"]*"/i
     ];
     
     for (const pattern of regPatterns) {
-      const matches = html.match(pattern);
-      if (matches) {
-        // For global patterns, check all matches
-        if (pattern.global) {
-          let match;
-          pattern.lastIndex = 0; // Reset regex
-          while ((match = pattern.exec(html)) !== null) {
-            const regNumber = match[1].replace(/\s+/g, '').toUpperCase();
-            if (/^[A-Z]{1,2}\d{4,5}$/.test(regNumber)) {
-              carData.registrationNumber = regNumber;
-              console.log(`Found registration number: ${regNumber}`);
-              break;
-            }
-          }
-        } else {
-          const regNumber = matches[1]?.replace(/\s+/g, '').toUpperCase();
-          if (regNumber && /^[A-Z]{1,2}\d{4,5}$/.test(regNumber)) {
+      if (pattern.global) {
+        let match;
+        pattern.lastIndex = 0;
+        while ((match = pattern.exec(html)) !== null) {
+          const regNumber = match[1].replace(/\s+/g, '').toUpperCase();
+          // Check both old and new Norwegian formats
+          if (/^[A-Z]{1,2}\d{4,6}$/.test(regNumber)) {
             carData.registrationNumber = regNumber;
             console.log(`Found registration number: ${regNumber}`);
             break;
           }
         }
-        if (carData.registrationNumber) break;
+      } else {
+        const matches = html.match(pattern) || (carData.title && carData.title.match(pattern));
+        if (matches) {
+          const regNumber = matches[1]?.replace(/\s+/g, '').toUpperCase();
+          if (regNumber && /^[A-Z]{1,2}\d{4,6}$/.test(regNumber)) {
+            carData.registrationNumber = regNumber;
+            console.log(`Found registration number: ${regNumber}`);
+            break;
+          }
+        }
       }
+      if (carData.registrationNumber) break;
     }
 
     // Simplified comprehensive image extraction
     const allImages: string[] = [];
     
-    // Extract ALL finncdn.no images from HTML using multiple strategies
-    const patterns = [
-      // Direct image URLs in any context
-      /https:\/\/images\.finncdn\.no\/[^\s"'<>]+\.(?:jpg|jpeg|png|webp)/g,
-      // Images in src attributes
-      /src="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/g,
-      // Images in data attributes (lazy loading)
-      /data-[^=]*src="(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/g,
-      // Images in JSON data
-      /"(https:\/\/images\.finncdn\.no\/[^"]+\.(?:jpg|jpeg|png|webp))"/g
-    ];
+    // COMPREHENSIVE IMAGE EXTRACTION - targeting Finn.no's actual structure
+    console.log('Starting comprehensive image extraction...');
     
-    console.log('Scanning HTML for images with multiple patterns...');
+    // Strategy 1: Extract from JSON structured data (contentUrl pattern)
+    const contentUrlMatches = html.match(/"contentUrl":\s*"(https:\/\/images\.finncdn\.no\/[^"]+)"/g) || [];
+    console.log(`Found ${contentUrlMatches.length} contentUrl images`);
+    contentUrlMatches.forEach(match => {
+      const url = match.split('"')[3]; // Extract URL from "contentUrl": "URL"
+      if (url && !allImages.includes(url)) {
+        allImages.push(url);
+      }
+    });
     
-    for (const pattern of patterns) {
-      const matches = html.match(pattern) || [];
-      console.log(`Pattern found ${matches.length} matches`);
-      
-      matches.forEach(match => {
-        // Extract URL from match (may have quotes)
-        const url = match.includes('src="') ? match.split('"')[1] : 
-                   match.includes('://') ? match : match.replace(/"/g, '');
-        
-        if (url && url.startsWith('https://images.finncdn.no/') && !allImages.includes(url)) {
-          allImages.push(url);
-        }
-      });
-    }
+    // Strategy 2: Extract from og:image and similar meta tags
+    const metaImageMatches = html.match(/(?:og:image|twitter:image)[^>]*content="(https:\/\/images\.finncdn\.no\/[^"]+)"/g) || [];
+    console.log(`Found ${metaImageMatches.length} meta images`);
+    metaImageMatches.forEach(match => {
+      const url = match.split('content="')[1]?.split('"')[0];
+      if (url && !allImages.includes(url)) {
+        allImages.push(url);
+      }
+    });
+    
+    // Strategy 3: All direct URLs in any context
+    const allUrlMatches = html.match(/https:\/\/images\.finncdn\.no\/[^\s"'<>]+/g) || [];
+    console.log(`Found ${allUrlMatches.length} direct URL matches`);
+    allUrlMatches.forEach(url => {
+      if (url && !allImages.includes(url)) {
+        allImages.push(url);
+      }
+    });
     
     console.log(`Total unique images extracted: ${allImages.length}`);
     
