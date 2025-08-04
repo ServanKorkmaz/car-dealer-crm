@@ -114,13 +114,16 @@ export default function Cars() {
     },
     onSuccess: (data: any) => {
       if (data.carData) {
-        // Show the car data in the add modal
-        setShowAddModal(true);
+        // Invalidate queries to refresh the list and dashboard stats
+        queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+        
+        // Close import dialog and show success message
         setShowFinnImport(false);
         setFinnUrl("");
         toast({
-          title: "Suksess",
-          description: "Bildata hentet fra Finn.no. Fyll ut eventuell manglende informasjon.",
+          title: "Suksess", 
+          description: "Bil importert fra Finn.no og lagt til i systemet",
         });
       }
     },
