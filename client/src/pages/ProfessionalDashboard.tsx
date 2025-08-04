@@ -11,7 +11,7 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { TrendingUp, TrendingDown, Car, Users, FileText, DollarSign, Clock, Package, Download, Calendar, Filter } from "lucide-react";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import SeedDataButton from "@/components/dashboard/SeedDataButton";
+
 
 export default function ProfessionalDashboard() {
   const { toast } = useToast();
@@ -174,7 +174,7 @@ export default function ProfessionalDashboard() {
             </p>
           </div>
           <div className="flex items-center space-x-4">
-            <SeedDataButton />
+
             <Select value={timeRange} onValueChange={setTimeRange}>
               <SelectTrigger className="w-48" data-testid="select-time-range">
                 <SelectValue />
