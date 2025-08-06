@@ -4,10 +4,13 @@ import type { InsertCar } from '@shared/schema';
 async function lookupVehicleData(regNumber: string) {
   try {
     if (!process.env.SVV_API_KEY) {
+      console.log('SVV API key not configured');
       return null;
     }
 
     const regNumberClean = regNumber.replace(/\s+/g, '').toUpperCase();
+    console.log(`Calling SVV API for registration: ${regNumberClean}`);
+    
     const response = await fetch(
       `https://akfell-datautlevering.atlas.vegvesen.no/enkeltoppslag/kjoretoydata?kjennemerke=${encodeURIComponent(regNumberClean)}`,
       {
@@ -18,29 +21,66 @@ async function lookupVehicleData(regNumber: string) {
       }
     );
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.log(`SVV API returned status: ${response.status}`);
+      return null;
+    }
     
     const responseText = await response.text();
-    if (!responseText.trim()) return null;
+    if (!responseText.trim()) {
+      console.log('SVV API returned empty response');
+      return null;
+    }
     
     const data = JSON.parse(responseText);
     const vehicleInfo = data.kjoretoydataListe?.[0];
-    if (!vehicleInfo) return null;
+    if (!vehicleInfo) {
+      console.log('No vehicle info found in SVV response');
+      return null;
+    }
 
     const tekniskData = vehicleInfo.godkjenning?.tekniskGodkjenning?.tekniskeData;
     const genereltData = tekniskData?.generelt;
+    const periodiskKjoretoykontroll = vehicleInfo.periodiskKjoretoykontroll;
+    const vektData = tekniskData?.vekter;
+    const motorData = tekniskData?.motorOgDrivverk?.motor?.[0];
     
-    return {
+    // Extract comprehensive vehicle data
+    const svvData = {
+      // Basic info
       make: genereltData?.merke?.[0]?.merke || "",
       model: genereltData?.handelsbetegnelse?.[0] || "",
+      chassisNumber: vehicleInfo.kjoretoyId?.understellsnummer || "",
+      
+      // Registration and dates
       year: vehicleInfo.forstegangsregistrering?.registrertForstegangNorgeDato ? 
             new Date(vehicleInfo.forstegangsregistrering.registrertForstegangNorgeDato).getFullYear() : 
-            new Date().getFullYear(),
-      fuelType: tekniskData?.motorOgDrivverk?.motor?.[0]?.drivstoff?.[0]?.drivstoffKode?.kodeBeskrivelse || "",
+            null,
+      firstRegistrationDate: vehicleInfo.forstegangsregistrering?.registrertForstegangNorgeDato || "",
+      
+      // EU control data
+      nextInspectionDate: periodiskKjoretoykontroll?.kontrollfrist || "",
+      lastInspectionDate: periodiskKjoretoykontroll?.sistGodkjent || "",
+      
+      // Technical specifications
+      fuelType: motorData?.drivstoff?.[0]?.drivstoffKode?.kodeBeskrivelse || "",
       transmission: tekniskData?.motorOgDrivverk?.girkasse?.girkasseType?.kodeBeskrivelse || "",
-      color: tekniskData?.karosseriOgLasteplan?.karosseri?.[0]?.farge?.kodeBeskrivelse || "",
-      power: tekniskData?.motorOgDrivverk?.motor?.[0]?.drivstoff?.[0]?.maksNettoEffekt || "",
+      color: tekniskData?.karosseriOgLasteplan?.karosseri?.[0]?.farge?.[0]?.kodeBeskrivelse || "",
+      power: motorData?.maksNettoEffekt ? `${motorData.maksNettoEffekt} kW` : "",
+      engineVolume: motorData?.slagvolum ? `${motorData.slagvolum} ccm` : "",
+      
+      // Weight data
+      weight: vektData?.egenvekt || null,
+      maxWeight: vektData?.tillattTotalvekt || null,
+      
+      // Additional info
+      seats: tekniskData?.persontall?.sitteplasserTotalt || null,
+      doors: tekniskData?.karosseriOgLasteplan?.karosseri?.[0]?.dorType?.kodeBeskrivelse || "",
+      co2Emissions: motorData?.miljodata?.utslipp?.co2WltpKombinert || null,
     };
+    
+    console.log('SVV data successfully retrieved with comprehensive details');
+    return svvData;
   } catch (error) {
     console.error('SVV lookup error:', error);
     return null;
@@ -67,7 +107,7 @@ interface FinnCarData {
   location?: string;
 }
 
-export async function scrapeFinnAd(url: string): Promise<Partial<InsertCar> | null> {
+export async function scrapeFinnAd(url: string, manualRegNumber?: string): Promise<Partial<InsertCar> | null> {
   try {
     // Validate that this is a Finn.no vehicle ad URL
     if (!url.includes('finn.no') || (!url.includes('/car/') && !url.includes('/mobility/'))) {
@@ -92,14 +132,20 @@ export async function scrapeFinnAd(url: string): Promise<Partial<InsertCar> | nu
     // Parse the HTML to extract car data
     const carData = parseCarDataFromHTML(html);
     
+    // Use manual registration number if provided, otherwise use extracted one
+    if (manualRegNumber) {
+      carData.registrationNumber = manualRegNumber.replace(/\s+/g, '').toUpperCase();
+      console.log(`Using manual registration number: ${carData.registrationNumber}`);
+    }
+    
     // Always attempt SVV lookup if we have a registration number
-    let svvData = null;
+    let svvData: any = null;
     if (carData.registrationNumber) {
       console.log(`Attempting SVV lookup for registration: ${carData.registrationNumber}`);
       try {
         svvData = await lookupVehicleData(carData.registrationNumber);
         if (svvData) {
-          // Use SVV data as primary source, fallback to Finn.no data if SVV is missing info
+          // Use SVV data as primary source, only use Finn data if SVV is missing
           carData.make = svvData.make || carData.make;
           carData.model = svvData.model || carData.model;
           carData.year = svvData.year || carData.year;
@@ -107,12 +153,21 @@ export async function scrapeFinnAd(url: string): Promise<Partial<InsertCar> | nu
           carData.transmission = svvData.transmission || carData.transmission;
           carData.color = svvData.color || carData.color;
           carData.power = svvData.power || carData.power;
-          console.log('SVV data successfully retrieved and merged:', {
-            make: svvData.make,
-            model: svvData.model,
-            year: svvData.year,
-            fuelType: svvData.fuelType
-          });
+          
+          // Add additional fields from SVV if they exist in our schema
+          if (svvData.nextInspectionDate) {
+            // Convert to Date for nextEuControl field
+            carData.nextEuControl = new Date(svvData.nextInspectionDate);
+          }
+          if (svvData.lastInspectionDate) {
+            // Convert to Date for lastEuControl field
+            carData.lastEuControl = new Date(svvData.lastInspectionDate);
+          }
+          if (svvData.co2Emissions) {
+            carData.co2Emissions = svvData.co2Emissions;
+          }
+          
+          console.log('SVV data successfully merged with comprehensive details');
         } else {
           console.log('SVV lookup returned no data');
         }

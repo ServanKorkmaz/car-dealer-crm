@@ -319,6 +319,8 @@ export default function Cars() {
   const [editingCar, setEditingCar] = useState<Car | null>(null);
   const [showFinnImport, setShowFinnImport] = useState(false);
   const [finnUrl, setFinnUrl] = useState("");
+  const [manualRegNumber, setManualRegNumber] = useState("");
+  const [showRegNumberDialog, setShowRegNumberDialog] = useState(false);
   const [sortBy, setSortBy] = useState("newest");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterMake, setFilterMake] = useState("all");
@@ -419,8 +421,8 @@ export default function Cars() {
   });
 
   const finnImportMutation = useMutation({
-    mutationFn: async (url: string) => {
-      const response = await apiRequest("POST", "/api/cars/import-from-finn", { url });
+    mutationFn: async (data: { url: string; regNumber?: string }) => {
+      const response = await apiRequest("POST", "/api/cars/import-from-finn", data);
       return response;
     },
     onSuccess: async (data: any) => {
@@ -429,10 +431,10 @@ export default function Cars() {
         setShowFinnImport(false);
         setFinnUrl("");
         
-        // Immediate cache invalidation for faster refresh
-        queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+        // Force immediate refresh with await to ensure UI updates
+        await queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+        await queryClient.refetchQueries({ queryKey: ['/api/cars'] });
         queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/analytics/30'] });
         
         toast({
           title: "Suksess", 
@@ -482,16 +484,18 @@ export default function Cars() {
       return;
     }
 
-    if (!finnUrl.includes('finn.no') || (!finnUrl.includes('/car/') && !finnUrl.includes('/mobility/'))) {
+    // Enhanced URL validation
+    const urlPattern = /^https?:\/\/(www\.)?finn\.no\/(car|mobility)\/(item|ad)\/\d+/i;
+    if (!urlPattern.test(finnUrl)) {
       toast({
-        title: "Feil",
-        description: "URL må være en Finn.no bil- eller kjøretøyannonse",
+        title: "Ugyldig URL",
+        description: "URL må være en Finn.no bil- eller kjøretøyannonse (f.eks. https://www.finn.no/mobility/item/123456)",
         variant: "destructive",
       });
       return;
     }
 
-    finnImportMutation.mutate(finnUrl);
+    finnImportMutation.mutate({ url: finnUrl, regNumber: manualRegNumber });
   };
 
   if (isLoading || !isAuthenticated) {
@@ -802,19 +806,53 @@ export default function Cars() {
               Lim inn URL-en til en bil- eller kjøretøyannonse på Finn.no for å hente data automatisk.
             </p>
             <div className="space-y-4">
-              <Input
-                type="url"
-                placeholder="https://www.finn.no/car/used/ad.html?finnkode=... eller /mobility/..."
-                value={finnUrl}
-                onChange={(e) => setFinnUrl(e.target.value)}
-                className="w-full"
-              />
+              <div>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Finn.no URL *
+                </label>
+                <Input
+                  type="url"
+                  placeholder="https://www.finn.no/mobility/item/123456"
+                  value={finnUrl}
+                  onChange={(e) => setFinnUrl(e.target.value)}
+                  className="w-full mt-1"
+                  disabled={finnImportMutation.isPending}
+                />
+              </div>
+              
+              <div>
+                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Registreringsnummer (valgfritt)
+                </label>
+                <Input
+                  type="text"
+                  placeholder="F.eks: EV12345 eller AB1234"
+                  value={manualRegNumber}
+                  onChange={(e) => setManualRegNumber(e.target.value.toUpperCase())}
+                  className="w-full mt-1"
+                  disabled={finnImportMutation.isPending}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Legg til hvis ikke i annonsen for å hente SVV-data
+                </p>
+              </div>
+              
+              {finnImportMutation.isPending && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                    <div className="w-4 h-4 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                    <span>Importerer bil fra Finn.no...</span>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex gap-2 justify-end">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setShowFinnImport(false);
                     setFinnUrl("");
+                    setManualRegNumber("");
                   }}
                   disabled={finnImportMutation.isPending}
                 >
@@ -828,7 +866,7 @@ export default function Cars() {
                   {finnImportMutation.isPending ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
-                      Henter data...
+                      Importerer...
                     </>
                   ) : (
                     <>

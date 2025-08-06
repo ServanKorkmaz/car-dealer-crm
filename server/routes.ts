@@ -546,13 +546,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Finn.no scraping endpoint
   app.post('/api/cars/import-from-finn', authMiddleware, async (req: any, res) => {
     try {
-      const { url } = req.body;
+      const { url, regNumber } = req.body;
       
       if (!url || typeof url !== 'string') {
         return res.status(400).json({ message: "URL is required" });
       }
 
-      const carData = await scrapeFinnAd(url);
+      const carData = await scrapeFinnAd(url, regNumber);
       
       if (!carData) {
         return res.status(400).json({ message: "Could not extract car data from URL" });
