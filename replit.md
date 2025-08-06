@@ -122,13 +122,13 @@ The database uses PostgreSQL with the following main entities:
 
 ## Recent Changes (2025-08-06)
 
-### ✅ Enhanced Finn.no Import with Complete Data Integration
-- **Smart Image Deduplication**: UUID-based filtering prevents duplicate images with different sizes
-- **Manual Registration Input**: Added optional field for registration numbers not in Finn ads
-- **Comprehensive SVV Data**: Extended API integration for EU-control dates, weight, CO2 emissions
-- **Improved Auto-refresh**: Force cache cancellation and delayed refetch for instant UI updates
-- **Enhanced URL Validation**: Regex patterns for both /car/ and /mobility/ Finn.no URLs
-- **Optimized Image Extraction**: Prioritizes high-resolution images, limits to 15 unique photos
+### ✅ Complete Finn.no Import System Overhaul  
+- **Advanced Image Extraction**: Multi-strategy approach finds ALL images (up to 40+) from Finn listings
+- **UUID-Based Deduplication**: Smart filtering prevents duplicate images using unique identifiers
+- **Instant UI Updates**: Direct refetch method ensures imported cars appear immediately
+- **Gallery Data Mining**: Extracts images from window.__remixContext for complete photo sets
+- **High-Quality Images**: Automatically selects 1600w resolution versions when available
+- **Comprehensive Data Merge**: Combines Finn.no data with full SVV registry information
 
 ### ✅ Professional Dashboard with Authentic Data Integration
 - **Real Data Analytics**: Dashboard now displays authentic sales data instead of test/dummy data

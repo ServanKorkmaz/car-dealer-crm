@@ -344,7 +344,7 @@ export default function Cars() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: cars = [], isLoading: carsLoading } = useQuery<Car[]>({
+  const { data: cars = [], isLoading: carsLoading, refetch: refetchCars } = useQuery<Car[]>({
     queryKey: ["/api/cars"],
     enabled: isAuthenticated,
   });
@@ -427,25 +427,21 @@ export default function Cars() {
     },
     onSuccess: async (data: any) => {
       if (data.carData) {
-        // Close import dialog and reset fields
-        setShowFinnImport(false);
-        setFinnUrl("");
-        setManualRegNumber("");
-        
-        // Force complete refresh of car list
-        await queryClient.cancelQueries({ queryKey: ['/api/cars'] });
-        await queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
-        
-        // Refetch with a small delay to ensure backend has saved
-        setTimeout(async () => {
-          await queryClient.refetchQueries({ queryKey: ['/api/cars'] });
-          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-        }, 100);
-        
         toast({
           title: "Suksess", 
           description: `Bil importert: ${data.carData.make} ${data.carData.model}`,
         });
+        
+        // Close dialog and reset fields
+        setShowFinnImport(false);
+        setFinnUrl("");
+        setManualRegNumber("");
+        
+        // Force immediate refresh
+        await refetchCars();
+        
+        // Also update dashboard stats
+        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       }
     },
     onError: (error: any) => {
