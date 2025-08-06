@@ -427,14 +427,20 @@ export default function Cars() {
     },
     onSuccess: async (data: any) => {
       if (data.carData) {
-        // Close import dialog first
+        // Close import dialog and reset fields
         setShowFinnImport(false);
         setFinnUrl("");
+        setManualRegNumber("");
         
-        // Force immediate refresh with await to ensure UI updates
+        // Force complete refresh of car list
+        await queryClient.cancelQueries({ queryKey: ['/api/cars'] });
         await queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
-        await queryClient.refetchQueries({ queryKey: ['/api/cars'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+        
+        // Refetch with a small delay to ensure backend has saved
+        setTimeout(async () => {
+          await queryClient.refetchQueries({ queryKey: ['/api/cars'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+        }, 100);
         
         toast({
           title: "Suksess", 

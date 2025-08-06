@@ -120,15 +120,15 @@ The database uses PostgreSQL with the following main entities:
 - Replit-specific configuration for authentication
 - Support for both Replit and external hosting
 
-## Recent Changes (2025-08-04)
+## Recent Changes (2025-08-06)
 
-### ✅ Finn.no Import System Completely Overhauled
-- **Enhanced Data Extraction**: Dramatically improved parsing of car data from Finn.no listings
-- **SVV API Integration**: Automatic fallback to Norwegian vehicle registry for missing data
-- **Smart Data Mining**: Multi-pattern extraction from title, HTML content, and structured data
-- **Auto-refresh Fixed**: Delayed cache invalidation ensures new cars appear without manual refresh
-- **Flexible Validation**: Schema now handles mixed data types from different sources
-- **Bil Editing Resolved**: Users can now successfully edit imported cars without validation errors
+### ✅ Enhanced Finn.no Import with Complete Data Integration
+- **Smart Image Deduplication**: UUID-based filtering prevents duplicate images with different sizes
+- **Manual Registration Input**: Added optional field for registration numbers not in Finn ads
+- **Comprehensive SVV Data**: Extended API integration for EU-control dates, weight, CO2 emissions
+- **Improved Auto-refresh**: Force cache cancellation and delayed refetch for instant UI updates
+- **Enhanced URL Validation**: Regex patterns for both /car/ and /mobility/ Finn.no URLs
+- **Optimized Image Extraction**: Prioritizes high-resolution images, limits to 15 unique photos
 
 ### ✅ Professional Dashboard with Authentic Data Integration
 - **Real Data Analytics**: Dashboard now displays authentic sales data instead of test/dummy data

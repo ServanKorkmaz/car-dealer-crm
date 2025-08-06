@@ -400,75 +400,72 @@ function parseCarDataFromHTML(html: string): FinnCarData {
       if (carData.registrationNumber) break;
     }
 
-    // Simplified comprehensive image extraction
-    const allImages: string[] = [];
+    // Image extraction with smart deduplication
+    const imageSet = new Set<string>();
+    const imageHashes = new Set<string>();
     
-    // COMPREHENSIVE IMAGE EXTRACTION - targeting Finn.no's actual structure
-    console.log('Starting comprehensive image extraction...');
+    console.log('Starting smart image extraction...');
     
-    // Strategy 1: Extract from JSON structured data (contentUrl pattern)
-    const contentUrlMatches = html.match(/"contentUrl":\s*"(https:\/\/images\.finncdn\.no\/[^"]+)"/g) || [];
-    console.log(`Found ${contentUrlMatches.length} contentUrl images`);
-    contentUrlMatches.forEach(match => {
-      const url = match.split('"')[3]; // Extract URL from "contentUrl": "URL"
-      if (url && !allImages.includes(url)) {
-        allImages.push(url);
-      }
-    });
+    // Helper to extract image ID from Finn URL
+    const getImageId = (url: string): string => {
+      // Extract the UUID from the URL (e.g., 1d8f055f-8217-4c00-8990-90cafd8b18a8)
+      const match = url.match(/\/([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/);
+      if (match) return match[1];
+      
+      // Fallback: extract numeric ID
+      const numMatch = url.match(/\/(\d+_\d+)(?:_\w+)?\.jpg/);
+      return numMatch ? numMatch[1] : url;
+    };
     
-    // Strategy 2: Extract from og:image and similar meta tags
-    const metaImageMatches = html.match(/(?:og:image|twitter:image)[^>]*content="(https:\/\/images\.finncdn\.no\/[^"]+)"/g) || [];
-    console.log(`Found ${metaImageMatches.length} meta images`);
-    metaImageMatches.forEach(match => {
-      const url = match.split('content="')[1]?.split('"')[0];
-      if (url && !allImages.includes(url)) {
-        allImages.push(url);
-      }
-    });
-    
-    // Strategy 3: All direct URLs in any context
-    const allUrlMatches = html.match(/https:\/\/images\.finncdn\.no\/[^\s"'<>]+/g) || [];
-    console.log(`Found ${allUrlMatches.length} direct URL matches`);
-    allUrlMatches.forEach(url => {
-      if (url && !allImages.includes(url)) {
-        allImages.push(url);
-      }
-    });
-    
-    console.log(`Total unique images extracted: ${allImages.length}`);
-    
-    // Strategy 2: Look for structured data with images
-    const structuredDataMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/s);
-    if (structuredDataMatch) {
+    // Strategy 1: Look for structured data first (most reliable)
+    const scriptMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/);
+    if (scriptMatch) {
       try {
-        const jsonData = JSON.parse(structuredDataMatch[1]);
+        const jsonData = JSON.parse(scriptMatch[1]);
         if (jsonData.image) {
-          if (Array.isArray(jsonData.image)) {
-            allImages.push(...jsonData.image.filter((img: any) => typeof img === 'string' && img.includes('finncdn.no')));
-          } else if (typeof jsonData.image === 'string') {
-            allImages.push(jsonData.image);
-          }
+          const images = Array.isArray(jsonData.image) ? jsonData.image : [jsonData.image];
+          images.forEach((img: string) => {
+            if (img && img.includes('finncdn.no')) {
+              const cleanUrl = img.split('?')[0];
+              const imageId = getImageId(cleanUrl);
+              if (!imageHashes.has(imageId)) {
+                imageHashes.add(imageId);
+                imageSet.add(cleanUrl);
+              }
+            }
+          });
         }
       } catch (e) {
-        // Ignore JSON parse errors
+        // Fallback to regex if JSON parse fails
       }
     }
     
-    // Basic filtering to remove duplicates and small images
-    const uniqueImages = Array.from(new Set(allImages));
-    const cleanImages = uniqueImages
-      .filter(url => {
-        if (!url || !url.startsWith('https://images.finncdn.no/')) return false;
-        
-        // Only exclude very small thumbnails
-        if (url.includes('width=50') || url.includes('height=50')) return false;
-        
-        return true;
-      })
-      .slice(0, 15);
+    // Strategy 2: Extract from contentUrl patterns (backup)
+    const contentUrlMatches = html.match(/"contentUrl":\s*"(https:\/\/images\.finncdn\.no\/[^"]+)"/g) || [];
+    contentUrlMatches.forEach(match => {
+      const urlMatch = match.match(/"contentUrl":\s*"([^"]+)"/);
+      if (urlMatch && urlMatch[1]) {
+        const cleanUrl = urlMatch[1].split('?')[0];
+        const imageId = getImageId(cleanUrl);
+        if (!imageHashes.has(imageId)) {
+          imageHashes.add(imageId);
+          // Prefer largest size available (dynamic/default or 1600w)
+          if (!cleanUrl.includes('/dynamic/')) {
+            imageSet.add(cleanUrl);
+          } else if (cleanUrl.includes('/default/') || cleanUrl.includes('/1600w/')) {
+            imageSet.add(cleanUrl.replace(/\/\d+w\//, '/1600w/'));
+          }
+        }
+      }
+    });
     
-    carData.images = cleanImages;
-    console.log(`Extracted ${cleanImages.length} images from Finn.no (${uniqueImages.length} unique, ${allImages.length} total found)`);
+    // Convert Set to Array
+    const allImages = Array.from(imageSet);
+    console.log(`Extracted ${allImages.length} unique images`);
+    
+    // Take up to 15 unique images
+    carData.images = allImages.slice(0, 15);
+    console.log(`Final: ${carData.images.length} unique images for car`);
 
     // Extract description
     const descMatch = html.match(/<meta[^>]+(?:description|content)[^>]*content="([^"]+)"/i);
