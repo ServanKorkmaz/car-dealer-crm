@@ -325,6 +325,9 @@ export default function Cars() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterMake, setFilterMake] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [showSellDialog, setShowSellDialog] = useState(false);
+  const [sellingCar, setSellingCar] = useState<Car | null>(null);
+  const [salePrice, setSalePrice] = useState("");
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -558,9 +561,20 @@ export default function Cars() {
   };
 
   const handleSellCar = (car: Car) => {
-    const soldPrice = prompt(`Salgspris for ${car.make} ${car.model}:`, car.salePrice || "");
-    if (soldPrice !== null) {
-      sellMutation.mutate({ carId: car.id, soldPrice });
+    setSellingCar(car);
+    setSalePrice(car.salePrice || "");
+    setShowSellDialog(true);
+  };
+
+  const confirmSell = () => {
+    if (sellingCar) {
+      sellMutation.mutate({ 
+        carId: sellingCar.id, 
+        soldPrice: salePrice 
+      });
+      setShowSellDialog(false);
+      setSellingCar(null);
+      setSalePrice("");
     }
   };
 
@@ -795,6 +809,112 @@ export default function Cars() {
           car={editingCar} 
           onClose={() => setEditingCar(null)} 
         />
+      )}
+
+      {/* Sell Car Dialog */}
+      {showSellDialog && sellingCar && (
+        <Dialog open={showSellDialog} onOpenChange={(open) => {
+          if (!open) {
+            setShowSellDialog(false);
+            setSellingCar(null);
+            setSalePrice("");
+          }
+        }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+                Marker som solgt
+              </DialogTitle>
+              <DialogDescription>
+                Angi salgspris for {sellingCar.make} {sellingCar.model} ({sellingCar.registrationNumber})
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 pt-4">
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">Utsalgspris:</span>
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    {formatPrice(sellingCar.salePrice || "0")}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">Innkjøpspris:</span>
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    {formatPrice(sellingCar.costPrice || "0")}
+                  </span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Faktisk salgspris
+                </label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    type="number"
+                    placeholder="Angi salgspris"
+                    value={salePrice}
+                    onChange={(e) => setSalePrice(e.target.value)}
+                    className="pl-10 text-lg font-medium"
+                    autoFocus
+                    data-testid="input-sale-price"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Beløp i norske kroner (NOK)
+                </p>
+              </div>
+              
+              {salePrice && sellingCar.costPrice && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-blue-700 dark:text-blue-300">Fortjeneste:</span>
+                    <span className={`font-bold ${
+                      parseInt(salePrice) - parseInt(sellingCar.costPrice) >= 0 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>
+                      {formatPrice((parseInt(salePrice || "0") - parseInt(sellingCar.costPrice || "0")).toString())}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSellDialog(false);
+                  setSellingCar(null);
+                  setSalePrice("");
+                }}
+                className="flex-1"
+                data-testid="button-cancel-sell"
+              >
+                Avbryt
+              </Button>
+              <Button
+                onClick={confirmSell}
+                disabled={!salePrice || sellMutation.isPending}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                data-testid="button-confirm-sell"
+              >
+                {sellMutation.isPending ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Marker som solgt
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Finn.no Import Dialog */}
