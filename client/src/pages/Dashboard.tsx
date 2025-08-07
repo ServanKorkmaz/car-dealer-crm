@@ -5,7 +5,7 @@ import MainLayout from "@/components/layout/MainLayout";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import RecentCars from "@/components/dashboard/RecentCars";
 import QuickActions from "@/components/dashboard/QuickActions";
-import RecentActivity from "@/components/dashboard/RecentActivity";
+import ActivityFeed from "@/components/dashboard/ActivityFeed";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -46,7 +46,7 @@ export default function Dashboard() {
           </div>
           <div className="space-y-6">
             <QuickActions />
-            <RecentActivity />
+            <ActivityFeed limit={8} />
           </div>
         </div>
       </div>
