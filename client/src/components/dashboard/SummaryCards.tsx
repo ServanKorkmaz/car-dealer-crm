@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Car, Users, FileText, TrendingUp, ArrowUp } from "lucide-react";
 
-export default function SummaryCards() {
+export default function SummaryCards({ compact = false }: { compact?: boolean }) {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["/api/dashboard/stats"],
   });
@@ -81,29 +81,29 @@ export default function SummaryCards() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 ${compact ? "gap-3" : "gap-4"}`}>
       {cards.map((card, index) => (
-        <Card key={index} className="card-hover group border-0 shadow-md hover:shadow-xl animate-scale-in" style={{ animationDelay: `${index * 0.1}s` }}>
-          <CardContent className="p-6 relative overflow-hidden">
+        <Card key={index} className="hover:shadow-md transition-shadow duration-200 border-slate-200 dark:border-slate-700">
+          <CardContent className={compact ? "p-3 relative" : "p-4 relative"}>
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-600 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">
+              <div className={compact ? "space-y-0.5" : "space-y-1"}>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   {card.title}
                 </p>
-                <p className="text-3xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">
+                <p className={compact ? "text-lg font-semibold text-slate-900 dark:text-white" : "text-xl font-semibold text-slate-900 dark:text-white"}>
                   {card.value}
                 </p>
-                <p className="text-sm text-emerald-600 dark:text-emerald-400 flex items-center mt-1 group-hover:text-emerald-500 transition-colors">
-                  <ArrowUp className="w-3 h-3 mr-1 group-hover:animate-bounce" />
-                  {card.change}
-                </p>
+                {!compact && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center">
+                    <ArrowUp className="w-3 h-3 mr-1 text-emerald-500" />
+                    <span className="text-emerald-600 dark:text-emerald-400">{card.change}</span>
+                  </p>
+                )}
               </div>
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getColorClasses(card.color)} group-hover:scale-110 transition-all duration-300 group-hover:shadow-lg`}>
-                <card.icon className="w-6 h-6 group-hover:rotate-12 transition-transform duration-300" />
+              <div className={`${compact ? "w-8 h-8" : "w-10 h-10"} rounded-lg flex items-center justify-center ${getColorClasses(card.color)}`}>
+                <card.icon className={compact ? "w-4 h-4" : "w-5 h-5"} />
               </div>
             </div>
-            {/* Animated background gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
           </CardContent>
         </Card>
       ))}

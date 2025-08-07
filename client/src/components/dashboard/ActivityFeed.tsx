@@ -72,13 +72,12 @@ export default function ActivityFeed({ limit = 10 }: { limit?: number }) {
   if (isLoading) {
     return (
       <Card data-testid="activity-feed">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium">
             Siste aktivitet
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="space-y-4">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="animate-pulse">
@@ -100,13 +99,12 @@ export default function ActivityFeed({ limit = 10 }: { limit?: number }) {
   if (activities.length === 0) {
     return (
       <Card data-testid="activity-feed">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="w-5 h-5" />
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium">
             Siste aktivitet
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <div className="text-center py-8">
             <Calendar className="w-12 h-12 text-slate-400 mx-auto mb-3" />
             <p className="text-slate-600 dark:text-slate-400">
@@ -123,21 +121,20 @@ export default function ActivityFeed({ limit = 10 }: { limit?: number }) {
 
   return (
     <Card data-testid="activity-feed">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="w-5 h-5" />
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-medium">
           Siste aktivitet
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="pt-0">
+        <div className="space-y-3">
           {activities.map((activity) => {
             const { icon: Icon, color, bgColor } = getActivityStyle(activity.type);
             
             return (
               <div 
                 key={activity.id} 
-                className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                className="flex items-start gap-3 p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                 data-testid={`activity-${activity.type}-${activity.id}`}
               >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${bgColor}`}>

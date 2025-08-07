@@ -1,0 +1,47 @@
+🛠 Problem:
+Designet på ForhandlerPRO-dashboardet fungerer greit funksjonelt, men visse elementer føles for store og overveldende, spesielt fontstørrelser og spacing. Dette gjør at brukeropplevelsen oppleves mindre oversiktlig enn ønsket.
+
+🎯 Mål:
+Forbedre UI/UX på dashbordet slik at det blir mer balansert, ryddig og profesjonelt. Gjør designbeslutninger basert på god brukeropplevelse, og tilpass med tanke på at plattformen skal brukes daglig av bilforhandlere.
+
+✅ Oppgaver:
+Revider typografi og fontstørrelser:
+
+Gå gjennom hele dashbordet og reduser litt på for store fonter, spesielt på tall og overskrifter som “Månedlig fortjeneste”.
+
+Bruk konsekvent typografi-hierarki (f.eks. text-sm, text-base, text-lg) og unngå text-2xl+ der det ikke er nødvendig.
+
+Vurder å bruke lettere font-weight på enkelte steder for bedre lesbarhet.
+
+Bedre visuell balanse og spacing:
+
+Justér padding og margin mellom kortene for å skape bedre luft og rytme.
+
+Sørg for jevn avstand mellom seksjoner som “Totale biler / Kunder / Kontrakter / Fortjeneste”.
+
+Unngå at noen elementer “tar over” visuelt (slik som profit-boxen i høyre hjørne nå gjør).
+
+Tilpass kortene på dashboardet:
+
+Reduser høyde på kortene dersom det ikke er nødvendig med så mye plass.
+
+Vurder å gjøre fortjenestekortet mer nøytralt i størrelse, og heller bruke farger og ikoner for å trekke oppmerksomhet.
+
+Sjekk at alle kort har lik høyde og struktur for å unngå visuell ubalanse.
+
+Responsiv forbedring:
+
+Test hvordan layouten ser ut på mindre skjermer. Gjør justeringer om enkelte elementer “bryter” layouten eller blir for store i mobilvisning.
+
+Generell forbedring av visuell hierarki:
+
+Bruk kontrast (ikke bare størrelse) for å skape hierarki.
+
+Sørg for at det er lett å skille mellom seksjoner, men uten for mye “visuell støy”.
+
+💡 Ekstra forslag (valgfritt):
+Innfør mulighet for kompakt visning (toggle switch): perfekt for forhandlere som ønsker å se mer informasjon på skjermen samtidig.
+
+Legg til “hover-effekter” på kortene for å gjøre UI litt mer interaktiv og moderne.
+
+Evaluer om mørkeblå bakgrunn fortsatt gir best lesbarhet eller om den kan tones litt ned for å fremheve viktig innhold.

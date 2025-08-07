@@ -48,11 +48,11 @@ export default function RecentCars() {
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle>Siste biler</CardTitle>
+          <CardTitle className="text-base font-medium">Siste biler</CardTitle>
           <Link href="/cars">
-            <Button variant="ghost" size="sm" className="text-primary hover:text-primary-600">
+            <Button variant="ghost" size="sm" className="text-xs text-slate-500 hover:text-slate-700">
               Se alle
             </Button>
           </Link>
@@ -70,19 +70,19 @@ export default function RecentCars() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {recentCars.map((car: CarType) => (
-              <div key={car.id} className="flex items-center space-x-4 py-4 border-b border-slate-100 dark:border-slate-700 last:border-b-0">
+              <div key={car.id} className="flex items-center space-x-3 py-3 border-b border-slate-100 dark:border-slate-700 last:border-b-0">
                 {/* Car image placeholder */}
-                <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
+                <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded flex items-center justify-center flex-shrink-0">
                   {car.images && car.images.length > 0 ? (
                     <img
                       src={car.images[0]}
                       alt={`${car.make} ${car.model}`}
-                      className="w-16 h-16 object-cover rounded-lg"
+                      className="w-12 h-12 object-cover rounded"
                     />
                   ) : (
-                    <Car className="text-slate-400 w-6 h-6" />
+                    <Car className="text-slate-400 w-5 h-5" />
                   )}
                 </div>
                 
@@ -90,12 +90,11 @@ export default function RecentCars() {
                   <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
                     {car.make} {car.model} {car.year}
                   </p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {car.registrationNumber}
-                  </p>
-                  <p className="text-xs text-slate-400 dark:text-slate-500">
-                    {car.mileage.toLocaleString('no-NO')} km
-                  </p>
+                  <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                    <span>{car.registrationNumber}</span>
+                    <span>·</span>
+                    <span>{car.mileage.toLocaleString('no-NO')} km</span>
+                  </div>
                 </div>
                 
                 <div className="text-right">
@@ -105,23 +104,6 @@ export default function RecentCars() {
                   <p className="text-xs text-emerald-600 dark:text-emerald-400">
                     +{car.profitMargin}% fortjeneste
                   </p>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="p-2 text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-700"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-slate-100 dark:hover:bg-slate-700"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
                 </div>
               </div>
             ))}

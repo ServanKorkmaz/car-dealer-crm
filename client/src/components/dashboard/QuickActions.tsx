@@ -60,27 +60,27 @@ export default function QuickActions() {
   return (
     <>
       <Card>
-        <CardHeader>
-          <CardTitle>Hurtighandlinger</CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base font-medium">Hurtighandlinger</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2 p-4">
           {actions.map((action, index) => (
             <Button
               key={index}
-              variant="outline"
-              className="w-full justify-between p-4 h-auto group hover:shadow-md transition-all duration-200 hover:scale-105 hover:border-primary/50 border-0 shadow-sm"
+              variant="ghost"
+              className="w-full justify-between p-3 h-auto group hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               onClick={action.onClick}
             >
               <div className="flex items-center space-x-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getColorClasses(action.color)} group-hover:scale-110 transition-all duration-200 group-hover:shadow-md`}>
-                  <action.icon className="w-5 h-5 group-hover:rotate-12 transition-transform duration-200" />
+                <div className={`w-8 h-8 rounded flex items-center justify-center ${getColorClasses(action.color)}`}>
+                  <action.icon className="w-4 h-4" />
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-medium group-hover:text-primary transition-colors">{action.name}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors">{action.description}</p>
+                  <p className="text-sm font-medium">{action.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{action.description}</p>
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-primary group-hover:translate-x-1 transition-all duration-200" />
+              <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 group-hover:translate-x-0.5 transition-all" />
             </Button>
           ))}
         </CardContent>
