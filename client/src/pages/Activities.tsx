@@ -405,19 +405,15 @@ export default function Activities() {
                                     </div>
                                     
                                     {/* Show additional metadata for certain activity types */}
-                                    {activity.type === 'car_sold' && activity.metadata && 
-                                     typeof activity.metadata === 'object' && 
-                                     'soldPrice' in activity.metadata && (
+                                    {activity.type === 'car_sold' && activity.metadata && (
                                       <Badge className="text-xs bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 mt-1">
-                                        {parseInt(String(activity.metadata.soldPrice) || '0').toLocaleString('no-NO')} kr
+                                        {parseInt((activity.metadata as any).soldPrice || '0').toLocaleString('no-NO')} kr
                                       </Badge>
                                     )}
                                     
-                                    {activity.type === 'car_imported' && activity.metadata && 
-                                     typeof activity.metadata === 'object' && 
-                                     'source' in activity.metadata && (
+                                    {activity.type === 'car_imported' && activity.metadata && (
                                       <Badge className="text-xs bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 mt-1">
-                                        {String(activity.metadata.source)}
+                                        {(activity.metadata as any).source}
                                       </Badge>
                                     )}
                                   </div>
