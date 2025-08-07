@@ -519,6 +519,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contractData = insertContractSchema.parse(req.body);
       const storage = await storagePromise;
       const contract = await storage.createContract(contractData, userId);
+      
+      // Log contract creation activity
+      try {
+        // Get customer and car details for better activity message
+        const customer = await storage.getCustomerById(contract.customerId, userId);
+        const car = await storage.getCarById(contract.carId, userId);
+        
+        await ActivityLogger.logContractCreated(userId, contract.id, {
+          contractNumber: contract.contractNumber,
+          customerName: customer?.name || "Ukjent kunde",
+          carDetails: car ? `${car.make} ${car.model} (${car.year})` : "Ukjent bil"
+        });
+      } catch (error) {
+        console.error("Failed to log contract creation activity:", error);
+      }
+      
       res.status(201).json(contract);
     } catch (error) {
       if (error instanceof z.ZodError) {

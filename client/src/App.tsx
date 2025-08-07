@@ -9,6 +9,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import ProfessionalDashboard from "@/pages/ProfessionalDashboard";
+import Activities from "@/pages/Activities";
 import Cars from "@/pages/Cars";
 import CarDetail from "@/pages/CarDetail";
 import Customers from "@/pages/Customers";
@@ -38,6 +39,7 @@ function Router() {
           <Route path="/customers" component={Customers} />
           <Route path="/customers/:id" component={CustomerProfile} />
           <Route path="/contracts" component={Contracts} />
+          <Route path="/activities" component={Activities} />
         </>
       )}
       <Route component={NotFound} />

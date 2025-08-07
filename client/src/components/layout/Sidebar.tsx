@@ -12,7 +12,8 @@ import {
   Moon,
   Sun,
   LogOut,
-  User
+  User,
+  Activity
 } from "lucide-react";
 
 const navigation = [
@@ -21,6 +22,7 @@ const navigation = [
   { name: "Biler", href: "/cars", icon: Car },
   { name: "Kunder", href: "/customers", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
+  { name: "Aktiviteter", href: "/activities", icon: Activity },
 ];
 
 export default function Sidebar() {
