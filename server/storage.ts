@@ -3,6 +3,7 @@ import {
   cars,
   customers,
   contracts,
+  activityLog,
   type User,
   type UpsertUser,
   type Car,
@@ -11,6 +12,8 @@ import {
   type InsertCustomer,
   type Contract,
   type InsertContract,
+  type ActivityLog,
+  type InsertActivityLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -88,6 +91,10 @@ export interface IStorage {
       count: number;
     }>;
   }>;
+
+  // Activity Log operations
+  createActivityLog(activity: InsertActivityLog): Promise<ActivityLog>;
+  getRecentActivities(userId: string, limit?: number): Promise<ActivityLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -456,6 +463,24 @@ export class DatabaseStorage implements IStorage {
       salesByMake,
       inventoryAging
     };
+  }
+
+  // Activity Log operations
+  async createActivityLog(activity: InsertActivityLog): Promise<ActivityLog> {
+    const [newActivity] = await db
+      .insert(activityLog)
+      .values(activity)
+      .returning();
+    return newActivity;
+  }
+
+  async getRecentActivities(userId: string, limit: number = 10): Promise<ActivityLog[]> {
+    return await db
+      .select()
+      .from(activityLog)
+      .where(eq(activityLog.userId, userId))
+      .orderBy(desc(activityLog.createdAt))
+      .limit(limit);
   }
 }
 

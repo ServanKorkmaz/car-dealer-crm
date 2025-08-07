@@ -7,6 +7,7 @@ import { insertCarSchema, insertCustomerSchema, insertContractSchema } from "@sh
 import { z } from "zod";
 import { generateContractHTML, generatePDF } from "./pdf-generator";
 import { scrapeFinnAd } from "./finn-scraper";
+import { ActivityLogger } from "./activityLogger";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Use simple auth for development instead of Replit auth
@@ -45,6 +46,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching dashboard analytics:", error);
       res.status(500).json({ message: "Failed to fetch dashboard analytics" });
+    }
+  });
+
+  // Recent activities endpoint
+  app.get('/api/dashboard/activities', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const storage = await storagePromise;
+      const activities = await storage.getRecentActivities(userId, limit);
+      res.json(activities);
+    } catch (error) {
+      console.error("Error fetching recent activities:", error);
+      res.status(500).json({ message: "Failed to fetch recent activities" });
     }
   });
 
@@ -102,6 +117,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const carData = insertCarSchema.parse(req.body);
       const storage = await storagePromise;
       const car = await storage.createCar(carData, userId);
+      
+      // Log car creation activity
+      try {
+        await ActivityLogger.logCarCreated(userId, car.id, {
+          make: car.make,
+          model: car.model,
+          year: car.year
+        });
+      } catch (error) {
+        console.error("Failed to log car creation activity:", error);
+      }
+      
       res.status(201).json(car);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -118,6 +145,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const carData = insertCarSchema.partial().parse(req.body);
       const storage = await storagePromise;
       const car = await storage.updateCar(req.params.id, carData, userId);
+      
+      // Log car update activity
+      try {
+        await ActivityLogger.logCarUpdated(userId, car.id, {
+          make: car.make,
+          model: car.model,
+          registrationNumber: car.registrationNumber
+        });
+      } catch (error) {
+        console.error("Failed to log car update activity:", error);
+      }
+      
       res.json(car);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -157,6 +196,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         soldPrice: soldPrice || null,
         soldToCustomerId: customerId || null,
       }, userId);
+
+      // Log car sold activity
+      try {
+        await ActivityLogger.logCarSold(userId, updatedCar.id, {
+          make: updatedCar.make,
+          model: updatedCar.model,
+          soldPrice: soldPrice || updatedCar.salePrice || "0"
+        });
+      } catch (error) {
+        console.error("Failed to log car sold activity:", error);
+      }
       
       if (!updatedCar) {
         return res.status(404).json({ message: "Car not found" });
@@ -579,6 +629,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const importedCar = await storage.createCar(carData, userId);
+
+      // Log car import activity
+      try {
+        await ActivityLogger.logCarImported(userId, importedCar.id, {
+          make: importedCar.make,
+          model: importedCar.model,
+          source: "Finn.no"
+        });
+      } catch (error) {
+        console.error("Failed to log car import activity:", error);
+      }
 
       res.json({
         success: true,

@@ -11,6 +11,7 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { TrendingUp, TrendingDown, Car, Users, FileText, DollarSign, Clock, Package, Download, Calendar, Filter } from "lucide-react";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import ActivityFeed from "@/components/dashboard/ActivityFeed";
 
 
 export default function ProfessionalDashboard() {
@@ -472,6 +473,11 @@ export default function ProfessionalDashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Recent Activity Section */}
+            <div className="lg:col-span-2 animate-slide-in-up" style={{animationDelay: '0.4s'}}>
+              <ActivityFeed limit={8} />
+            </div>
           </>
         ) : (
           <Card className="text-center py-12">

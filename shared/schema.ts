@@ -112,11 +112,35 @@ export const contracts = pgTable("contracts", {
   userId: varchar("user_id").notNull().references(() => users.id),
 });
 
+// Activity Log table for tracking system activities
+export const activityLog = pgTable("activity_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: varchar("type").notNull(), // car_created, car_updated, car_sold, customer_created, customer_updated, contract_created, contract_signed, user_login
+  message: text("message").notNull(), // human-readable description
+  entityId: varchar("entity_id"), // ID of the related entity (car, customer, contract)
+  entityType: varchar("entity_type"), // cars, customers, contracts
+  userId: varchar("user_id").notNull().references(() => users.id),
+  metadata: jsonb("metadata"), // additional data like old/new values, prices, etc.
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("IDX_activity_log_created_at").on(table.createdAt),
+  index("IDX_activity_log_user_id").on(table.userId),
+  index("IDX_activity_log_type").on(table.type),
+]);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   cars: many(cars),
   customers: many(customers),
   contracts: many(contracts),
+  activityLogs: many(activityLog),
+}));
+
+export const activityLogRelations = relations(activityLog, ({ one }) => ({
+  user: one(users, {
+    fields: [activityLog.userId],
+    references: [users.id],
+  }),
 }));
 
 export const carsRelations = relations(cars, ({ one, many }) => ({
@@ -219,6 +243,10 @@ export const insertContractSchema = createInsertSchema(contracts).omit({
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Activity Log types
+export type ActivityLog = typeof activityLog.$inferSelect;
+export type InsertActivityLog = typeof activityLog.$inferInsert;
 export type InsertCar = z.infer<typeof insertCarSchema>;
 export type Car = typeof cars.$inferSelect;
 export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
