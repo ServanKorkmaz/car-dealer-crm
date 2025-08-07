@@ -10,53 +10,70 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import AddCarModal from "@/components/cars/AddCarModal";
 import EditCarModal from "@/components/cars/EditCarModal";
 import { 
   Plus, Search, Edit, Trash2, CheckCircle, Clock, ExternalLink, 
   Filter, SortAsc, Car as CarIcon, Calendar, Gauge, MapPin,
-  Eye, DollarSign, Settings
+  Eye, DollarSign, Settings, TrendingUp, TrendingDown, AlertCircle,
+  Copy, Star, Grid3x3, List, LayoutGrid, Fuel, Info, X
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
 import { Link } from "wouter";
 
-// Grid Card Component for modern card layout
+// Improved Grid Card Component - kompakt og oversiktlig
 function GridCarCard({ 
   car, 
   onEdit, 
   onSell, 
   onDelete, 
+  onToggleFavorite,
   isDeleting, 
-  isSelling, 
+  isSelling,
+  isFavorite,
   calculateDaysOnStock, 
   formatPrice, 
   getStatusColor, 
-  getStatusText 
+  getStatusText,
+  calculateProfit 
 }: {
   car: Car;
   onEdit: () => void;
   onSell: () => void;
   onDelete: () => void;
+  onToggleFavorite: () => void;
   isDeleting: boolean;
   isSelling: boolean;
+  isFavorite: boolean;
   calculateDaysOnStock: (createdAt: string, soldDate?: string | null) => number;
   formatPrice: (price: string) => string;
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
+  calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
 }) {
   const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate || null);
   const hasImage = car.images && car.images.length > 0;
+  const profit = calculateProfit(car.salePrice || "0", car.costPrice || undefined);
+  const [showQuickInfo, setShowQuickInfo] = useState(false);
 
+  // Advarselsflagg for manglende data
+  const warnings = [];
+  if (!hasImage) warnings.push("Mangler bilde");
+  if (!car.euControl) warnings.push("Mangler EU-kontroll");
+  
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 bg-white dark:bg-slate-800 border-0 shadow-lg overflow-hidden cursor-pointer" data-testid={`card-car-${car.id}`}>
-      {/* Car Image */}
-      <div className="relative h-48 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 overflow-hidden">
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col" data-testid={`card-car-${car.id}`}>
+      {/* Bilbilde med statusmerking */}
+      <div className="relative h-36 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 mb-2">
         {hasImage ? (
           <img 
             src={car.images![0]} 
             alt={`${car.make} ${car.model}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none';
               (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
@@ -64,243 +81,289 @@ function GridCarCard({
           />
         ) : null}
         <div className={`${hasImage ? 'hidden' : 'flex'} absolute inset-0 items-center justify-center`}>
-          <div className="text-center">
-            <CarIcon className="w-16 h-16 text-slate-400 mx-auto mb-2" />
-            <p className="text-sm text-slate-500 dark:text-slate-400">Ingen bilde</p>
+          <CarIcon className="w-10 h-10 text-slate-400" />
+        </div>
+        
+        {/* Status badge øverst til venstre */}
+        <Badge className={`absolute top-2 left-2 ${getStatusColor(car.status)} text-xs px-2 py-0.5`}>
+          {getStatusText(car.status)}
+        </Badge>
+        
+        {/* Pris øverst til høyre */}
+        <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-sm font-bold">
+          {formatPrice(car.salePrice || "0")}
+        </div>
+        
+        {/* Dager på lager nederst til høyre */}
+        <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-0.5 rounded">
+          {daysOnStock} dager
+        </div>
+        
+        {/* Favorittmerking */}
+        <button
+          onClick={onToggleFavorite}
+          className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm p-1 rounded hover:bg-black/80 transition-colors"
+        >
+          <Star className={`w-4 h-4 ${isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-white'}`} />
+        </button>
+      </div>
+
+      {/* Tittel og hovedinfo */}
+      <div className="flex-1">
+        <div className="flex justify-between items-start mb-1">
+          <h3 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
+            {car.make} {car.model} {car.year}
+          </h3>
+          {warnings.length > 0 && (
+            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" title={warnings.join(", ")} />
+          )}
+        </div>
+        
+        {/* Teknisk info på én linje */}
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 truncate">
+          {car.registrationNumber} · {car.mileage?.toLocaleString('no-NO')} km · {car.transmission || 'Auto'} · {car.fuelType || 'Ukjent'}
+        </p>
+        
+        {/* Fortjeneste-indikator */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1">
+            {profit.amount > 0 ? (
+              <>
+                <TrendingUp className="w-3 h-3 text-green-600" />
+                <span className="text-xs font-medium text-green-600">
+                  +{formatPrice(String(profit.amount))} ({profit.percentage.toFixed(0)}%)
+                </span>
+              </>
+            ) : profit.amount < 0 ? (
+              <>
+                <TrendingDown className="w-3 h-3 text-red-600" />
+                <span className="text-xs font-medium text-red-600">
+                  {formatPrice(String(profit.amount))} ({profit.percentage.toFixed(0)}%)
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-slate-400">Ingen kostpris</span>
+            )}
           </div>
         </div>
         
-        {/* Status Badge */}
-        <div className="absolute top-3 right-3">
-          <Badge className={`${getStatusColor(car.status)} shadow-lg`}>
-            {getStatusText(car.status)}
-          </Badge>
-        </div>
-
-        {/* Days on stock */}
-        <div className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded-md text-xs flex items-center">
-          <Clock className="w-3 h-3 mr-1" />
-          {daysOnStock} dager
-        </div>
-      </div>
-
-      <CardContent className="p-4">
-        {/* Title and Year */}
-        <div className="mb-3">
-          <Link href={`/cars/${car.id}`}>
-            <h3 className="font-bold text-lg text-slate-900 dark:text-white truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-              {car.make} {car.model}
-            </h3>
-          </Link>
-          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-            <Calendar className="w-3 h-3" />
-            <span>{car.year}</span>
-            <span>•</span>
-            <MapPin className="w-3 h-3" />
-            <span>{car.registrationNumber}</span>
-          </div>
-        </div>
-
-        {/* Key Info */}
-        <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
-          <div className="flex items-center gap-1">
-            <Gauge className="w-3 h-3 text-slate-400" />
-            <span className="text-slate-600 dark:text-slate-400">
-              {car.mileage?.toLocaleString('no-NO') || '0'} km
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Settings className="w-3 h-3 text-slate-400" />
-            <span className="text-slate-600 dark:text-slate-400">
-              {car.transmission || 'Auto'}
-            </span>
-          </div>
-        </div>
-
-        {/* Price */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
-              {formatPrice(car.status === 'sold' && car.soldPrice ? car.soldPrice : car.salePrice || "0")}
-            </span>
-            <div className="text-right text-xs text-slate-500">
-              {car.status === 'sold' ? 'Solgt for' : 'Salgspris'}
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2">
-          <Link href={`/cars/${car.id}`} className="flex-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              data-testid={`button-view-${car.id}`}
-            >
-              <Eye className="w-3 h-3 mr-1" />
-              Se detaljer
-            </Button>
-          </Link>
-          
+        {/* Handlingsknapper */}
+        <div className="flex gap-1">
           <Button
-            variant="outline"
+            variant="ghost"
+            size="sm"
+            className="flex-1 h-7 text-xs"
+            onClick={() => setShowQuickInfo(!showQuickInfo)}
+          >
+            <Info className="w-3 h-3 mr-1" />
+            Detaljer
+          </Button>
+          <Button
+            variant="ghost"
             size="sm"
             onClick={onEdit}
+            className="h-7 px-2"
             data-testid={`button-edit-${car.id}`}
           >
             <Edit className="w-3 h-3" />
           </Button>
-          
           {car.status === 'available' && (
             <Button
               size="sm"
               onClick={onSell}
               disabled={isSelling}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
               data-testid={`button-sell-${car.id}`}
             >
-              <CheckCircle className="w-3 h-3 mr-1" />
               Selg
             </Button>
           )}
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDelete}
-            disabled={isDeleting}
-            className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
-            data-testid={`button-delete-${car.id}`}
-          >
-            <Trash2 className="w-3 h-3" />
-          </Button>
         </div>
-      </CardContent>
-    </Card>
+        
+        {/* Utvidet info (toggle) */}
+        {showQuickInfo && (
+          <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Kostpris:</span>
+              <span className="font-medium">{car.costPrice ? formatPrice(car.costPrice) : '-'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">EU-kontroll:</span>
+              <span className="font-medium">{car.euControl || 'Ikke registrert'}</span>
+            </div>
+            {car.finnUrl && (
+              <button
+                onClick={() => navigator.clipboard.writeText(car.finnUrl!)}
+                className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
+              >
+                <Copy className="w-3 h-3" />
+                Kopier Finn-lenke
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
-// List Card Component for compact list view
+// Improved List Card Component - kompakt listevisning
 function ListCarCard({ 
   car, 
   onEdit, 
   onSell, 
   onDelete, 
+  onToggleFavorite,
   isDeleting, 
-  isSelling, 
+  isSelling,
+  isFavorite,
   calculateDaysOnStock, 
   formatPrice, 
   getStatusColor, 
-  getStatusText 
+  getStatusText,
+  calculateProfit 
 }: {
   car: Car;
   onEdit: () => void;
   onSell: () => void;
   onDelete: () => void;
+  onToggleFavorite: () => void;
   isDeleting: boolean;
   isSelling: boolean;
+  isFavorite: boolean;
   calculateDaysOnStock: (createdAt: string, soldDate?: string | null) => number;
   formatPrice: (price: string) => string;
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
+  calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
 }) {
   const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate || null);
   const hasImage = car.images && car.images.length > 0;
+  const profit = calculateProfit(car.salePrice || "0", car.costPrice || undefined);
+  
+  // Advarselsflagg
+  const warnings = [];
+  if (!hasImage) warnings.push("Mangler bilde");
+  if (!car.euControl) warnings.push("Mangler EU-kontroll");
 
   return (
-    <Card className="hover:shadow-lg transition-all duration-200 bg-white dark:bg-slate-800 border-0 shadow-md" data-testid={`card-car-${car.id}`}>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-4">
-          {/* Thumbnail */}
-          <div className="w-20 h-16 flex-shrink-0 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 rounded-lg overflow-hidden">
-            {hasImage ? (
-              <img 
-                src={car.images![0]} 
-                alt={`${car.make} ${car.model}`}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                }}
-              />
-            ) : null}
-            <div className={`${hasImage ? 'hidden' : 'flex'} w-full h-full items-center justify-center`}>
-              <CarIcon className="w-6 h-6 text-slate-400" />
-            </div>
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-3" data-testid={`card-car-${car.id}`}>
+      <div className="flex items-center gap-3">
+        {/* Miniatyrbilde */}
+        <div className="w-24 h-16 flex-shrink-0 bg-slate-100 dark:bg-slate-800 rounded overflow-hidden relative">
+          {hasImage ? (
+            <img 
+              src={car.images![0]} 
+              alt={`${car.make} ${car.model}`}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+                (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+              }}
+            />
+          ) : null}
+          <div className={`${hasImage ? 'hidden' : 'flex'} w-full h-full items-center justify-center`}>
+            <CarIcon className="w-6 h-6 text-slate-400" />
           </div>
+          
+          {/* Favorittmerking */}
+          <button
+            onClick={onToggleFavorite}
+            className="absolute top-1 left-1 bg-black/60 backdrop-blur-sm p-0.5 rounded"
+          >
+            <Star className={`w-3 h-3 ${isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-white'}`} />
+          </button>
+        </div>
 
-          {/* Car Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <h3 className="font-semibold text-lg text-slate-900 dark:text-white truncate">
-                  {car.make} {car.model}
+        {/* Bilinformasjon */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
+                  {car.make} {car.model} {car.year}
                 </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  {car.year} • {car.registrationNumber} • {car.mileage?.toLocaleString('no-NO')} km
-                </p>
+                {warnings.length > 0 && (
+                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" title={warnings.join(", ")} />
+                )}
               </div>
-              <div className="flex items-center gap-3">
-                <Badge className={getStatusColor(car.status)}>
-                  {getStatusText(car.status)}
-                </Badge>
-                <div className="text-right">
-                  <div className="text-xl font-bold text-slate-900 dark:text-white">
-                    {formatPrice(car.status === 'sold' && car.soldPrice ? car.soldPrice : car.salePrice || "0")}
-                  </div>
-                  <div className="text-xs text-slate-500 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {daysOnStock} dager
-                  </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {car.registrationNumber} · {car.mileage?.toLocaleString('no-NO')} km · {car.transmission || 'Auto'} · {car.fuelType || 'Ukjent'}
+              </p>
+            </div>
+            
+            {/* Status og pris */}
+            <div className="flex items-center gap-3">
+              <Badge className={`${getStatusColor(car.status)} text-xs`}>
+                {getStatusText(car.status)}
+              </Badge>
+              <div className="text-right">
+                <div className="text-lg font-bold text-slate-900 dark:text-white">
+                  {formatPrice(car.salePrice || "0")}
+                </div>
+                <div className="text-xs text-slate-500">
+                  {daysOnStock} dager
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Additional Details */}
-            <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400 mb-3">
-              <span>{car.fuelType || 'Ukjent drivstoff'}</span>
-              <span>•</span>
-              <span>{car.transmission || 'Ukjent girkasse'}</span>
-              {car.color && (
+          {/* Fortjeneste og handlinger */}
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center gap-1">
+              {profit.amount > 0 ? (
                 <>
-                  <span>•</span>
-                  <span>{car.color}</span>
+                  <TrendingUp className="w-3 h-3 text-green-600" />
+                  <span className="text-xs font-medium text-green-600">
+                    +{formatPrice(String(profit.amount))} ({profit.percentage.toFixed(0)}%)
+                  </span>
                 </>
+              ) : profit.amount < 0 ? (
+                <>
+                  <TrendingDown className="w-3 h-3 text-red-600" />
+                  <span className="text-xs font-medium text-red-600">
+                    {formatPrice(String(profit.amount))} ({profit.percentage.toFixed(0)}%)
+                  </span>
+                </>
+              ) : (
+                <span className="text-xs text-slate-400">Ingen kostpris</span>
               )}
             </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2">
+            
+            {/* Handlingsknapper */}
+            <div className="flex gap-1">
+              <Link href={`/cars/${car.id}`}>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                  <Eye className="w-3 h-3 mr-1" />
+                  Detaljer
+                </Button>
+              </Link>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={onEdit}
+                className="h-7 px-2"
                 data-testid={`button-edit-${car.id}`}
               >
-                <Edit className="w-3 h-3 mr-1" />
-                Rediger
+                <Edit className="w-3 h-3" />
               </Button>
-              
               {car.status === 'available' && (
                 <Button
                   size="sm"
                   onClick={onSell}
                   disabled={isSelling}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
                   data-testid={`button-sell-${car.id}`}
                 >
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Marker som solgt
+                  Selg
                 </Button>
               )}
-              
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={onDelete}
                 disabled={isDeleting}
-                className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                className="h-7 px-2 text-red-600 hover:text-red-700"
                 data-testid={`button-delete-${car.id}`}
               >
                 <Trash2 className="w-3 h-3" />
@@ -308,8 +371,8 @@ function ListCarCard({
             </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -324,10 +387,16 @@ export default function Cars() {
   const [sortBy, setSortBy] = useState("newest");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterMake, setFilterMake] = useState("all");
+  const [filterFuelType, setFilterFuelType] = useState("all");
+  const [filterYear, setFilterYear] = useState<[number, number]>([2000, new Date().getFullYear()]);
+  const [filterMileage, setFilterMileage] = useState<[number, number]>([0, 500000]);
+  const [filterPrice, setFilterPrice] = useState<[number, number]>([0, 2000000]);
+  const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [showSellDialog, setShowSellDialog] = useState(false);
   const [sellingCar, setSellingCar] = useState<Car | null>(null);
   const [salePrice, setSalePrice] = useState("");
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -507,10 +576,41 @@ export default function Cars() {
     return <div className="min-h-screen bg-slate-50 dark:bg-slate-900" />;
   }
 
-  // Get unique makes for filter dropdown
+  // Get unique makes and fuel types for filter dropdown
   const uniqueMakes = Array.from(new Set(cars.map(car => car.make))).sort();
+  const uniqueFuelTypes = Array.from(new Set(cars.map(car => car.fuelType).filter(Boolean))).sort();
+  
+  // Calculate profit function
+  const calculateProfit = (salePrice: string, costPrice?: string) => {
+    const sale = parseFloat(salePrice || '0');
+    const cost = parseFloat(costPrice || '0');
+    if (cost === 0) return { amount: 0, percentage: 0 };
+    const amount = sale - cost;
+    const percentage = (amount / cost) * 100;
+    return { amount, percentage };
+  };
+  
+  // Load favorites from localStorage
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem('carFavorites');
+    if (savedFavorites) {
+      setFavorites(new Set(JSON.parse(savedFavorites)));
+    }
+  }, []);
+  
+  // Save favorites to localStorage
+  const toggleFavorite = (carId: string) => {
+    const newFavorites = new Set(favorites);
+    if (newFavorites.has(carId)) {
+      newFavorites.delete(carId);
+    } else {
+      newFavorites.add(carId);
+    }
+    setFavorites(newFavorites);
+    localStorage.setItem('carFavorites', JSON.stringify(Array.from(newFavorites)));
+  };
 
-  // Filter and sort cars
+  // Filter and sort cars with advanced filters
   let filteredCars = cars.filter((car: Car) => {
     const matchesSearch = 
       car.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -521,8 +621,22 @@ export default function Cars() {
     
     const matchesStatus = filterStatus === "all" || car.status === filterStatus;
     const matchesMake = filterMake === "all" || car.make === filterMake;
+    const matchesFuelType = filterFuelType === "all" || car.fuelType === filterFuelType;
     
-    return matchesSearch && matchesStatus && matchesMake;
+    // Year filter
+    const carYear = car.year || 0;
+    const matchesYear = carYear >= filterYear[0] && carYear <= filterYear[1];
+    
+    // Mileage filter
+    const carMileage = car.mileage || 0;
+    const matchesMileage = carMileage >= filterMileage[0] && carMileage <= filterMileage[1];
+    
+    // Price filter
+    const carPrice = parseFloat(car.salePrice || '0');
+    const matchesPrice = carPrice >= filterPrice[0] && carPrice <= filterPrice[1];
+    
+    return matchesSearch && matchesStatus && matchesMake && matchesFuelType && 
+           matchesYear && matchesMileage && matchesPrice;
   });
 
   // Sort cars
@@ -655,7 +769,18 @@ export default function Cars() {
               />
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className="h-10"
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Avanserte filtre
+                {showFilters && <X className="w-4 h-4 ml-2" />}
+              </Button>
+              
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="w-[140px]" data-testid="select-filter-status">
                   <SelectValue placeholder="Status" />
@@ -735,6 +860,97 @@ export default function Cars() {
           </div>
         </div>
 
+        {/* Advanced Filters Panel */}
+        {showFilters && (
+          <Card className="p-4 bg-slate-50 dark:bg-slate-800/50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Fuel Type Filter */}
+              <div className="space-y-2">
+                <Label htmlFor="fuel-type" className="text-sm font-medium">Drivstofftype</Label>
+                <Select value={filterFuelType} onValueChange={setFilterFuelType}>
+                  <SelectTrigger id="fuel-type">
+                    <SelectValue placeholder="Velg drivstoff" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle typer</SelectItem>
+                    {uniqueFuelTypes.map(fuel => (
+                      <SelectItem key={fuel} value={fuel}>{fuel}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Year Range */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Årsmodell: {filterYear[0]} - {filterYear[1]}</Label>
+                <div className="px-2">
+                  <Slider
+                    value={filterYear}
+                    onValueChange={setFilterYear}
+                    min={2000}
+                    max={new Date().getFullYear()}
+                    step={1}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              
+              {/* Mileage Range */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Kilometerstand: {filterMileage[0].toLocaleString()} - {filterMileage[1].toLocaleString()} km
+                </Label>
+                <div className="px-2">
+                  <Slider
+                    value={filterMileage}
+                    onValueChange={setFilterMileage}
+                    min={0}
+                    max={500000}
+                    step={10000}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              
+              {/* Price Range */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Pris: {formatPrice(String(filterPrice[0]))} - {formatPrice(String(filterPrice[1]))}
+                </Label>
+                <div className="px-2">
+                  <Slider
+                    value={filterPrice}
+                    onValueChange={setFilterPrice}
+                    min={0}
+                    max={2000000}
+                    step={50000}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Reset Filters Button */}
+            <div className="mt-4 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFilterStatus("all");
+                  setFilterMake("all");
+                  setFilterFuelType("all");
+                  setFilterYear([2000, new Date().getFullYear()]);
+                  setFilterMileage([0, 500000]);
+                  setFilterPrice([0, 2000000]);
+                  setSearchTerm("");
+                }}
+              >
+                Nullstill filtre
+              </Button>
+            </div>
+          </Card>
+        )}
+
         {carsLoading ? (
           <div className="text-center py-12">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -762,8 +978,8 @@ export default function Cars() {
           </Card>
         ) : (
           <div className={viewMode === "grid" 
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" 
-            : "space-y-4"
+            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
+            : "space-y-3"
           }>
             {filteredCars.map((car: Car) => (
               viewMode === "grid" ? (
@@ -773,12 +989,15 @@ export default function Cars() {
                   onEdit={() => setEditingCar(car)}
                   onSell={() => handleSellCar(car)}
                   onDelete={() => deleteMutation.mutate(car.id)}
+                  onToggleFavorite={() => toggleFavorite(car.id)}
                   isDeleting={deleteMutation.isPending}
                   isSelling={sellMutation.isPending}
+                  isFavorite={favorites.has(car.id)}
                   calculateDaysOnStock={calculateDaysOnStock}
                   formatPrice={formatPrice}
                   getStatusColor={getStatusColor}
                   getStatusText={getStatusText}
+                  calculateProfit={calculateProfit}
                 />
               ) : (
                 <ListCarCard 
@@ -787,12 +1006,15 @@ export default function Cars() {
                   onEdit={() => setEditingCar(car)}
                   onSell={() => handleSellCar(car)}
                   onDelete={() => deleteMutation.mutate(car.id)}
+                  onToggleFavorite={() => toggleFavorite(car.id)}
                   isDeleting={deleteMutation.isPending}
                   isSelling={sellMutation.isPending}
+                  isFavorite={favorites.has(car.id)}
                   calculateDaysOnStock={calculateDaysOnStock}
                   formatPrice={formatPrice}
                   getStatusColor={getStatusColor}
                   getStatusText={getStatusText}
+                  calculateProfit={calculateProfit}
                 />
               )
             ))}

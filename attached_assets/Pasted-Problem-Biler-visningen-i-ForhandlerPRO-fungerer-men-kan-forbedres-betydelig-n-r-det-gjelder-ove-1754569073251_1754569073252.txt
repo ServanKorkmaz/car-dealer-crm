@@ -1,0 +1,104 @@
+Problem:
+"Biler"-visningen i ForhandlerPRO fungerer, men kan forbedres betydelig når det gjelder oversiktlighet, lesbarhet og brukervennlighet. Per nå føles kortene visuelt tunge, og det er vanskelig å skanne informasjon raskt — noe som er kritisk for bilforhandlere som jobber med mange objekter daglig.
+
+🎯 Mål:
+Lag en forbedret visning av biler som er:
+
+Lett å skumme og navigere
+
+Mer profesjonell og kompakt
+
+Rask og responsiv
+
+I tråd med moderne DMS-standarder
+
+✅ Oppgaver og forslag:
+1. Reorganiser kortdesign for bilkortene:
+Gjør kortene lavere i høyden, og bruk grid-cols-4 istedenfor grid-cols-3 på store skjermer.
+
+Flytt teknisk info (modell, km, gir, registreringsnummer) til en horisontal rad eller dropdown på hover.
+
+Sett prisen øverst til høyre i kortet, fremhevet men ikke for dominerende.
+
+Bruk status-labels som "Tilgjengelig", "Solgt", "Reservert" med Tailwind-badges.
+
+🧪 Tailwind CSS justeringseksempel for kort:
+tsx
+Copy
+Edit
+<div className="rounded-xl border border-zinc-700 bg-zinc-900 p-3 shadow-md hover:shadow-lg transition-shadow duration-200 flex flex-col gap-2">
+  <div className="relative">
+    <img src={imageURL} alt="Bilbilde" className="rounded-md object-cover w-full h-48" />
+    <span className="absolute top-2 left-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+      Tilgjengelig
+    </span>
+    <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+      {daysAgo} dager siden
+    </span>
+  </div>
+
+  <div className="flex justify-between items-start">
+    <div>
+      <p className="font-medium text-white">{car.brand} {car.model} {car.year}</p>
+      <p className="text-sm text-zinc-400">{car.registrationNumber} · {car.mileage} km · {car.gearbox}</p>
+    </div>
+    <p className="text-lg font-bold text-white">{price.toLocaleString()} kr</p>
+  </div>
+
+  <div className="flex gap-2 mt-auto">
+    <button className="text-sm text-white bg-zinc-800 px-3 py-1 rounded hover:bg-zinc-700">
+      Se detaljer
+    </button>
+    <button className="text-sm text-blue-400 hover:underline">
+      Rediger
+    </button>
+  </div>
+</div>
+2. Forbedre filter-funksjonene:
+Legg til flere filtervalg, som:
+
+Kilometerstand (slider)
+
+Drivstofftype
+
+Prisintervall
+
+Modellår
+
+Status (tilgjengelig, solgt, utgått)
+
+Behold filtervalg i URL eller localStorage slik at de huskes ved navigasjon.
+
+3. Legg til nyttige "Dealersystem"-funksjoner:
+Vis fortjeneste per bil direkte på kortet, med fargekode (grønn for pluss, rød for minus).
+
+Legg til knapp for “Marker som solgt” direkte i kortet.
+
+Aktiver drag-and-drop sortering eller kategorier (f.eks. "Lager", "Solgte", "Innkommende").
+
+4. Forbedre statusindikatorer visuelt:
+Bruk fargekoder for å skape visuell gjenkjenning:
+
+tsx
+Copy
+Edit
+// Eksempel Tailwind-stiler:
+"bg-green-600 text-white" // tilgjengelig
+"bg-red-500 text-white" // solgt
+"bg-yellow-500 text-black" // reservert
+5. Responsiv visning:
+Vis 1 kolonne på mobil (grid-cols-1), 2 på nettbrett, og 4 på desktop.
+
+Kortene må kunne skaleres ned uten at teksten bryter eller blir klippet.
+
+✨ Bonusforbedringer (valgfritt):
+Vis advarsler (ikon/label) hvis viktige felter mangler (f.eks. mangler EU-kontroll, eller bilde ikke lastet opp).
+
+Legg til knapp for å kopiere Finn.no-lenken direkte fra kortet.
+
+Aktiver favoritt-stjernemarkering for biler du vil prioritere.
+
+Legg til visning for “Sist oppdatert” med dato/tid (hover tooltip eller liten tekst).
+
+📌 Konklusjon:
+Bruk egne designbeslutninger for å gjøre “Biler”-siden så oversiktlig og effektiv som mulig for daglig bruk hos profesjonelle bilforhandlere. Designet skal kunne håndtere store mengder biler samtidig, uten å miste struktur eller ytelse.
