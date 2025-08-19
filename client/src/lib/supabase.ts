@@ -49,9 +49,11 @@ export const supabase = isSupabaseConfigured
         },
         signUp: async ({ email, password }: { email: string; password: string }) => {
           if (email && password.length >= 6) {
-            const mockUser = { id: 'mock-user-123', email };
+            const mockUser = { id: 'mock-user-123', email, email_confirmed_at: new Date().toISOString() };
             localStorage.setItem('mockSession', 'true');
             localStorage.setItem('mockUser', JSON.stringify(mockUser));
+            // Trigger immediate sign in for mock mode
+            window.dispatchEvent(new Event('storage'));
             return { data: { user: mockUser, session: { access_token: 'mock-token', user: mockUser } }, error: null };
           }
           return { data: null, error: new Error('Invalid signup data') };

@@ -44,17 +44,31 @@ export default function Register() {
     setError(null);
 
     try {
+      const { isSupabaseConfigured } = await import('@/lib/supabase');
+      
       await signUp(data.email, data.password);
       setSuccess(true);
       
-      toast({
-        title: 'Konto opprettet!',
-        description: 'Sjekk e-posten din for å bekrefte kontoen.',
-      });
+      if (isSupabaseConfigured) {
+        toast({
+          title: 'Konto opprettet!',
+          description: 'Sjekk e-posten din for å bekrefte kontoen.',
+        });
+      } else {
+        // In development mode, skip email verification
+        toast({
+          title: 'Konto opprettet!',
+          description: 'Du kan nå logge inn.',
+        });
+      }
 
-      // Redirect to onboarding after a short delay
+      // Redirect to login or onboarding
       setTimeout(() => {
-        setLocation('/onboarding');
+        if (isSupabaseConfigured) {
+          setLocation('/login');
+        } else {
+          setLocation('/onboarding');
+        }
       }, 2000);
     } catch (error: any) {
       console.error('Registration error:', error);
@@ -86,8 +100,7 @@ export default function Register() {
               <Alert className="border-green-200 bg-green-50 dark:bg-green-950">
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-green-800 dark:text-green-200">
-                  Konto opprettet! Sjekk e-posten din for å bekrefte kontoen.
-                  Du blir videresendt til oppsettet...
+                  Konto opprettet! Du blir videresendt...
                 </AlertDescription>
               </Alert>
             </div>

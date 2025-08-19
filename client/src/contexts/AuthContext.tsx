@@ -180,13 +180,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (error) {
       throw error;
+    }
+    
+    // In mock mode, automatically sign in after signup
+    if (!isSupabaseConfigured && data?.user) {
+      await fetchUserData(data.user.id, data.user.email || '');
     }
   };
 
