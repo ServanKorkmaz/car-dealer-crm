@@ -107,7 +107,9 @@ export const customers = pgTable("customers", {
   phone: varchar("phone"),
   organizationNumber: varchar("organization_number"), // for companies
   address: text("address"),
-  type: varchar("type").default("individual"), // individual, company
+  type: varchar("type").default("PRIVAT").$type<'PRIVAT' | 'BEDRIFT'>(), // PRIVAT, BEDRIFT
+  gdprConsent: boolean("gdpr_consent").default(false),
+  gdprConsentAt: timestamp("gdpr_consent_at", { withTimezone: true }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   userId: varchar("user_id").notNull().references(() => users.id),
@@ -471,3 +473,23 @@ export type PriceSuggestion = {
   }[];
   reasons: string[];
 };
+
+// Follow-ups table for customer follow-ups and reminders
+export const followups = pgTable("followups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  customerId: varchar("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  dueDate: varchar("due_date").notNull(), // Using varchar for date to match existing pattern
+  note: text("note"),
+  status: varchar("status").notNull().default("OPEN").$type<'OPEN' | 'DONE' | 'SKIPPED'>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+// Insert and Select Types for Follow-ups
+export const insertFollowupSchema = createInsertSchema(followups).omit({ 
+  id: true, 
+  createdAt: true 
+});
+export type InsertFollowup = z.infer<typeof insertFollowupSchema>;
+export type Followup = typeof followups.$inferSelect;

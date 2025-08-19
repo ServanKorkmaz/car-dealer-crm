@@ -10,6 +10,7 @@ import {
   profiles,
   memberships,
   invites,
+  followups,
   type User,
   type UpsertUser,
   type Car,
@@ -29,6 +30,8 @@ import {
   type PricingRules,
   type InsertPricingRules,
   type PriceSuggestion,
+  type Followup,
+  type InsertFollowup
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -194,6 +197,20 @@ export interface IStorage {
     accepted: boolean;
     createdAt: Date;
   }>>;
+
+  // Follow-ups methods  
+  getFollowups(userId: string): Promise<Followup[]>;
+  createFollowup(followup: InsertFollowup, userId: string): Promise<Followup>;
+  updateFollowup(id: string, followup: Partial<InsertFollowup>, userId: string): Promise<Followup>;
+
+  // Customer 360 profile
+  getCustomerProfile(customerId: string, userId: string): Promise<{
+    customer: Customer;
+    cars: Car[];
+    contracts: Contract[];
+    followups: Followup[];
+    activities: Activity[];
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -348,6 +365,7 @@ export class DatabaseStorage implements IStorage {
       .insert(customers)
       .values({
         ...customer,
+        type: (customer.type as 'PRIVAT' | 'BEDRIFT') || 'PRIVAT',
         userId,
         companyId: membership.companyId,
       })
@@ -362,7 +380,11 @@ export class DatabaseStorage implements IStorage {
     
     const [updatedCustomer] = await db
       .update(customers)
-      .set({ ...customer, updatedAt: new Date() })
+      .set({ 
+        ...customer, 
+        type: customer.type ? (customer.type as 'PRIVAT' | 'BEDRIFT') : undefined,
+        updatedAt: new Date() 
+      })
       .where(and(eq(customers.id, id), eq(customers.companyId, membership.companyId), eq(customers.userId, userId)))
       .returning();
     return updatedCustomer;
@@ -774,6 +796,28 @@ export class DatabaseStorage implements IStorage {
     return newActivity;
   }
 
+  async logActivity(
+    type: string,
+    description: string,
+    entityId: string,
+    companyId: string,
+    userId: string,
+    priority: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW'
+  ): Promise<Activity> {
+    const [activity] = await db
+      .insert(activities)
+      .values({
+        type,
+        description,
+        entityId,
+        companyId,
+        userId,
+        priority,
+      })
+      .returning();
+    return activity;
+  }
+
   async resolveActivity(activityId: string, userId: string): Promise<boolean> {
     const result = await db
       .update(activities)
@@ -1055,44 +1099,32 @@ export class DatabaseStorage implements IStorage {
     kmMax?: number;
     limit?: number;
   }): Promise<MarketComp[]> {
-    // Use direct SQL query to work with the existing market_comps table structure
-    const conditions: string[] = ['company_id = $1'];
-    const params: any[] = [filters.companyId];
+    // Build WHERE conditions with proper escaping
+    const conditions: string[] = [];
+    conditions.push(`company_id = '${filters.companyId}'`);
     
-    if (filters.brand) {
-      conditions.push(`brand = $${params.length + 1}`);
-      params.push(filters.brand);
-    }
-    if (filters.model) {
-      conditions.push(`model = $${params.length + 1}`);
-      params.push(filters.model);
-    }
+    if (filters.brand) conditions.push(`brand = '${filters.brand}'`);
+    if (filters.model) conditions.push(`model = '${filters.model}'`);
     if (filters.yearMin && filters.yearMax) {
-      conditions.push(`year >= $${params.length + 1} AND year <= $${params.length + 2}`);
-      params.push(filters.yearMin, filters.yearMax);
+      conditions.push(`year >= ${filters.yearMin} AND year <= ${filters.yearMax}`);
     }
-    if (filters.fuel) {
-      conditions.push(`fuel = $${params.length + 1}`);
-      params.push(filters.fuel);
-    }
-    if (filters.gearbox) {
-      conditions.push(`gearbox = $${params.length + 1}`);
-      params.push(filters.gearbox);
-    }
+    if (filters.fuel) conditions.push(`fuel = '${filters.fuel}'`);
+    if (filters.gearbox) conditions.push(`gearbox = '${filters.gearbox}'`);
     if (filters.kmMin && filters.kmMax) {
-      conditions.push(`km >= $${params.length + 1} AND km <= $${params.length + 2}`);
-      params.push(filters.kmMin, filters.kmMax);
+      conditions.push(`km >= ${filters.kmMin} AND km <= ${filters.kmMax}`);
     }
 
     const limit = filters.limit || 200;
-    const query = `
+    
+    const queryString = `
       SELECT * FROM market_comps 
       WHERE ${conditions.join(' AND ')}
       ORDER BY fetched_at DESC 
       LIMIT ${limit}
     `;
-
-    const result = await db.execute(sql.raw(query, params));
+    
+    const result = await db.execute(sql.raw(queryString));
+    
     return result.rows.map(row => ({
       id: row.id,
       companyId: row.company_id,
@@ -1114,6 +1146,95 @@ export class DatabaseStorage implements IStorage {
       .values({ ...comp, companyId })
       .returning();
     return result;
+  }
+
+  // Follow-ups methods
+  async getFollowups(userId: string): Promise<Followup[]> {
+    // Set user context for RLS
+    await db.execute(sql`SELECT set_config('app.current_user_id', ${userId}, false)`);
+    
+    return await db.select().from(followups).orderBy(followups.dueDate);
+  }
+
+  async createFollowup(followup: InsertFollowup, userId: string): Promise<Followup> {
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) throw new Error('User not in company');
+    
+    const [newFollowup] = await db
+      .insert(followups)
+      .values({
+        ...followup,
+        companyId: membership.companyId,
+      })
+      .returning();
+    
+    // Create activity for new followup
+    await this.logActivity(
+      'FOLLOWUP_CREATED',
+      `Ny oppfølging opprettet for kunde`,
+      followup.customerId,
+      membership.companyId,
+      userId,
+      'LOW'
+    );
+    
+    return newFollowup;
+  }
+
+  async updateFollowup(id: string, followup: Partial<InsertFollowup>, userId: string): Promise<Followup> {
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) throw new Error('User not in company');
+    
+    const [updatedFollowup] = await db
+      .update(followups)
+      .set(followup)
+      .where(and(eq(followups.id, id), eq(followups.companyId, membership.companyId)))
+      .returning();
+    
+    return updatedFollowup;
+  }
+
+  async getCustomerProfile(customerId: string, userId: string): Promise<{
+    customer: Customer;
+    cars: Car[];
+    contracts: Contract[];
+    followups: Followup[];
+    activities: Activity[];
+  }> {
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) throw new Error('User not in company');
+
+    // Set user context for RLS
+    await db.execute(sql`SELECT set_config('app.current_user_id', ${userId}, false)`);
+
+    // Get customer data
+    const [customer] = await db.select().from(customers)
+      .where(and(eq(customers.id, customerId), eq(customers.companyId, membership.companyId)));
+
+    if (!customer) throw new Error('Customer not found');
+
+    // Get related data
+    const customerCars = await db.select().from(cars)
+      .where(eq(cars.soldToCustomerId, customerId));
+      
+    const customerContracts = await db.select().from(contracts)
+      .where(eq(contracts.customerId, customerId));
+      
+    const customerFollowups = await db.select().from(followups)
+      .where(eq(followups.customerId, customerId));
+      
+    const customerActivities = await db.select().from(activities)
+      .where(eq(activities.entityId, customerId))
+      .orderBy(desc(activities.createdAt))
+      .limit(50);
+
+    return {
+      customer,
+      cars: customerCars,
+      contracts: customerContracts,
+      followups: customerFollowups,
+      activities: customerActivities,
+    };
   }
 
   async getSuggestedPrice(carId: string, userId: string): Promise<PriceSuggestion> {

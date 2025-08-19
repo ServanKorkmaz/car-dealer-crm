@@ -1074,6 +1074,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer 360 profile endpoint
+  app.get('/api/customers/:id/profile', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const profile = await storage.getCustomerProfile(req.params.id, userId);
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Error getting customer profile:', error);
+      res.status(500).json({ message: error.message || 'Failed to get customer profile' });
+    }
+  });
+
+  // Follow-ups endpoints
+  app.get('/api/followups', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const followups = await storage.getFollowups(userId);
+      res.json(followups);
+    } catch (error: any) {
+      console.error('Error getting followups:', error);
+      res.status(500).json({ message: error.message || 'Failed to get followups' });
+    }
+  });
+
+  app.post('/api/followups', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const followup = await storage.createFollowup(req.body, userId);
+      res.status(201).json(followup);
+    } catch (error: any) {
+      console.error('Error creating followup:', error);
+      res.status(500).json({ message: error.message || 'Failed to create followup' });
+    }
+  });
+
+  app.put('/api/followups/:id', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const followup = await storage.updateFollowup(req.params.id, req.body, userId);
+      res.json(followup);
+    } catch (error: any) {
+      console.error('Error updating followup:', error);
+      res.status(500).json({ message: error.message || 'Failed to update followup' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

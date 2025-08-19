@@ -1,0 +1,122 @@
+Prompt 8 — Company Switcher + Invites UI
+
+Goal: Allow users to belong to multiple companies, switch between them in the app, and invite teammates with role control.
+
+1) Database (already from Prompt 5)
+
+We already created:
+
+companies
+
+memberships (user_id, company_id, role)
+
+invites (company_id, email, role, token, expires_at, accepted)
+
+No new migrations needed if Prompt 5 was applied. ✅
+
+2) Server utilities
+Get companies for current user
+async function getUserCompanies() {
+  const { data } = await supabase
+    .from("memberships")
+    .select("company_id, role, companies(name)")
+    .eq("user_id", currentUserId);
+  return data?.map(m => ({
+    id: m.company_id,
+    name: m.companies.name,
+    role: m.role
+  })) ?? [];
+}
+
+Set active company
+
+Store activeCompanyId in localStorage (frontend) and in user session context.
+
+Every API call must include company_id = activeCompanyId.
+
+3) UI — Company Switcher
+
+Placement: Top navbar, left side.
+
+Show current company name with a chevron ↓.
+
+On click → dropdown with list of companies (user’s memberships).
+
+Option at bottom: + Ny bedrift (opens modal to create new company).
+
+Tailwind example:
+
+<div class="relative">
+  <button class="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5">
+    <span>{{ activeCompany.name }}</span>
+    <ChevronDownIcon class="w-4 h-4" />
+  </button>
+  <!-- Dropdown -->
+  <div class="absolute mt-2 w-56 rounded-xl bg-white/5 shadow-lg">
+    <ul class="py-1">
+      <li v-for="c in companies" @click="switchCompany(c.id)" class="px-3 py-2 hover:bg-white/10">
+        {{ c.name }} <span class="text-xs text-gray-400">({{ c.role }})</span>
+      </li>
+      <li class="border-t border-white/10 px-3 py-2 text-sm text-blue-400 hover:bg-white/10">
+        + Ny bedrift
+      </li>
+    </ul>
+  </div>
+</div>
+
+4) UI — Invite teammates
+
+New page under Innstillinger → Team.
+
+Table of members:
+
+Name, Email, Role, Joined date.
+
+Action column (change role, remove member — only visible for EIER).
+
+Button: Inviter bruker → opens modal.
+
+Invite modal:
+
+Fields: Email, Role (select: EIER / SELGER / REGNSKAP / VERKSTED).
+
+On submit:
+
+Call API → insert into invites with random token.
+
+Send email (stub: just display invite link in dev).
+
+Invite link = https://app.forhandlerpro.no/accept-invite?token=XYZ.
+
+Accept invite page:
+
+If logged in: consume invite → insert into memberships (user_id, company_id, role).
+
+If not logged in: prompt to sign up first, then continue.
+
+Show success → redirect to dashboard with that company active.
+
+5) Alerts & roles integration
+
+If user has pending invites, show a small banner: “Du har X invitasjoner – [Godta nå]”.
+
+Role enforcement (from Prompt 5 RLS) already ensures that only EIER can manage invites/memberships.
+
+6) Acceptance criteria
+
+I can click the topbar company name and switch between two companies without refreshing (localStorage + API reload).
+
+In Innstillinger → Team, I see my team with roles.
+
+As EIER, I can invite a user with a role → they get a token link.
+
+When invite is accepted, they appear in the membership list.
+
+Non-EIER cannot see invite/remove buttons.
+
+All queries filter by the active company_id.
+
+7) Next up
+
+When this is in place, you’ll be able to run multi-dealer setups (perfect for dealer groups).
+I’d suggest queuing Prompt 9 — Accounting/export module (Tripletex/Visma) after this, so your dealers can push sales into their ERP directly.
