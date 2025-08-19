@@ -274,7 +274,7 @@ export async function parseContractCreationCommand(command: string, hints: UserH
     }
     
     // Check if customer exists or create new one
-    const customers = await storage.getCustomers(hints.companyId || 'default-company');
+    const customers = await storage.getCustomers(hints.userId || 'test-user-123');
     let customer = customers.find(c => 
       c.name?.toLowerCase().includes(customerName.toLowerCase())
     );

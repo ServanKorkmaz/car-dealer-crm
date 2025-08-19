@@ -1201,12 +1201,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Enhanced AI Assistant endpoint
   app.post('/api/assistant', authMiddleware, async (req: any, res) => {
     try {
-      const { messages, hints } = req.body as {
-        messages: Array<{ role: "user" | "assistant"; content: string }>;
-        hints?: { role?: string; activeCompanyId?: string; currentRoute?: string };
+      const { messages, message, hints } = req.body as {
+        messages?: Array<{ role: "user" | "assistant"; content: string }>;
+        message?: string;
+        hints?: { role?: string; activeCompanyId?: string; currentRoute?: string; userId?: string };
       };
 
-      const lastMessage = messages?.at(-1)?.content || "";
+      const lastMessage = messages?.at(-1)?.content || message || "";
       const role = (hints?.role || "SELGER").toUpperCase();
       const companyId = hints?.activeCompanyId;
 
