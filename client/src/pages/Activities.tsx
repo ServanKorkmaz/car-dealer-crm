@@ -89,7 +89,7 @@ export default function Activities() {
   const currentFilter = ActivityFilters.find(f => f.key === selectedFilter);
 
   // Fetch activities
-  const { data: activities = [], isLoading } = useQuery({
+  const { data: activities = [], isLoading } = useQuery<Activity[]>({
     queryKey: ['/api/activities', currentFilter?.type, showResolved],
     queryFn: () => apiRequest("GET", `/api/activities?${new URLSearchParams({
       ...(currentFilter?.type && { type: currentFilter.type }),
@@ -138,9 +138,11 @@ export default function Activities() {
   });
 
   // Filter activities based on search
-  const filteredActivities = activities.filter((activity: Activity) =>
-    activity.message.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredActivities = Array.isArray(activities) 
+    ? activities.filter((activity: Activity) =>
+        activity.message.toLowerCase().includes(searchQuery.toLowerCase())
+      ) 
+    : [];
 
   // Group activities by priority for better organization
   const groupedActivities = {
