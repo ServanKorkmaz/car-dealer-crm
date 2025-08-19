@@ -17,21 +17,21 @@ export async function getCarByReg(regInput: string, hints: UserHints) {
     const normalizedInput = normReg(regInput);
     
     const car = cars.find(c => {
-      const carReg = normReg(c.registration || '');
+      const carReg = normReg(c.registrationNumber || '');
       return carReg === normalizedInput || carReg.includes(normalizedInput);
     });
     
     if (!car) return null;
     
     // Calculate days on lot
-    const daysOnLot = Math.floor((Date.now() - new Date(car.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+    const daysOnLot = car.createdAt ? Math.floor((Date.now() - new Date(car.createdAt).getTime()) / (1000 * 60 * 60 * 24)) : 0;
     
     return {
       id: car.id,
-      registration: car.registration,
+      registration: car.registrationNumber,
       status: car.status,
       salePrice: car.salePrice,
-      brand: car.brand,
+      brand: car.make,
       model: car.model,
       year: car.year,
       daysOnLot
@@ -42,11 +42,30 @@ export async function getCarByReg(regInput: string, hints: UserHints) {
   }
 }
 
-export async function getMostExpensiveSold(filterBrand: string | null, hints: UserHints) {
+export async function countAvailable(companyId?: string) {
   try {
     const storage = await storagePromise;
-    const contracts = await storage.getContracts(hints.companyId || 'default-company');
-    const cars = await storage.getCars(hints.companyId || 'default-company');
+    const cars = await storage.getCars(companyId || 'default-company');
+    
+    // Count non-sold inventory (exclude cars with "solgt" status)
+    const availableCars = cars.filter(car => 
+      !car.status?.toLowerCase().includes('solgt') &&
+      car.status !== 'Sold' &&
+      car.status !== 'SOLD'
+    );
+    
+    return availableCars.length;
+  } catch (error) {
+    console.error("Error counting available cars:", error);
+    return 0;
+  }
+}
+
+export async function mostExpensiveSold(brand: string | null, companyId?: string) {
+  try {
+    const storage = await storagePromise;
+    const contracts = await storage.getContracts(companyId || 'default-company');
+    const cars = await storage.getCars(companyId || 'default-company');
     
     // Find completed/signed contracts - broader status matching
     const soldContracts = contracts.filter(c => 
@@ -65,14 +84,14 @@ export async function getMostExpensiveSold(filterBrand: string | null, hints: Us
         const car = cars.find(c => c.id === contract.carId);
         if (!car) return null;
         
-        // Use final price from contract, fallback to car sale price
-        const salePrice = contract.finalPrice || car.salePrice || 0;
+        // Use sale price from contract, fallback to car sale price
+        const salePrice = parseFloat(contract.salePrice) || car.salePrice || 0;
         
         return {
-          id: car.id,
-          registration: car.registration,
-          salePrice,
-          brand: car.brand,
+          car_id: car.id,
+          registration: car.registrationNumber,
+          sale_price: salePrice,
+          brand: car.make,
           model: car.model,
           year: car.year,
           status: car.status,
@@ -85,18 +104,19 @@ export async function getMostExpensiveSold(filterBrand: string | null, hints: Us
     
     // Filter by brand if specified
     let filteredCars = soldCars;
-    if (filterBrand) {
+    if (brand) {
       filteredCars = soldCars.filter(car => 
-        car.brand?.toLowerCase().includes(filterBrand.toLowerCase())
+        car && car.brand?.toLowerCase().includes(brand.toLowerCase())
       );
     }
     
     if (!filteredCars.length) return null;
     
     // Find most expensive by sale price
-    const mostExpensive = filteredCars.reduce((max, car) => 
-      (car.salePrice || 0) > (max.salePrice || 0) ? car : max
-    );
+    const mostExpensive = filteredCars.reduce((max, car) => {
+      if (!max || !car) return car || max;
+      return (car.sale_price || 0) > (max.sale_price || 0) ? car : max;
+    });
     
     return mostExpensive;
   } catch (error) {
@@ -124,6 +144,7 @@ export async function getUnsignedContracts(hints: UserHints) {
     
     return unsigned.map(c => ({
       id: c.id,
+      createdAt: c.createdAt || new Date().toISOString(),
       customerId: c.customerId,
       carId: c.carId,
       status: c.status,

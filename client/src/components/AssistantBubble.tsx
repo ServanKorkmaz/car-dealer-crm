@@ -23,6 +23,7 @@ export default function AssistantBubble({
   const endRef = useRef<HTMLDivElement>(null);
   const [location, setLocation] = useLocation();
   const lastToolRef = useRef<Tool | null>(null);
+  const [pendingTool, setPendingTool] = useState<any>(null);
 
   useEffect(() => { 
     endRef.current?.scrollIntoView({ behavior: "smooth" }); 
@@ -95,7 +96,11 @@ export default function AssistantBubble({
       
       if (data?.tool) {
         lastToolRef.current = data.tool; // Remember last tool for "ja" responses
-        window.dispatchEvent(new CustomEvent("assistant:action", { detail: data.tool }));
+        if (data.tool.auto) {
+          window.dispatchEvent(new CustomEvent("assistant:action", { detail: data.tool }));
+        } else {
+          setPendingTool(data.tool);
+        }
       }
       
       if (data?.reply) {
@@ -197,6 +202,22 @@ export default function AssistantBubble({
             )}
             <div ref={endRef} />
           </div>
+
+          {/* Pending tool confirm button */}
+          {pendingTool && (
+            <div className="mb-3 flex justify-start">
+              <button
+                className="text-xs rounded-full px-3 py-1 bg-blue-500/80 hover:bg-blue-500 text-white transition-colors"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("assistant:action", { detail: pendingTool }));
+                  setPendingTool(null);
+                }}
+                data-testid="assistant-confirm-button"
+              >
+                {pendingTool.label ?? "Åpne"}
+              </button>
+            </div>
+          )}
 
           {/* Input area */}
           <div className="flex gap-2 border-t border-slate-200 dark:border-slate-700 pt-3">
