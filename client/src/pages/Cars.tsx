@@ -12,14 +12,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import AddCarModal from "@/components/cars/AddCarModal";
 import EditCarModal from "@/components/cars/EditCarModal";
+import CarCard from "@/components/cars/CarCard";
 import { 
   Plus, Search, Edit, Trash2, CheckCircle, Clock, ExternalLink, 
   Filter, SortAsc, Car as CarIcon, Calendar, Gauge, MapPin,
   Eye, DollarSign, Settings, TrendingUp, TrendingDown, AlertCircle,
-  Copy, Star, Grid3x3, List, LayoutGrid, Fuel, Info, X
+  Copy, Star, Grid3x3, List, LayoutGrid, Fuel, Info, X,
+  Layers3, Layers2, Layers
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
@@ -55,7 +57,7 @@ function GridCarCard({
   getStatusText: (status: string) => string;
   calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
 }) {
-  const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate || null);
+  const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate || null);
   const hasImage = car.images && car.images.length > 0;
   const profit = calculateProfit(car.salePrice || "0", car.costPrice || undefined);
   const [showQuickInfo, setShowQuickInfo] = useState(false);
@@ -85,8 +87,8 @@ function GridCarCard({
         </div>
         
         {/* Status badge øverst til venstre */}
-        <Badge className={`absolute top-2 left-2 ${getStatusColor(car.status)} text-xs px-2 py-0.5`}>
-          {getStatusText(car.status)}
+        <Badge className={`absolute top-2 left-2 ${getStatusColor(car.status || 'available')} text-xs px-2 py-0.5`}>
+          {getStatusText(car.status || 'available')}
         </Badge>
         
         {/* Pris øverst til høyre */}
@@ -115,7 +117,7 @@ function GridCarCard({
             {car.make} {car.model} {car.year}
           </h3>
           {warnings.length > 0 && (
-            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" title={warnings.join(", ")} />
+            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
           )}
         </div>
         
@@ -237,7 +239,7 @@ function ListCarCard({
   getStatusText: (status: string) => string;
   calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
 }) {
-  const daysOnStock = calculateDaysOnStock(car.createdAt || "", car.soldDate || null);
+  const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate || null);
   const hasImage = car.images && car.images.length > 0;
   const profit = calculateProfit(car.salePrice || "0", car.costPrice || undefined);
   
@@ -284,7 +286,7 @@ function ListCarCard({
                   {car.make} {car.model} {car.year}
                 </h3>
                 {warnings.length > 0 && (
-                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" title={warnings.join(", ")} />
+                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -294,8 +296,8 @@ function ListCarCard({
             
             {/* Status og pris */}
             <div className="flex items-center gap-3">
-              <Badge className={`${getStatusColor(car.status)} text-xs`}>
-                {getStatusText(car.status)}
+              <Badge className={`${getStatusColor(car.status || 'available')} text-xs`}>
+                {getStatusText(car.status || 'available')}
               </Badge>
               <div className="text-right">
                 <div className="text-lg font-bold text-slate-900 dark:text-white">
@@ -393,6 +395,7 @@ export default function Cars() {
   const [filterPrice, setFilterPrice] = useState<[number, number]>([0, 2000000]);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [density, setDensity] = useState<'comfort' | 'normal' | 'compact'>('normal');
   const [showSellDialog, setShowSellDialog] = useState(false);
   const [sellingCar, setSellingCar] = useState<Car | null>(null);
   const [salePrice, setSalePrice] = useState("");
@@ -400,6 +403,20 @@ export default function Cars() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Load density preference from localStorage
+  useEffect(() => {
+    const savedDensity = localStorage.getItem('cars_density') as 'comfort' | 'normal' | 'compact' | null;
+    if (savedDensity) {
+      setDensity(savedDensity);
+    }
+  }, []);
+  
+  // Save density preference to localStorage
+  const handleDensityChange = (newDensity: 'comfort' | 'normal' | 'compact') => {
+    setDensity(newDensity);
+    localStorage.setItem('cars_density', newDensity);
+  };
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -824,10 +841,36 @@ export default function Cars() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             <span className="text-sm text-slate-600 dark:text-slate-400">
               {filteredCars.length} av {cars.length} biler
             </span>
+            
+            {/* Density toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-600 dark:text-slate-400">Tetthet:</span>
+              <ToggleGroup 
+                type="single" 
+                value={density} 
+                onValueChange={(value) => value && handleDensityChange(value as 'comfort' | 'normal' | 'compact')}
+                className="border rounded-md"
+              >
+                <ToggleGroupItem value="comfort" aria-label="Komfort" className="px-3 py-1">
+                  <Layers3 className="w-4 h-4 mr-1" />
+                  Komfort
+                </ToggleGroupItem>
+                <ToggleGroupItem value="normal" aria-label="Normal" className="px-3 py-1">
+                  <Layers2 className="w-4 h-4 mr-1" />
+                  Normal
+                </ToggleGroupItem>
+                <ToggleGroupItem value="compact" aria-label="Kompakt" className="px-3 py-1">
+                  <Layers className="w-4 h-4 mr-1" />
+                  Kompakt
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            
+            {/* View mode toggle */}
             <div className="flex border rounded-md">
               <Button
                 variant={viewMode === "grid" ? "default" : "ghost"}
@@ -874,7 +917,7 @@ export default function Cars() {
                   <SelectContent>
                     <SelectItem value="all">Alle typer</SelectItem>
                     {uniqueFuelTypes.map(fuel => (
-                      <SelectItem key={fuel} value={fuel}>{fuel}</SelectItem>
+                      <SelectItem key={fuel || 'unknown'} value={fuel || 'unknown'}>{fuel || 'Ukjent'}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -886,7 +929,7 @@ export default function Cars() {
                 <div className="px-2">
                   <Slider
                     value={filterYear}
-                    onValueChange={setFilterYear}
+                    onValueChange={(value) => setFilterYear(value as [number, number])}
                     min={2000}
                     max={new Date().getFullYear()}
                     step={1}
@@ -903,7 +946,7 @@ export default function Cars() {
                 <div className="px-2">
                   <Slider
                     value={filterMileage}
-                    onValueChange={setFilterMileage}
+                    onValueChange={(value) => setFilterMileage(value as [number, number])}
                     min={0}
                     max={500000}
                     step={10000}
@@ -920,7 +963,7 @@ export default function Cars() {
                 <div className="px-2">
                   <Slider
                     value={filterPrice}
-                    onValueChange={setFilterPrice}
+                    onValueChange={(value) => setFilterPrice(value as [number, number])}
                     min={0}
                     max={2000000}
                     step={50000}
@@ -977,15 +1020,19 @@ export default function Cars() {
             </CardContent>
           </Card>
         ) : (
-          <div className={viewMode === "grid" 
-            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" 
-            : "space-y-3"
-          }>
+          <div className={`
+            ${viewMode === "grid" 
+              ? `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 
+                 ${density === 'compact' ? 'gap-2' : density === 'comfort' ? 'gap-6' : 'gap-4'}` 
+              : "space-y-3"
+            }
+          `}>
             {filteredCars.map((car: Car) => (
               viewMode === "grid" ? (
-                <GridCarCard 
+                <CarCard
                   key={car.id} 
-                  car={car} 
+                  car={car}
+                  density={density}
                   onEdit={() => setEditingCar(car)}
                   onSell={() => handleSellCar(car)}
                   onDelete={() => deleteMutation.mutate(car.id)}
@@ -997,7 +1044,6 @@ export default function Cars() {
                   formatPrice={formatPrice}
                   getStatusColor={getStatusColor}
                   getStatusText={getStatusText}
-                  calculateProfit={calculateProfit}
                 />
               ) : (
                 <ListCarCard 

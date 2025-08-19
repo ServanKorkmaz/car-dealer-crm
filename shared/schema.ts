@@ -57,10 +57,13 @@ export const cars = pgTable("cars", {
   vehicleClass: varchar("vehicle_class"),
   costPrice: varchar("cost_price").notNull().default("0"), // Changed to varchar to handle strings
   salePrice: varchar("sale_price").default("0"),
+  recondCost: varchar("recond_cost").default("0"), // Reconditioning cost
   profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }), // calculated field
   notes: text("notes"), // renamed from description for consistency
   images: text("images").array(), // array of image URLs
   status: varchar("status").default("available"), // available, sold, reserved
+  euControl: boolean("eu_control").default(false), // EU control status
+  finnUrl: varchar("finn_url"), // Finn.no listing URL
   soldDate: timestamp("sold_date"),
   soldPrice: varchar("sold_price"),
   soldToCustomerId: varchar("sold_to_customer_id"),
