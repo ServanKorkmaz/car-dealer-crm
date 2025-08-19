@@ -1,0 +1,193 @@
+1) Send riktig “hints” fra frontenden
+
+Sørg for at AssistantBubble får activeCompanyId, userId og currentRoute. Hent dem fra din app‑context (der du allerede vet aktiv bedrift) – og pass dem inn.
+
+// AppRoot.tsx (eller der bobla rendres)
+import AssistantBubble from "@/components/AssistantBubble";
+import { AssistantActionListener } from "@/components/AssistantActionListener";
+import { useAppContext } from "@/lib/appContext"; // ditt eget
+
+export default function AppRoot({ router }) {
+  const { activeCompanyId, currentUser, currentRoute } = useAppContext();
+
+  return (
+    <>
+      <AssistantActionListener router={router} />
+      <AssistantBubble
+        userRole={currentUser?.role ?? "SELGER"}
+        activeCompanyId={activeCompanyId ?? localStorage.getItem("activeCompanyId") ?? ""}
+        currentRoute={currentRoute}
+        userId={currentUser?.id ?? ""}
+      />
+    </>
+  );
+}
+
+
+I AssistantBubble.tsx: sørg for at du sender disse i fetch("/api/assistant"):
+
+body: JSON.stringify({
+  messages: newMsgs,
+  hints: { role: userRole, activeCompanyId, currentRoute, userId }
+})
+
+
+👉 Uten activeCompanyId vil alle DB‑kall som har .eq("company_id", ...) returnere 0 rader.
+
+2) Normaliser regnr (PR‑52981 ⇢ PR52981) og bruk korrekt kolonne
+
+Kjør denne enkle migrasjonen (oppdater coalesce‑listen hvis din kolonne heter noe annet):
+
+create or replace view cars_secure_norm as
+select
+  c.*,
+  upper(regexp_replace(
+    coalesce(c.registration, c.regnr, c.license_plate, ''),
+    '\s|-', '', 'g'
+  )) as regnr_norm
+from cars_secure c;
+
+create or replace view cars_secure_with_age as
+select
+  csn.*,
+  (current_date - csn.created_at::date) as days_on_lot
+from cars_secure_norm csn;
+
+
+I serverkoden bruk regnr_norm:
+
+// assistantTools.ts
+function normReg(x:string){ return (x||"").toUpperCase().replace(/[\s-]/g,""); }
+
+export async function getCarByReg(regInput: string, hints: UserHints) {
+  const reg = normReg(regInput);
+  let q = supabase
+    .from("cars_secure_with_age")
+    .select("id, company_id, registration, status, sale_price, brand, model, year, days_on_lot")
+    .eq("regnr_norm", reg)
+    .limit(1);
+
+  if (hints.companyId) q = q.eq("company_id", hints.companyId); // filtrer bare hvis vi har id
+  const { data, error } = await q;
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
+
+3) “Solgt” via kontrakter (ikke status på bil)
+
+Hvis “dyreste solgte” gir tomt resultat, skyldes det ofte at salget bor i contracts. Lag en enkel view:
+
+create or replace view sold_cars_v as
+select
+  ct.company_id,
+  ct.id   as contract_id,
+  cr.id   as car_id,
+  cr.brand, cr.model, cr.year, cr.sale_price
+from contracts ct
+join cars cr on cr.id = ct.car_id
+where ct.status in ('Fullført','Betalt','Levert');  -- tilpass til dine statuser
+
+
+Og oppdater verktøyet:
+
+export async function getMostExpensiveSold(brandFragment: string | null, hints: UserHints) {
+  let q = supabase
+    .from("sold_cars_v")
+    .select("company_id, car_id, brand, model, year, sale_price")
+    .order("sale_price", { ascending: false })
+    .limit(1);
+
+  if (hints.companyId) q = q.eq("company_id", hints.companyId);
+  if (brandFragment) q = q.ilike("brand", `%${brandFragment}%`);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
+
+4) Få “åpne siden nå” til å fungere når bruker svarer “ja”
+
+To alternativer – velg A (enklest):
+
+A) Håndter “ja” i klienten (ingen serverside state)
+
+Lag en liten “sist verktøy”‑buffer i bobla:
+
+// AssistantBubble.tsx
+const lastToolRef = useRef<any>(null);
+
+async function send() {
+  // ...
+  const data = await res.json();
+  if (data?.tool) {
+    lastToolRef.current = data.tool; // husk for "ja"
+    window.dispatchEvent(new CustomEvent("assistant:action", { detail: data.tool }));
+  }
+  if (data?.reply) setMsgs(m => [...m, { role: "assistant", content: data.reply }]);
+}
+
+useEffect(() => {
+  // Hvis bruker skriver "ja", "ja takk", "åpne", "gjør det" – og vi har et nylig tool
+  const lower = input.trim().toLowerCase();
+  if (["ja","ja takk","åpne","gjør det","please"].includes(lower) && lastToolRef.current) {
+    window.dispatchEvent(new CustomEvent("assistant:action", { detail: lastToolRef.current }));
+    setInput("");
+  }
+}, [input]);
+
+B) (Mer avansert) Lag en “session memory” på serveren og gi last_tool ved “ja” – ikke nødvendig nå.
+5) Intent‑regex som faktisk fanger PR‑52981 / BS 19507
+
+I /api/assistant:
+
+// Fanger bs19507, BS 19507, PR-52981
+const regMatch = last.match(/([a-z]{2})[\s-]?(\d{5})/i);
+const joinedReg = regMatch ? (regMatch[1] + regMatch[2]).toUpperCase() : null;
+
+if (/(pris(en)? på|hva koster)/i.test(last) && joinedReg) {
+  // CAR_PRICE
+}
+
+if ((/er (bil|den)/i.test(last) && /(solgt|tilgjengelig|status)/i.test(last)) && joinedReg) {
+  // CAR_STATUS
+}
+
+6) Hurtig test (2 minutter)
+
+Bekreft hints: i devtools → Network → request til /api/assistant → se at hints.activeCompanyId ikke er tom.
+
+Regnr: Spør
+
+“Hva koster PR‑52981?”
+
+“Er BS 19507 solgt?”
+Forvent: konkret svar + forslag om å åpne Rediger.
+
+Dyrt salg: “Hvilken Porsche er den dyreste vi har solgt?”
+Forvent: modell/år + pris hentet fra sold_cars_v.
+
+Svar “ja takk” etter et forslag → skal åpne siden.
+
+7) Vanlige feil å sjekke
+
+activeCompanyId mangler → alle spørringer blir tomme.
+
+contracts.status bruker andre verdier enn 'Fullført','Betalt','Levert' → justér viewet.
+
+Regnr ligger i en annen kolonne → oppdater coalesce(c.registration, c.regnr, ...) i viewet.
+
+ActionListener er ikke montert → tool‑navigasjon gjør ingenting. Sørg for at du har:
+
+// AssistantActionListener.tsx
+useEffect(() => {
+  function onAction(e:any){
+    const t = e.detail;
+    if (t?.name==="open"){
+      if (router?.push) router.push(t.page);
+      else window.location.hash = t.page;
+      // håndter modal/tab hvis du bruker global state
+    }
+  }
+  window.addEventListener("assistant:action", onAction);
+  return () => window.removeEventListener("assistant:action", onAction);
+}, [router]);

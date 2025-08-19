@@ -1289,9 +1289,9 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
 
       const intent = detectIntent(lastMessage);
       const userHints: UserHints = {
-        role: role as any,
-        companyId: companyId || 'default-company',
-        userId: req.user?.claims?.sub
+        role: (hints?.role || role) as any,
+        companyId: hints?.activeCompanyId || companyId || 'default-company',
+        userId: hints?.userId || req.user?.claims?.sub || 'test-user-123'
       };
 
       // Data queries with real database lookup

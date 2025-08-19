@@ -35,6 +35,12 @@ function Router() {
     enabled: isAuthenticated,
   });
 
+  // Get current user data
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/auth/user'],
+    enabled: isAuthenticated,
+  });
+
   return (
     <>
       <Switch>
@@ -55,6 +61,7 @@ function Router() {
         <AssistantBubble 
           userRole={userRole?.role || "SELGER"} 
           activeCompanyId={userRole?.companyId || "default-company"}
+          userId={currentUser?.id || "test-user-123"}
         />
       )}
     </>

@@ -8,9 +8,11 @@ type Tool = { name: "open"; page: string; params?: { id?: string; tab?: string; 
 export default function AssistantBubble({
   userRole = "SELGER",
   activeCompanyId,
+  userId,
 }: { 
   userRole?: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"; 
   activeCompanyId?: string;
+  userId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([
@@ -20,6 +22,7 @@ export default function AssistantBubble({
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const [location, setLocation] = useLocation();
+  const lastToolRef = useRef<Tool | null>(null);
 
   useEffect(() => { 
     endRef.current?.scrollIntoView({ behavior: "smooth" }); 
@@ -50,6 +53,20 @@ export default function AssistantBubble({
     return () => window.removeEventListener("assistant:action", onAction as EventListener);
   }, [setLocation]);
 
+  // Handle "ja/yes" responses to execute last tool
+  useEffect(() => {
+    const lower = input.trim().toLowerCase();
+    if (["ja", "ja takk", "åpne", "gjør det", "please", "yes", "ok"].includes(lower) && lastToolRef.current) {
+      window.dispatchEvent(new CustomEvent("assistant:action", { detail: lastToolRef.current }));
+      setInput("");
+      setMsgs(msgs => [...msgs, 
+        { role: "user", content: input },
+        { role: "assistant", content: "Åpner siden for deg!" }
+      ]);
+      lastToolRef.current = null;
+    }
+  }, [input]);
+
   async function send() {
     if (!input.trim()) return;
     const userMsg = { role: "user" as const, content: input };
@@ -67,8 +84,9 @@ export default function AssistantBubble({
           messages: newMsgs,
           hints: { 
             role: userRole, 
-            activeCompanyId, 
-            currentRoute: location 
+            activeCompanyId: activeCompanyId || 'default-company',
+            currentRoute: location,
+            userId: userId
           }
         })
       });
@@ -76,6 +94,7 @@ export default function AssistantBubble({
       const data = await res.json();
       
       if (data?.tool) {
+        lastToolRef.current = data.tool; // Remember last tool for "ja" responses
         window.dispatchEvent(new CustomEvent("assistant:action", { detail: data.tool }));
       }
       
