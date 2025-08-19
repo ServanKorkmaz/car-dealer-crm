@@ -28,20 +28,14 @@ function Router() {
 
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
-        <Route path="/" component={Landing} />
-      ) : (
-        <>
-          <Route path="/" component={Dashboard} />
-          <Route path="/dashboard-pro" component={ProfessionalDashboard} />
-          <Route path="/cars" component={Cars} />
-          <Route path="/cars/:id" component={CarDetail} />
-          <Route path="/customers" component={Customers} />
-          <Route path="/customers/:id" component={CustomerProfile} />
-          <Route path="/contracts" component={Contracts} />
-          <Route path="/activities" component={Activities} />
-        </>
-      )}
+      <Route path="/" component={isLoading || !isAuthenticated ? Landing : Dashboard} />
+      <Route path="/dashboard-pro" component={ProfessionalDashboard} />
+      <Route path="/cars" component={Cars} />
+      <Route path="/cars/:id" component={CarDetail} />
+      <Route path="/customers" component={Customers} />
+      <Route path="/customers/:id" component={CustomerProfile} />
+      <Route path="/contracts" component={Contracts} />
+      <Route path="/activities" component={Activities} />
       <Route component={NotFound} />
     </Switch>
   );

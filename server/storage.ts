@@ -4,6 +4,7 @@ import {
   customers,
   contracts,
   activityLog,
+  userSavedViews,
   type User,
   type UpsertUser,
   type Car,
@@ -95,6 +96,18 @@ export interface IStorage {
   // Activity Log operations
   createActivityLog(activity: InsertActivityLog): Promise<ActivityLog>;
   getRecentActivities(userId: string, limit?: number): Promise<ActivityLog[]>;
+  
+  // Saved Views operations
+  getSavedViews(userId: string, page: string): Promise<any[]>;
+  createSavedView(view: {
+    userId: string;
+    companyId: string;
+    page: string;
+    name: string;
+    payload: any;
+  }): Promise<any>;
+  updateSavedView(id: string, updates: { name?: string; payload?: any }, userId: string): Promise<any | null>;
+  deleteSavedView(id: string, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -481,6 +494,57 @@ export class DatabaseStorage implements IStorage {
       .where(eq(activityLog.userId, userId))
       .orderBy(desc(activityLog.createdAt))
       .limit(limit);
+  }
+
+  // Saved Views operations
+  async getSavedViews(userId: string, page: string): Promise<any[]> {
+    return await db
+      .select()
+      .from(userSavedViews)
+      .where(and(
+        eq(userSavedViews.userId, userId),
+        eq(userSavedViews.page, page)
+      ))
+      .orderBy(desc(userSavedViews.createdAt));
+  }
+
+  async createSavedView(view: {
+    userId: string;
+    companyId: string;
+    page: string;
+    name: string;
+    payload: any;
+  }): Promise<any> {
+    const [newView] = await db
+      .insert(userSavedViews)
+      .values(view)
+      .returning();
+    return newView;
+  }
+
+  async updateSavedView(id: string, updates: { name?: string; payload?: any }, userId: string): Promise<any | null> {
+    const [updatedView] = await db
+      .update(userSavedViews)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(userSavedViews.id, id),
+        eq(userSavedViews.userId, userId)
+      ))
+      .returning();
+    return updatedView || null;
+  }
+
+  async deleteSavedView(id: string, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(userSavedViews)
+      .where(and(
+        eq(userSavedViews.id, id),
+        eq(userSavedViews.userId, userId)
+      ));
+    return (result as any).rowCount > 0;
   }
 }
 

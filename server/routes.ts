@@ -33,6 +33,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Saved Views API endpoints
+  app.get('/api/saved-views', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { page } = req.query;
+      
+      if (!page || !['cars', 'customers'].includes(page)) {
+        return res.status(400).json({ message: "Valid page parameter required" });
+      }
+      
+      const storage = await storagePromise;
+      const savedViews = await storage.getSavedViews(userId, page);
+      res.json(savedViews);
+    } catch (error) {
+      console.error("Error fetching saved views:", error);
+      res.status(500).json({ message: "Failed to fetch saved views" });
+    }
+  });
+
+  app.post('/api/saved-views', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { page, name, payload } = req.body;
+      
+      if (!page || !name || !payload) {
+        return res.status(400).json({ message: "Page, name, and payload are required" });
+      }
+      
+      if (!['cars', 'customers'].includes(page)) {
+        return res.status(400).json({ message: "Invalid page parameter" });
+      }
+      
+      const storage = await storagePromise;
+      const savedView = await storage.createSavedView({
+        userId,
+        companyId: 'default-company', // For now, use default company
+        page,
+        name,
+        payload
+      });
+      
+      res.status(201).json(savedView);
+    } catch (error) {
+      console.error("Error creating saved view:", error);
+      res.status(500).json({ message: "Failed to create saved view" });
+    }
+  });
+
+  app.put('/api/saved-views/:id', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      const { name, payload } = req.body;
+      
+      if (!name && !payload) {
+        return res.status(400).json({ message: "Name or payload is required" });
+      }
+      
+      const storage = await storagePromise;
+      const updatedView = await storage.updateSavedView(id, { name, payload }, userId);
+      
+      if (!updatedView) {
+        return res.status(404).json({ message: "Saved view not found" });
+      }
+      
+      res.json(updatedView);
+    } catch (error) {
+      console.error("Error updating saved view:", error);
+      res.status(500).json({ message: "Failed to update saved view" });
+    }
+  });
+
+  app.delete('/api/saved-views/:id', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { id } = req.params;
+      
+      const storage = await storagePromise;
+      const success = await storage.deleteSavedView(id, userId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Saved view not found" });
+      }
+      
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting saved view:", error);
+      res.status(500).json({ message: "Failed to delete saved view" });
+    }
+  });
+
   // Advanced dashboard analytics
   app.get('/api/dashboard/analytics/:timeRange', authMiddleware, async (req: any, res) => {
     try {
@@ -399,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         source: 'Statens Vegvesen'
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Vehicle lookup error:', error);
       res.status(500).json({ 
         message: 'Feil ved oppslag av bildata. Prøv igjen senere.',
@@ -644,7 +735,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const importedCar = await storage.createCar(carData, userId);
+      // Ensure required fields are present for car creation
+      const carDataWithDefaults = {
+        ...carData,
+        registrationNumber: carData.registrationNumber || '',
+        make: carData.make || '',
+        model: carData.model || '',
+        year: carData.year || new Date().getFullYear(),
+        mileage: carData.mileage || 0,
+        power: carData.power || '',
+        co2Emissions: carData.co2Emissions ?? null,
+        lastEuControl: carData.lastEuControl ?? null,
+        nextEuControl: carData.nextEuControl ?? null,
+      };
+      
+      const importedCar = await storage.createCar(carDataWithDefaults, userId);
 
       // Log car import activity
       try {

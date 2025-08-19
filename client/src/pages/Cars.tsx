@@ -26,6 +26,8 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
 import { Link } from "wouter";
+import SavedViewsToolbar from "@/components/shared/SavedViewsToolbar";
+import { deserializeViewFromUrl, type SavedViewPayload } from "@/hooks/useSavedViews";
 
 // Improved Grid Card Component - kompakt og oversiktlig
 function GridCarCard({ 
@@ -57,7 +59,7 @@ function GridCarCard({
   getStatusText: (status: string) => string;
   calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
 }) {
-  const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate || null);
+  const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate?.toString() || null);
   const hasImage = car.images && car.images.length > 0;
   const profit = calculateProfit(car.salePrice || "0", car.costPrice || undefined);
   const [showQuickInfo, setShowQuickInfo] = useState(false);
@@ -239,7 +241,7 @@ function ListCarCard({
   getStatusText: (status: string) => string;
   calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
 }) {
-  const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate || null);
+  const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate?.toString() || null);
   const hasImage = car.images && car.images.length > 0;
   const profit = calculateProfit(car.salePrice || "0", car.costPrice || undefined);
   
@@ -416,6 +418,52 @@ export default function Cars() {
   const handleDensityChange = (newDensity: 'comfort' | 'normal' | 'compact') => {
     setDensity(newDensity);
     localStorage.setItem('cars_density', newDensity);
+  };
+
+  // Handle URL-based view sharing
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewParam = urlParams.get('view');
+    if (viewParam) {
+      const payload = deserializeViewFromUrl(viewParam);
+      if (payload) {
+        applyViewPayload(payload);
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, []);
+
+  // Create current filter state for saved views
+  const getCurrentFilters = (): SavedViewPayload => {
+    return {
+      searchTerm,
+      sortBy,
+      filterStatus,
+      filterMake,
+      filterFuelType,
+      filterYear,
+      filterMileage,
+      filterPrice,
+      density,
+      viewMode,
+      showFilters,
+    };
+  };
+
+  // Apply saved view payload
+  const applyViewPayload = (payload: SavedViewPayload) => {
+    if (payload.searchTerm !== undefined) setSearchTerm(payload.searchTerm);
+    if (payload.sortBy !== undefined) setSortBy(payload.sortBy);
+    if (payload.filterStatus !== undefined) setFilterStatus(payload.filterStatus);
+    if (payload.filterMake !== undefined) setFilterMake(payload.filterMake);
+    if (payload.filterFuelType !== undefined) setFilterFuelType(payload.filterFuelType);
+    if (payload.filterYear !== undefined) setFilterYear(payload.filterYear);
+    if (payload.filterMileage !== undefined) setFilterMileage(payload.filterMileage);
+    if (payload.filterPrice !== undefined) setFilterPrice(payload.filterPrice);
+    if (payload.density !== undefined) handleDensityChange(payload.density);
+    if (payload.viewMode !== undefined) setViewMode(payload.viewMode);
+    if (payload.showFilters !== undefined) setShowFilters(payload.showFilters);
   };
 
   // Redirect to home if not authenticated
@@ -771,6 +819,14 @@ export default function Cars() {
             </Button>
           </div>
         </div>
+
+        {/* Saved Views Toolbar */}
+        <SavedViewsToolbar
+          page="cars"
+          currentFilters={getCurrentFilters()}
+          onApplyView={applyViewPayload}
+          className="mb-4"
+        />
 
         {/* Search and Filters */}
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">

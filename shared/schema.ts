@@ -126,9 +126,22 @@ export const activityLog = pgTable("activity_log", {
   metadata: jsonb("metadata"), // additional data like old/new values, prices, etc.
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
-  index("IDX_activity_log_created_at").on(table.createdAt),
-  index("IDX_activity_log_user_id").on(table.userId),
-  index("IDX_activity_log_type").on(table.type),
+  index("idx_activity_log_user_id").on(table.userId),
+  index("idx_activity_log_entity").on(table.entityId, table.entityType),
+]);
+
+// User Saved Views table for storing user filter preferences
+export const userSavedViews = pgTable("user_saved_views", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  companyId: varchar("company_id").notNull(), // For multi-tenant support
+  page: varchar("page").notNull(), // 'cars' or 'customers'
+  name: varchar("name").notNull(),
+  payload: jsonb("payload").notNull(), // Contains all filter state
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_saved_views_user_company").on(table.userId, table.companyId, table.page),
 ]);
 
 // Relations
@@ -256,3 +269,13 @@ export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 export type Customer = typeof customers.$inferSelect;
 export type InsertContract = z.infer<typeof insertContractSchema>;
 export type Contract = typeof contracts.$inferSelect;
+
+// Saved Views schemas
+export const insertSavedViewSchema = createInsertSchema(userSavedViews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type UserSavedView = typeof userSavedViews.$inferSelect;
+export type InsertSavedView = z.infer<typeof insertSavedViewSchema>;
