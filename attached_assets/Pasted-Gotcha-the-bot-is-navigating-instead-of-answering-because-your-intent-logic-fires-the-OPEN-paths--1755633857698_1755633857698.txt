@@ -1,0 +1,171 @@
+Gotcha — the bot is navigating instead of answering because your intent logic fires the OPEN_ paths anytime it sees words like “biler/kontrakter”. Fix = (1) split question vs. command, (2) only auto‑open on explicit commands, (3) answer with data first, and (4) add better DB intents.
+
+Here’s a drop‑in patch (keep names, tweak paths if needed).
+
+1) Update intent logic (answer vs. open)
+
+In /api/assistant replace your detectIntent with this:
+
+function detectIntent(q: string) {
+  const t = q.toLowerCase().trim();
+
+  // capture regnr like "PR-52981", "BS 19507"
+  const reg = t.match(/([a-z]{2})[\s-]?(\d{5})/i);
+  const regJoin = reg ? (reg[1] + reg[2]).toUpperCase() : null;
+
+  // QUESTION words → we should ANSWER (not navigate):
+  const isQuestion = /(hva|hvem|hvilken|hvilke|hvor mange|finnes|er|status)/i.test(t);
+  // COMMAND words → we should NAVIGATE:
+  const isCommand  = /(åpne|vis|gå til|naviger|ta meg til)/i.test(t);
+
+  // Pure navigation (only when explicit command)
+  if (isCommand && /(biler|lager)/i.test(t))       return { kind: "OPEN", page: "#/cars" };
+  if (isCommand && /(kunder)/i.test(t))            return { kind: "OPEN", page: "#/customers" };
+  if (isCommand && /(kontrakt)/i.test(t))          return { kind: "OPEN", page: "#/contracts" };
+  if (isCommand && /(innstillinger|team)/i.test(t))return { kind: "OPEN", page: "#/settings/team" };
+  if (isCommand && /(varsler|aktiviteter)/i.test(t))return { kind: "OPEN", page: "#/activities" };
+
+  // Data Q&A (prefer answering)
+  if (/(pris(en)? på|hva koster)/i.test(t) && regJoin)           return { kind: "CAR_PRICE", reg: regJoin };
+  if (/(er).*?(solgt|tilgjengelig|status)/i.test(t) && regJoin)  return { kind: "CAR_STATUS", reg: regJoin };
+  if (/(dyreste|høyeste pris).*solgt/i.test(t)) {
+    const brand = t.match(/(porsche|bmw|audi|mercedes|volkswagen|toyota|volvo)/i)?.[1] ?? null;
+    return { kind: "MOST_EXPENSIVE_SOLD", brand };
+  }
+  if (/(hvor mange).*biler.*(til salgs|på lager|tilgjengelig)/i.test(t))
+    return { kind: "COUNT_AVAILABLE" };
+  if (/(usignerte|ikke har signert).*kontrakt/i.test(t))
+    return { kind: "UNSIGNED_CONTRACTS" };
+
+  // If it looks like a question but we didn’t match a tool → let LLM answer
+  if (isQuestion) return { kind: "FREE_QA" };
+
+  // default: suggest, don't auto-open
+  return { kind: "SUGGEST", page: "#/dashboard" };
+}
+
+2) Add/patch DB tools
+
+In your assistantTools.ts add:
+
+export async function countAvailable(companyId?: string) {
+  // Adjust statuses to your schema. This counts non-sold inventory.
+  let q = supabase.from("cars_secure").select("id", { count: "exact", head: true })
+    .not("status", "ilike", "%solgt%");
+  if (companyId) q = q.eq("company_id", companyId);
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function mostExpensiveSold(brand: string | null, companyId?: string) {
+  let q = supabase.from("sold_cars_v")
+    .select("car_id, brand, model, year, sale_price")
+    .order("sale_price", { ascending: false })
+    .limit(1);
+  if (companyId) q = q.eq("company_id", companyId);
+  if (brand)     q = q.ilike("brand", `%${brand}%`);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
+
+3) Answer first; offer confirm to open
+
+In /api/assistant use tools before LLM and do not auto‑navigate for Q&A. Return a tool with auto:false so the UI can show a confirm button.
+
+// inside handler, after detectIntent(...)
+switch (intent.kind) {
+  case "OPEN":
+    return res.json({ reply: `Åpner ${intent.page.includes("cars")?"**Biler**":intent.page}.`, tool: { name:"open", page:intent.page, auto:true } });
+
+  case "CAR_PRICE": {
+    const car = await tools.getCarByReg(intent.reg, { companyId: hints?.activeCompanyId, role, userId: hints?.userId });
+    if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg}** i aktiv bedrift.` });
+    const pris = car.sale_price != null ? `${Number(car.sale_price).toLocaleString("no-NO")} kr` : "ukjent";
+    return res.json({
+      reply: `**${car.brand ?? ""} ${car.model ?? ""} ${car.year ?? ""}** (${car.registration ?? intent.reg}) – salgspris: **${pris}**.`,
+      tool: { name:"open", page:"#/cars", params:{ modal:"edit", id: car.id, tab:"pricing" }, auto:false, label:"Åpne bilen i Rediger" }
+    });
+  }
+
+  case "CAR_STATUS": {
+    const car = await tools.getCarByReg(intent.reg, { companyId: hints?.activeCompanyId, role, userId: hints?.userId });
+    if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg}** i aktiv bedrift.` });
+    const status = car.status || "Ukjent";
+    const alder  = `${car.days_on_lot ?? "?"} dager på lager`;
+    return res.json({
+      reply: `**${car.brand ?? ""} ${car.model ?? ""} ${car.year ?? ""}** (${car.registration ?? intent.reg}) – status: **${status}** (${alder}).`,
+      tool: { name:"open", page:"#/cars", params:{ modal:"edit", id: car.id }, auto:false, label:"Åpne bilen" }
+    });
+  }
+
+  case "MOST_EXPENSIVE_SOLD": {
+    const row = await tools.mostExpensiveSold(intent.brand ?? null, hints?.activeCompanyId);
+    if (!row) return res.json({ reply: "Fant ingen solgte biler enda i denne bedriften." });
+    const price = row.sale_price != null ? `${Number(row.sale_price).toLocaleString("no-NO")} kr` : "ukjent";
+    return res.json({
+      reply: `Dyraste solgte ${intent.brand ?? "bil"}: **${row.brand ?? ""} ${row.model ?? ""} ${row.year ?? ""}** – **${price}**.`,
+      tool: { name:"open", page:"#/contracts", auto:false, label:"Åpne Kontrakter" }
+    });
+  }
+
+  case "COUNT_AVAILABLE": {
+    const n = await tools.countAvailable(hints?.activeCompanyId);
+    return res.json({ reply: `Du har **${n}** biler til salgs akkurat nå.` });
+  }
+
+  case "UNSIGNED_CONTRACTS": {
+    const rows = await tools.getUnsignedContracts({ companyId: hints?.activeCompanyId });
+    const reply = rows.length
+      ? `Usignerte kontrakter: ${rows.map(r => "#"+String(r.id).slice(0,8)).join(", ")}.`
+      : "Ingen usignerte kontrakter 🎉";
+    return res.json({ reply, tool: { name:"open", page:"#/activities", auto:false, label:"Åpne Aktiviteter" } });
+  }
+
+  case "FREE_QA":
+  default:
+    // fall through to LLM message (keeps your natural language answers)
+}
+
+4) Don’t auto‑execute tools in the client
+
+Change AssistantBubble to only auto‑execute when tool.auto === true; otherwise show a confirm button.
+
+// in AssistantBubble.tsx
+const [pendingTool, setPendingTool] = useState<any>(null);
+
+if (data?.tool) {
+  if (data.tool.auto) {
+    window.dispatchEvent(new CustomEvent("assistant:action", { detail: data.tool }));
+  } else {
+    setPendingTool(data.tool);
+  }
+}
+
+// render a confirm button when pendingTool exists
+{pendingTool && (
+  <button
+    className="mt-2 text-xs rounded-full px-3 py-1 bg-blue-500/80 hover:bg-blue-500 text-white self-start"
+    onClick={() => {
+      window.dispatchEvent(new CustomEvent("assistant:action", { detail: pendingTool }));
+      setPendingTool(null);
+    }}
+  >
+    {pendingTool.label ?? "Åpne"}
+  </button>
+)}
+
+5) Quick sanity checks
+
+“Hvor mange biler har vi til salgs nå?” → tall (ikke navigasjon).
+
+“Hva er den dyreste bilen vi har solgt?” → navn + pris; knapp Åpne Kontrakter.
+
+“Hvor mye koster SV33419?” → pris; knapp Åpne bilen i Rediger.
+
+“Åpne biler” / “Vis kontrakter” → navigerer umiddelbart.
+
+“Hva med PR‑52981?” → fanges av reg‑regex → pris/status (ikke bare åpne).
+
+If something still opens instead of answering, your message is matching the OPEN branch — check verbs in the question and ensure isCommand only catches explicit commands.
