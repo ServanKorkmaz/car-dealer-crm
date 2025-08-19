@@ -37,6 +37,7 @@ interface CarCardProps {
   formatPrice: (price: string) => string;
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
+  canDelete: boolean;
 }
 
 // Calculate gross margin with proper handling
@@ -113,11 +114,12 @@ export default function CarCard({
   formatPrice,
   getStatusColor,
   getStatusText,
+  canDelete,
 }: CarCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   
-  const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate || null);
+  const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate?.toString() || null);
   const hasImage = car.images && car.images.length > 0;
   const grossMargin = calculateGrossMargin(
     car.salePrice || "0", 
@@ -179,9 +181,9 @@ export default function CarCard({
             <div className={`
               rounded-full px-2.5 py-0.5 ${styles.text.badge} font-medium 
               border border-white/10 bg-white/5 backdrop-blur-sm
-              ${getStatusColor(car.status)}
+              ${getStatusColor(car.status || 'available')}
             `}>
-              {getStatusText(car.status)}
+              {getStatusText(car.status || 'available')}
             </div>
             
             {/* Days on lot */}
@@ -318,16 +320,18 @@ export default function CarCard({
               </Button>
             )}
             
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onDelete}
-              disabled={isDeleting}
-              className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
-              data-testid={`button-delete-${car.id}`}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            {canDelete && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onDelete}
+                disabled={isDeleting}
+                className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400"
+                data-testid={`button-delete-${car.id}`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
       </div>

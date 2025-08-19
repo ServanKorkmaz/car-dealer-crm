@@ -21,6 +21,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Choose the right auth middleware
   const authMiddleware = process.env.NODE_ENV === "development" ? isSimpleAuthenticated : isAuthenticated;
 
+  // Role-based endpoints
+  app.get('/api/user/role', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const membership = await storage.getUserMembership(userId, 'default-company');
+      
+      if (!membership) {
+        return res.status(404).json({ message: "User not found in company" });
+      }
+      
+      res.json({
+        role: membership.role,
+        companyId: membership.companyId,
+        canViewSensitive: ['EIER', 'REGNSKAP'].includes(membership.role),
+        canDelete: membership.role === 'EIER',
+        canInvite: membership.role === 'EIER'
+      });
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      res.status(500).json({ message: "Failed to fetch user role" });
+    }
+  });
+
+  // Invite management endpoints (EIER only)
+  app.post('/api/invites', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { email, role } = req.body;
+      
+      if (!email || !role) {
+        return res.status(400).json({ message: "Email and role are required" });
+      }
+      
+      if (!['EIER', 'SELGER', 'REGNSKAP', 'VERKSTED'].includes(role)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+      
+      const storage = await storagePromise;
+      const invite = await storage.createInvite('default-company', email, role, userId);
+      
+      res.json({
+        message: "Invitation sent successfully",
+        inviteId: invite.id,
+        inviteLink: `${req.protocol}://${req.get('host')}/accept-invite?token=${invite.token}`
+      });
+    } catch (error) {
+      console.error("Error creating invite:", error);
+      res.status(403).json({ message: error instanceof Error ? error.message : "Failed to create invite" });
+    }
+  });
+
+  app.get('/api/invites', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const invites = await storage.getCompanyInvites('default-company', userId);
+      
+      res.json(invites);
+    } catch (error) {
+      console.error("Error fetching invites:", error);
+      res.status(403).json({ message: error instanceof Error ? error.message : "Failed to fetch invites" });
+    }
+  });
+
+  app.post('/api/accept-invite', async (req, res) => {
+    try {
+      const { token, userId } = req.body;
+      
+      if (!token) {
+        return res.status(400).json({ message: "Invite token is required" });
+      }
+      
+      const storage = await storagePromise;
+      const result = await storage.acceptInvite(token, userId || 'new-user-' + Date.now());
+      
+      if (!result) {
+        return res.status(400).json({ message: "Invalid or expired invite" });
+      }
+      
+      res.json({
+        message: "Invite accepted successfully",
+        companyId: result.companyId,
+        role: result.role
+      });
+    } catch (error) {
+      console.error("Error accepting invite:", error);
+      res.status(500).json({ message: "Failed to accept invite" });
+    }
+  });
+
   // Dashboard stats
   app.get('/api/dashboard/stats', authMiddleware, async (req: any, res) => {
     try {

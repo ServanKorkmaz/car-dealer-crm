@@ -21,8 +21,10 @@ import {
   Filter, SortAsc, Car as CarIcon, Calendar, Gauge, MapPin,
   Eye, DollarSign, Settings, TrendingUp, TrendingDown, AlertCircle,
   Copy, Star, Grid3x3, List, LayoutGrid, Fuel, Info, X,
-  Layers3, Layers2, Layers
+  Layers3, Layers2, Layers, UserPlus
 } from "lucide-react";
+import { InviteTeamDialog } from "@/components/team/InviteTeamDialog";
+import { useUserRole, useCanViewSensitive, useCanDelete, useCanInvite } from "@/hooks/useUserRole";
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
 import { Link } from "wouter";
@@ -43,7 +45,8 @@ function GridCarCard({
   formatPrice, 
   getStatusColor, 
   getStatusText,
-  calculateProfit 
+  calculateProfit,
+  canDelete 
 }: {
   car: Car;
   onEdit: () => void;
@@ -58,10 +61,12 @@ function GridCarCard({
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
   calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
+  canDelete: boolean;
 }) {
+  const canViewSensitive = useCanViewSensitive();
   const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate?.toString() || null);
   const hasImage = car.images && car.images.length > 0;
-  const profit = calculateProfit(car.salePrice || "0", car.costPrice || undefined);
+  const profit = canViewSensitive ? calculateProfit(car.salePrice || "0", car.costPrice || undefined) : { amount: 0, percentage: 0 };
   const [showQuickInfo, setShowQuickInfo] = useState(false);
 
   // Advarselsflagg for manglende data
@@ -225,7 +230,8 @@ function ListCarCard({
   formatPrice, 
   getStatusColor, 
   getStatusText,
-  calculateProfit 
+  calculateProfit,
+  canDelete
 }: {
   car: Car;
   onEdit: () => void;
@@ -240,10 +246,12 @@ function ListCarCard({
   getStatusColor: (status: string) => string;
   getStatusText: (status: string) => string;
   calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
+  canDelete: boolean;
 }) {
+  const canViewSensitive = useCanViewSensitive();
   const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate?.toString() || null);
   const hasImage = car.images && car.images.length > 0;
-  const profit = calculateProfit(car.salePrice || "0", car.costPrice || undefined);
+  const profit = canViewSensitive ? calculateProfit(car.salePrice || "0", car.costPrice || undefined) : { amount: 0, percentage: 0 };
   
   // Advarselsflagg
   const warnings = [];
@@ -362,16 +370,18 @@ function ListCarCard({
                   Selg
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onDelete}
-                disabled={isDeleting}
-                className="h-7 px-2 text-red-600 hover:text-red-700"
-                data-testid={`button-delete-${car.id}`}
-              >
-                <Trash2 className="w-3 h-3" />
-              </Button>
+              {canDelete && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDelete}
+                  disabled={isDeleting}
+                  className="h-7 px-2 text-red-600 hover:text-red-700"
+                  data-testid={`button-delete-${car.id}`}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -405,6 +415,10 @@ export default function Cars() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
+  const { data: userRole } = useUserRole();
+  const canDelete = useCanDelete();
+  const canInvite = useCanInvite();
+  const canViewSensitive = useCanViewSensitive();
   
   // Load density preference from localStorage
   useEffect(() => {
@@ -817,6 +831,20 @@ export default function Cars() {
               <ExternalLink className="w-4 h-4 mr-2" />
               Importer fra Finn.no
             </Button>
+            {canInvite && (
+              <InviteTeamDialog
+                trigger={
+                  <Button 
+                    variant="outline"
+                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:border-green-800 dark:text-green-300 shadow-md hover:shadow-lg transition-all duration-200"
+                    data-testid="button-invite-team"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Inviter teammedlem
+                  </Button>
+                }
+              />
+            )}
           </div>
         </div>
 
@@ -1100,6 +1128,7 @@ export default function Cars() {
                   formatPrice={formatPrice}
                   getStatusColor={getStatusColor}
                   getStatusText={getStatusText}
+                  canDelete={canDelete}
                 />
               ) : (
                 <ListCarCard 
@@ -1117,6 +1146,7 @@ export default function Cars() {
                   getStatusColor={getStatusColor}
                   getStatusText={getStatusText}
                   calculateProfit={calculateProfit}
+                  canDelete={canDelete}
                 />
               )
             ))}
@@ -1163,12 +1193,14 @@ export default function Cars() {
                     {formatPrice(sellingCar.salePrice || "0")}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-600 dark:text-slate-400">Innkjøpspris:</span>
-                  <span className="font-medium text-slate-900 dark:text-white">
-                    {formatPrice(sellingCar.costPrice || "0")}
-                  </span>
-                </div>
+                {canViewSensitive && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-600 dark:text-slate-400">Innkjøpspris:</span>
+                    <span className="font-medium text-slate-900 dark:text-white">
+                      {formatPrice(sellingCar.costPrice || "0")}
+                    </span>
+                  </div>
+                )}
               </div>
               
               <div>
@@ -1192,7 +1224,7 @@ export default function Cars() {
                 </p>
               </div>
               
-              {salePrice && sellingCar.costPrice && (
+              {salePrice && sellingCar.costPrice && canViewSensitive && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-blue-700 dark:text-blue-300">Fortjeneste:</span>

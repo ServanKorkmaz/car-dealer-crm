@@ -177,6 +177,21 @@ export const activityLog = pgTable("activity_log", {
   index("idx_activity_log_entity").on(table.entityId, table.entityType),
 ]);
 
+// Invites table for team member invitations
+export const invites = pgTable("invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  role: varchar("role").notNull().default("SELGER").$type<"EIER" | "SELGER" | "REGNSKAP" | "VERKSTED">(),
+  token: text("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull().default(sql`now() + interval '7 days'`),
+  accepted: boolean("accepted").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_invites_company").on(table.companyId),
+  index("idx_invites_token").on(table.token),
+]);
+
 // Enhanced Activities table for smart alerts and notifications
 export const activities = pgTable("activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

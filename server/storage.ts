@@ -9,6 +9,7 @@ import {
   companies,
   profiles,
   memberships,
+  invites,
   type User,
   type UpsertUser,
   type Car,
@@ -23,7 +24,8 @@ import {
   type InsertActivity,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
+import crypto from "crypto";
 
 // Interface for storage operations
 export interface IStorage {
@@ -151,6 +153,22 @@ export interface IStorage {
     createdAt: Date;
   }>>;
   createProfile(userId: string, fullName: string): Promise<void>;
+  
+  // Invite system methods
+  createInvite(companyId: string, email: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED", inviterUserId: string): Promise<{
+    id: string;
+    token: string;
+    expiresAt: Date;
+  }>;
+  acceptInvite(token: string, userId: string): Promise<{ companyId: string; role: string } | null>;
+  getCompanyInvites(companyId: string, inviterUserId: string): Promise<Array<{
+    id: string;
+    email: string;
+    role: string;
+    expiresAt: Date;
+    accepted: boolean;
+    createdAt: Date;
+  }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -175,15 +193,21 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  // Car operations - now with company isolation
+  // Car operations - now with company isolation and role-based field masking
   async getCars(userId: string): Promise<Car[]> {
     // Get user's company
     const membership = await this.getUserMembership(userId, 'default-company');
     if (!membership) return [];
     
-    return await db.select().from(cars)
-      .where(and(eq(cars.companyId, membership.companyId), eq(cars.userId, userId)))
+    // Set user context for database functions
+    await db.execute(sql`SELECT set_config('app.current_user_id', ${userId}, false)`);
+    
+    const results = await db.select().from(cars)
+      .where(and(eq(cars.companyId, membership.companyId)))
       .orderBy(desc(cars.createdAt));
+    
+    // Apply role-based field masking
+    return results.map(car => this.maskSensitiveCarFields(car, membership.role));
   }
 
   async getCarById(carId: string, userId: string): Promise<Car | undefined> {
@@ -822,6 +846,113 @@ export class DatabaseStorage implements IStorage {
         target: profiles.id,
         set: { fullName }
       });
+  }
+
+  // Role-based field masking for cars
+  private maskSensitiveCarFields(car: any, userRole: string) {
+    const canViewSensitive = ['EIER', 'REGNSKAP'].includes(userRole);
+    
+    if (!canViewSensitive) {
+      return {
+        ...car,
+        costPrice: null,
+        recondCost: null,
+        profitMargin: null,
+      };
+    }
+    
+    return car;
+  }
+
+  // Invite system methods
+  async createInvite(companyId: string, email: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED", inviterUserId: string): Promise<{
+    id: string;
+    token: string;
+    expiresAt: Date;
+  }> {
+    // Check if inviter has EIER role
+    const inviterMembership = await this.getUserMembership(inviterUserId, companyId);
+    if (!inviterMembership || inviterMembership.role !== 'EIER') {
+      throw new Error('Only company owners can invite members');
+    }
+
+    const token = crypto.randomUUID();
+    const [invite] = await db
+      .insert(invites)
+      .values({
+        companyId,
+        email,
+        role,
+        token,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+      })
+      .returning();
+
+    return {
+      id: invite.id,
+      token: invite.token,
+      expiresAt: invite.expiresAt || new Date()
+    };
+  }
+
+  async acceptInvite(token: string, userId: string): Promise<{ companyId: string; role: string } | null> {
+    const [invite] = await db
+      .select()
+      .from(invites)
+      .where(and(
+        eq(invites.token, token),
+        eq(invites.accepted, false),
+        sql`${invites.expiresAt} > now()`
+      ));
+
+    if (!invite) return null;
+
+    // Create profile if needed
+    await this.createProfile(userId, "New User");
+    
+    // Add user to company
+    await this.addUserToCompany(userId, invite.companyId, invite.role as any);
+
+    // Mark invite as accepted
+    await db
+      .update(invites)
+      .set({ accepted: true })
+      .where(eq(invites.id, invite.id));
+
+    return {
+      companyId: invite.companyId,
+      role: invite.role
+    };
+  }
+
+  async getCompanyInvites(companyId: string, inviterUserId: string): Promise<Array<{
+    id: string;
+    email: string;
+    role: string;
+    expiresAt: Date;
+    accepted: boolean;
+    createdAt: Date;
+  }>> {
+    // Check if user has EIER role
+    const membership = await this.getUserMembership(inviterUserId, companyId);
+    if (!membership || membership.role !== 'EIER') {
+      throw new Error('Only company owners can view invites');
+    }
+
+    const results = await db
+      .select()
+      .from(invites)
+      .where(eq(invites.companyId, companyId))
+      .orderBy(desc(invites.createdAt));
+
+    return results.map(invite => ({
+      id: invite.id,
+      email: invite.email,
+      role: invite.role,
+      expiresAt: invite.expiresAt || new Date(),
+      accepted: invite.accepted || false,
+      createdAt: invite.createdAt || new Date()
+    }));
   }
 }
 
