@@ -7,6 +7,7 @@ ForhandlerPRO is a modern, secure, and scalable Dealer Management System (DMS) d
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Assistant name: "AI Assistent" (changed from "ForhandlerPRO-assistent")
 
 ## System Architecture
 

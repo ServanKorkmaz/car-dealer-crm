@@ -16,7 +16,7 @@ export default function AssistantBubble({
 }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([
-    { role: "assistant", content: "Hei! Jeg er ForhandlerPRO-assistenten. Spør meg hvor du finner ting, eller hvordan du gjør noe – jeg kan også åpne riktig side for deg." }
+    { role: "assistant", content: "Hei! Jeg er AI Assistenten. Spør meg hvor du finner ting, eller hvordan du gjør noe – jeg kan også åpne riktig side for deg." }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -148,7 +148,7 @@ export default function AssistantBubble({
         <div className="fixed bottom-24 right-6 z-50 w-[380px] max-h-[70vh] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl p-4 flex flex-col">
           <div className="text-lg font-semibold mb-3 text-slate-900 dark:text-white flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-blue-600" />
-            ForhandlerPRO-assistent
+            AI Assistent
           </div>
 
           {/* Quick replies */}
