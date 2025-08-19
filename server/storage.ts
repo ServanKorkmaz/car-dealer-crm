@@ -202,6 +202,7 @@ export interface IStorage {
   getFollowups(userId: string): Promise<Followup[]>;
   createFollowup(followup: InsertFollowup, userId: string): Promise<Followup>;
   updateFollowup(id: string, followup: Partial<InsertFollowup>, userId: string): Promise<Followup>;
+  getTodayFollowups(userId: string): Promise<Followup[]>;
 
   // Customer 360 profile
   getCustomerProfile(customerId: string, userId: string): Promise<{
@@ -808,7 +809,7 @@ export class DatabaseStorage implements IStorage {
       .insert(activities)
       .values({
         type,
-        description: description,
+        message: description,
         entityId,
         companyId,
         userId,
@@ -1288,6 +1289,23 @@ export class DatabaseStorage implements IStorage {
     await this.addUserToCompany(userId, company.id, 'EIER');
 
     return company;
+  }
+
+  async getTodayFollowups(userId: string): Promise<Followup[]> {
+    // Set user context for RLS
+    await db.execute(sql`SELECT set_config('app.current_user_id', ${userId}, false)`);
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    return await db.select().from(followups)
+      .where(and(
+        eq(followups.status, 'OPEN'),
+        sql`DATE(${followups.dueDate}) = DATE('now')`
+      ))
+      .orderBy(followups.dueDate);
   }
 
   async getSuggestedPrice(carId: string, userId: string): Promise<PriceSuggestion> {

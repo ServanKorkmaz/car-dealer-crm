@@ -13,7 +13,8 @@ import {
   Sun,
   LogOut,
   User,
-  Activity
+  Activity,
+  Settings
 } from "lucide-react";
 
 const navigation = [
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Kunder", href: "/customers", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Aktiviteter", href: "/activities", icon: Activity },
+  { name: "Innstillinger", href: "/settings", icon: Settings },
 ];
 
 export default function Sidebar() {

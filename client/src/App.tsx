@@ -16,6 +16,7 @@ import Customers from "@/pages/Customers";
 import CustomerProfile from "@/pages/CustomerProfile";
 import { CustomerProfilePage } from "@/pages/CustomerProfilePage";
 import Contracts from "@/pages/Contracts";
+import Settings from "@/pages/Settings";
 
 // Database configuration - easily switch between Replit DB and Supabase
 const DATABASE_CONFIG = {
@@ -38,6 +39,7 @@ function Router() {
       <Route path="/customers/:id/profile" component={CustomerProfilePage} />
       <Route path="/contracts" component={Contracts} />
       <Route path="/activities" component={Activities} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1124,6 +1124,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/followups/today', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const todayFollowups = await storage.getTodayFollowups(userId);
+      res.json(todayFollowups);
+    } catch (error: any) {
+      console.error('Error getting today followups:', error);
+      res.status(500).json({ message: error.message || 'Failed to get today followups' });
+    }
+  });
+
   // Company management routes
   app.get('/api/companies/user', authMiddleware, async (req: any, res) => {
     try {

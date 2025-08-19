@@ -1,0 +1,143 @@
+🔧 Full Prompt — Fix Missing Features in ForhandlerPRO
+
+Goal: Bring the app up to date with all planned features:
+
+Company switcher + Innstillinger → Team
+
+Notification bell + Alerts feed
+
+Dashboard follow-ups widget
+
+Customer 360 (Timeline, Notes, Follow-ups, Hot/Warm/Cold, Siste kontakt)
+
+Contracts detail (Add-ons, Trade-in, Gross summary)
+
+Rediger bil → Prisassistent
+
+1) Topbar / Navbar
+
+Add Company switcher (dropdown with all memberships; current company stored in localStorage as activeCompanyId).
+
+Add Notification bell with unread counter (# high/normal alerts unresolved).
+
+Clicking opens dropdown with 10 latest alerts.
+
+Each alert links to the full Aktiviteter page.
+
+2) Dashboard
+
+Add “Oppgaver i dag” widget (shows follow-ups due today for current user).
+
+If none → empty state “Ingen oppgaver i dag”.
+
+3) Biler → Rediger bil modal
+
+Add Prisassistent panel (right side):
+
+Shows Anbefalt pris, bands (lav / anbefalt / høy), comps sample list.
+
+Button “Bruk anbefalt pris” updates sale_price.
+
+Hide gross % if role ≠ EIER/REGNSKAP.
+
+4) Kunder (list)
+
+Table/card view must show:
+
+Siste kontakt = last activity date for that customer.
+
+Hot/Warm/Cold chip:
+
+Hot: activity in last 7d
+
+Warm: 8–30d
+
+Cold: >30d
+
+Add Saved Views dropdown like Biler.
+
+5) Customer 360 Profile
+
+Tabs/sections:
+
+Timeline: merged activities (cars, contracts, notes, follow-ups).
+
+Biler: list of linked cars.
+
+Kontrakter: list of contracts.
+
+Notater: free text notes (create/edit).
+
+Follow-ups: inline list with create modal.
+
+Follow-ups: create (due date, note, assign), mark Done/Skipped.
+
+6) Contracts
+
+Contract detail/edit modal:
+
+Add-ons table (Beskrivelse, Kost, Pris, Antall).
+
+Trade-in section (verdivurdering, rekond-kost, netto innbytte).
+
+Gross summary (Salgspris + Add-ons – Innkjøp – Rekond = Brutto kr & %).
+
+Show progress bar (Opprettet → Signert → Betalt → Levert).
+
+7) Aktiviteter / Alerts
+
+Feed should display real activities with filters (Salg / Import / Lagerstyring / Kontrakter / Varsler).
+
+Show priority chips (Høy rød, Normal gul, Lav grå).
+
+Auto-generated alerts:
+
+Car > 60d unsold → alert.
+
+Contract unsigned >24h → alert.
+
+Car gross <5% → alert.
+
+Customer without follow-up → alert.
+
+Alerts visible both in feed + bell.
+
+Allow “Mark as resolved”.
+
+8) Innstillinger → Team
+
+Add new nav item Innstillinger.
+
+Subsection: Team
+
+Table of members: Name, Email, Role, Joined.
+
+Only EIER can: invite new (email + role), change role, remove.
+
+Invite flow: generate token → accept invite → join company.
+
+9) Design Tokens (Tailwind)
+
+Chips: rounded-full px-2.5 py-0.5 text-xs font-medium
+
+Panel: rounded-2xl border border-white/5 bg-white/5 p-4 space-y-3
+
+Progress bar: h-2 rounded-full bg-white/10 overflow-hidden with inner bar colored per status.
+
+10) Acceptance Criteria
+
+Topbar shows company switcher + bell.
+
+Dashboard shows today’s follow-ups.
+
+Rediger bil shows Prisassistent.
+
+Kunder list shows Siste kontakt + Hot/Warm/Cold.
+
+Customer profile has Timeline, Notes, Follow-ups.
+
+Contract detail has Add-ons, Trade-in, Gross summary.
+
+Aktiviteter feed + alerts working and appear in bell dropdown.
+
+Innstillinger → Team visible and functional (invite, role change).

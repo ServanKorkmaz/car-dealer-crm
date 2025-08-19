@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import AddCarModal from "@/components/cars/AddCarModal";
 import CustomerForm from "@/components/customers/CustomerForm";
 import { CompanySwitcher } from "./CompanySwitcher";
+import { NotificationBell } from "./NotificationBell";
 import { Plus, UserPlus } from "lucide-react";
 
 export default function TopBar() {
@@ -16,8 +17,9 @@ export default function TopBar() {
           {/* Left side - Company Switcher */}
           <CompanySwitcher />
           
-          {/* Right side - Quick Actions */}
+          {/* Right side - Notifications and Quick Actions */}
           <div className="flex items-center space-x-3">
+            <NotificationBell />
             <Button
               onClick={() => setShowAddCar(true)}
               className="bg-primary hover:bg-primary-600 text-white"

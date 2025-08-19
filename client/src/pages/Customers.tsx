@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useCanDelete } from "@/hooks/useUserRole";
+import { useCustomerStatus, getStatusColor, getStatusLabel } from "@/hooks/useCustomerStatus";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,9 @@ export default function Customers() {
     enabled: isAuthenticated,
   });
 
+  // Get customers with status (Hot/Warm/Cold)
+  const { customersWithStatus } = useCustomerStatus();
+
   const deleteMutation = useMutation({
     mutationFn: async (customerId: string) => {
       await apiRequest("DELETE", `/api/customers/${customerId}`);
@@ -80,7 +84,7 @@ export default function Customers() {
     return <div className="min-h-screen bg-slate-50 dark:bg-slate-900" />;
   }
 
-  const filteredCustomers = customers.filter((customer) =>
+  const filteredCustomers = customersWithStatus.filter((customer) =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.phone?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -150,9 +154,14 @@ export default function Customers() {
                         {customer.email || "Ingen e-post"}
                       </p>
                     </div>
-                    <Badge variant={customer.type === "company" ? "default" : "secondary"}>
-                      {customer.type === "company" ? "Bedrift" : "Privat"}
-                    </Badge>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={customer.type === "company" ? "default" : "secondary"}>
+                        {customer.type === "company" ? "Bedrift" : "Privat"}
+                      </Badge>
+                      <Badge className={`${getStatusColor(customer.status)} text-xs`} variant="outline">
+                        {getStatusLabel(customer.status)}
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -164,6 +173,11 @@ export default function Customers() {
                       <p className="text-sm text-muted-foreground" data-testid={`text-created-${customer.id}`}>
                         Opprettet {new Date(customer.createdAt!).toLocaleDateString('no-NO')}
                       </p>
+                      {customer.lastContactDate && (
+                        <p className="text-sm text-muted-foreground">
+                          Siste kontakt: {new Date(customer.lastContactDate).toLocaleDateString('no-NO')}
+                        </p>
+                      )}
                     </div>
                     <Button
                       variant="outline"
