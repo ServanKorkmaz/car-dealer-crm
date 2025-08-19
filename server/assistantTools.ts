@@ -290,8 +290,8 @@ export async function parseContractCreationCommand(command: string, hints: UserH
         notes: 'Opprettet automatisk fra assistent'
       };
       
-      // createCustomer will add the proper fields
-      const createdCustomer = await storage.createCustomer(newCustomer as any);
+      // createCustomer will add the proper fields - pass userId
+      const createdCustomer = await storage.createCustomer(newCustomer as any, hints.userId || 'test-user-123');
       customer = createdCustomer;
     }
     
