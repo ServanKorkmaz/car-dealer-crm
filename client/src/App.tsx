@@ -18,6 +18,8 @@ import { CustomerProfilePage } from "@/pages/CustomerProfilePage";
 import Contracts from "@/pages/Contracts";
 import Settings from "@/pages/Settings";
 import AssistantBubble from "@/components/AssistantBubble";
+import { SettingsAccounting } from "@/features/accounting/pages/SettingsAccounting";
+import { SyncMonitor } from "@/features/accounting/pages/SyncMonitor";
 
 // Database configuration - easily switch between Replit DB and Supabase
 const DATABASE_CONFIG = {
@@ -54,6 +56,8 @@ function Router() {
         <Route path="/contracts" component={Contracts} />
         <Route path="/activities" component={Activities} />
         <Route path="/settings" component={Settings} />
+        <Route path="/settings/regnskap" component={SettingsAccounting} />
+        <Route path="/sync" component={SyncMonitor} />
         <Route component={NotFound} />
       </Switch>
       {/* Assistant bubble - show only when authenticated */}

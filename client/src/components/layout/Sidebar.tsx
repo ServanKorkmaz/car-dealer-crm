@@ -14,7 +14,9 @@ import {
   LogOut,
   User,
   Activity,
-  Settings
+  Settings,
+  Calculator,
+  RefreshCw
 } from "lucide-react";
 
 const navigation = [
@@ -24,6 +26,8 @@ const navigation = [
   { name: "Kunder", href: "/customers", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Aktiviteter", href: "/activities", icon: Activity },
+  { name: "Regnskap", href: "/settings/regnskap", icon: Calculator },
+  { name: "Synkronisering", href: "/sync", icon: RefreshCw },
   { name: "Innstillinger", href: "/settings", icon: Settings },
 ];
 

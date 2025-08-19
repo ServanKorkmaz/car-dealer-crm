@@ -1,0 +1,182 @@
+Title: Professional Accounting UI (PowerOffice Go) for ForhandlerPRO
+
+Objective
+Build a complete, production-quality UI to manage the PowerOffice Go (PO Go) integration end-to-end: connect/disconnect, mappings, defaults, contract actions (“Send til PowerOffice Go”, “Fakturer nå”), and a sync monitor with retry & diagnostics.
+
+Context
+- Stack: React + TypeScript + Vite, TailwindCSS, shadcn/ui, lucide-react. State via React Query (preferred) or your existing pattern. 
+- Backend routes already exist:
+  - GET /api/accounting/pogo/connect
+  - GET /api/accounting/pogo/callback
+  - POST /api/accounting/pogo/disconnect
+  - POST /api/accounting/pogo/send-order
+  - POST /api/accounting/pogo/invoice
+  - POST /api/accounting/pogo/webhook (server-only)
+  - (Optional) GET /api/accounting/pogo/status, GET /api/accounting/pogo/vat-codes, GET /api/accounting/pogo/accounts
+- DB tables: accounting_settings, accounting_vat_map, accounting_account_map, accounting_links, sync_queue, sync_log.
+
+Non-Goals
+- No mascot/gamification. No workshop/payroll integration yet. No multi-provider UI beyond structure for future providers.
+
+Design & UX (professional)
+- Use shadcn/ui (Card, Button, Badge, Table, Tabs, Dialog, Drawer, Tooltip, Input, Select, Separator, Alert, Toast).
+- Aesthetic: modern, minimal, grid-based, rounded-2xl, soft shadows, generous spacing.
+- Dark & light mode. Responsive ≥ 360px. Keyboard accessible; focus rings on actions.
+- Copy language: Norwegian. Short, actionable microcopy.
+
+Routes & Navigation
+- Add left-sidebar entry: **Innstillinger → Regnskap**
+- Pages:
+  1) `/settings/regnskap` – Accounting Settings (PO Go)
+  2) `/contracts/:id` – Enhance “Ny kontrakt” page with PO Go actions & status panel
+  3) `/sync` – Sync Monitor
+
+Page 1: Accounting Settings (PO Go)
+Layout: Header + Tabs
+- Header
+  - Title: “Regnskap”
+  - Subtitle: “Koble til PowerOffice Go og konfigurer mappere, kontoer og standardvalg.”
+  - Connection Status Card:
+    - If disconnected: 
+      - Primary: “Koble til PowerOffice Go”
+      - On click → GET /api/accounting/pogo/connect (redirect).
+    - If connected: show: organisasjonsnavn/ID (fra API), miljø (Sandbox/Prod), tilkoblet siden (timestamp), token alder, scopes.
+      - Buttons: “Test tilkobling”, “Koble fra”.
+      - On “Koble fra” → POST /api/accounting/pogo/disconnect, confirm dialog.
+    - Small badges: Tilkoblet/Frakoblet, Sandbox/Produksjon.
+
+- Tabs: **MVA-mapping**, **Kontoplan-mapping**, **Standardvalg**, **Validering**
+  - MVA-mapping
+    - Table with rows for kategorier: Bil, Tillegg (AddOn), Deler (Parts), Arbeid (Labor), Gebyr (Fee).
+    - Columns: Kategori | Lokal MVA-etikett | Fjern MVA-kode (Select, hentes fra `/vat-codes`) | Status.
+    - Missing mapping shows red badge + inline hint.
+    - Actions: “Lagre endringer”, “Tilbakestill”.
+  - Kontoplan-mapping
+    - Table rows per kategori; inputs for: 
+      - Salgsinntekt (income_account), Varekost (cogs_account), Lagerkonto (inventory_account, optional), Gebyrkonto (fee_account, optional).
+    - Fjern kontoliste hentes fra `/accounts` (searchable Select).
+    - Actions: Lagre / Tilbakestill.
+  - Standardvalg
+    - Inputs:
+      - Betalingsbetingelser (dager) [Number]
+      - Prosjektkode [Text], Avdelingskode [Text]
+      - Fakturakanal [Select: “E-post”, “EHF”, “Post”] (kan justeres)
+    - Actions: Lagre / Test tilkobling.
+  - Validering
+    - Read-only checklist:
+      - Tilkoblet til PO Go
+      - Minst én MVA-mapping per kategori
+      - Nødvendige konti satt per kategori
+      - Standardvalg komplett
+    - Button: “Kjør validering” → viser pass/fail med konkrete feilmeldinger og deep-link til riktig tab.
+
+- Bottom area: “Siste synkroniseringer” (mini-logg)
+  - Table (10 siste) fra `sync_log`: Tid | Enhet | Handling | Status | Melding | “Se detaljer”
+  - “Se detaljer” åpner Drawer med payload/response (JSON viewer, collapsible), correlationId, externalRef.
+
+Page 2: Contract Enhancements (`/contracts/:id`)
+- Right Side Panel: “PowerOffice Go”
+  - Status-badge: Draft / Order / Invoiced / Sent / Partially paid / Paid / Overdue (fargekodet).
+  - Fields (read-only): OrderId (link til PO Go), InvoiceId (link), Sist oppdatert, Betalt/Rest.
+  - Timeline (compact): Opprettet → Ordre → Faktura → Betalinger (med tidspunkter).
+- Actions (Primary/Secondary buttons near header or in panel):
+  - “Send til PowerOffice Go”
+    - Disabled if: ikke tilkoblet, mangler MVA/kontomapping, kunde ikke synket, bil linje mangler pris.
+    - On click: preflight validering → spinner state → toast on success: 
+      “Ordre opprettet i PowerOffice Go ✔” + lenke. On error: konkret, norsk feilmelding.
+  - “Fakturer nå”
+    - Visible if order exists and not yet invoiced.
+    - On success: badge oppdateres, lagrer invoiceId, viser toast “Faktura opprettet ✔”.
+  - Overflow menu:
+    - “Synk kunde” (upsert til PO Go hvis mangler remoteId)
+    - “Åpne i PowerOffice Go”
+    - “Oppdater status” (manuell poll)
+- Empty & error states:
+  - If disconnected: Inline Alert med knapp “Koble til” (deeplink til /settings/regnskap).
+  - If mappings missing: Alert med “Gå til mapping”.
+
+Page 3: Sync Monitor (`/sync`)
+- Filters: Dato (fra/til), Entity (kunde, vare, kontrakt, ordre, faktura, betaling), Status (queued/running/failed/done), Provider (PowerOffice Go), Søk (message/externalRef).
+- Table (paginated 25/side): Tid | Enhet | LocalId | Action | Status | Forsøk | Melding | Handlinger
+  - Handlinger:
+    - “Vis” → Drawer med full detalj (payload, response, headers snapshot, retries).
+    - “Prøv på nytt” (for failed) → queue job; optimistic UI; toast on ok.
+    - “Kopier correlationId” (tooltip).
+- Bulk actions: checkbox select → “Prøv på nytt”.
+- Export CSV (client-side) of current view.
+
+Front-end Data Layer
+- Create `src/features/accounting/api.ts`
+  - `getStatus()`, `connectUrl()` (optional), `disconnect()`
+  - `getVatCodes()`, `getAccounts()`
+  - `saveVatMap(payload)`, `saveAccountMap(payload)`, `saveDefaults(payload)`
+  - `validateSettings()`
+  - `sendOrder(contractId)`, `invoiceContract(contractId)`, `syncCustomer(customerId)`, `pollInvoiceStatus(invoiceId)`
+  - `listSyncLogs(params)`, `retrySync(id)`
+- Use React Query for caching, loading/skeletons, error toasts.
+
+Components (structure)
+- `src/features/accounting/components/ConnectionCard.tsx`
+- `.../VatMappingTable.tsx`
+- `.../AccountMappingTable.tsx`
+- `.../DefaultsForm.tsx`
+- `.../ValidationChecklist.tsx`
+- `.../MiniSyncLog.tsx`
+- `src/features/accounting/pages/SettingsAccounting.tsx`
+- `src/features/accounting/pages/SyncMonitor.tsx`
+- `src/features/accounting/contract/PowerOfficePanel.tsx` (used on Contracts page)
+
+UI Strings (Norwegian — examples)
+- Buttons: “Koble til PowerOffice Go”, “Koble fra”, “Test tilkobling”, “Lagre endringer”, “Tilbakestill”, “Kjør validering”, “Send til PowerOffice Go”, “Fakturer nå”, “Synk kunde”, “Åpne i PowerOffice Go”, “Oppdater status”, “Prøv på nytt”
+- Alerts:
+  - “Mangler MVA-mapping for {kategori}. Gå til Regnskap → MVA-mapping.”
+  - “Kan ikke sende ordre før du er tilkoblet PowerOffice Go.”
+- Toasts:
+  - “Sendt til PowerOffice Go ✔”
+  - “Faktura opprettet ✔”
+  - “Tilkobling testet ✔”
+  - “Lagring fullført ✔”
+  - “Noe gikk galt — prøv igjen.”
+
+States & UX rules
+- Skeleton loaders for cards & tables; optimistic updates where safe.
+- Unsaved changes guard: “Du har ulagrede endringer. Vil du forkaste?”
+- Disable primary actions during network ops; show spinners, keep layout stable.
+- Validation highlights fields with errors and gives next action.
+
+Accessibility
+- All interactive controls reachable by keyboard; ARIA labels on icons.
+- High contrast badges; screen-reader text for status.
+
+Performance
+- Lazy-load heavy tables/components.
+- Debounced search filters; paginate logs.
+
+Security
+- Do not render any secret tokens.
+- Sanitize JSON in drawers; truncate large payloads with “Vis mer”.
+
+Telemetry (optional)
+- Emit events: `accounting_connect`, `vat_map_saved`, `account_map_saved`, `order_sent`, `invoice_created`, `sync_retry`.
+
+Testing (frontend)
+- Unit tests: mapping forms validation, API hooks (mocks), status badges logic.
+- E2E (Playwright):
+  - Connect flow stubbed → UI shows Tilkoblet.
+  - Block send when mapping missing; deep-link works.
+  - Send order from contract → toast success; status updates.
+  - Invoice now → badge changes to Invoiced; link visible.
+  - Sync Monitor → retry turns failed → queued/done.
+
+Acceptance Criteria (must pass)
+1) `/settings/regnskap` shows accurate connection state and allows connect/disconnect and “Test tilkobling”.
+2) MVA-mapping and Kontoplan-mapping can be edited/saved; missing mappings are clearly indicated and block sending.
+3) Standardvalg are saved and used by the backend flows.
+4) On `/contracts/:id`, “Send til PowerOffice Go” creates an order (with preflight validation) and shows success toast + link; “Fakturer nå” creates an invoice; status panel reflects live state.
+5) `/sync` lists logs with filters, details drawer, and working “Prøv på nytt” (single/bulk).
+6) All pages are responsive, accessible, and consistent with the app’s design system.
+
+Deliverables
+- New pages/components wired to backend endpoints.
+- Minimal README section explaining routes, where code lives, and how to extend for future providers.
+- Tests as above.

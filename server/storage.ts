@@ -212,6 +212,29 @@ export interface IStorage {
     followups: Followup[];
     activities: Activity[];
   }>;
+
+  // Accounting integration methods
+  getAccountingSettings(companyId: string, provider: string): Promise<any | null>;
+  upsertAccountingSettings(settings: any): Promise<any>;
+  updateAccountingSettings(companyId: string, provider: string, updates: any): Promise<any>;
+  
+  getVatMappings(companyId: string, provider: string): Promise<any[]>;
+  upsertVatMapping(mapping: any): Promise<any>;
+  
+  getAccountMappings(companyId: string, provider: string): Promise<any[]>;
+  upsertAccountMapping(mapping: any): Promise<any>;
+  
+  getAccountingLink(provider: string, entityType: string, localId: string): Promise<any | null>;
+  createAccountingLink(link: any): Promise<any>;
+  
+  createSyncJob(job: any): Promise<any>;
+  getSyncJob(jobId: string): Promise<any | null>;
+  updateSyncJob(jobId: string, updates: any): Promise<any>;
+  
+  createSyncLog(log: any): Promise<any>;
+  getSyncLogs(companyId: string, limit: number): Promise<any[]>;
+  
+  updateContract(contractId: string, updates: any, userId: string): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1429,6 +1452,90 @@ export class DatabaseStorage implements IStorage {
       })),
       reasons
     };
+  }
+
+  // Accounting integration methods (stub implementations)
+  async getAccountingSettings(companyId: string, provider: string): Promise<any | null> {
+    // TODO: Implement database query
+    return null;
+  }
+  
+  async upsertAccountingSettings(settings: any): Promise<any> {
+    // TODO: Implement database upsert
+    return settings;
+  }
+  
+  async updateAccountingSettings(companyId: string, provider: string, updates: any): Promise<any> {
+    // TODO: Implement database update
+    return updates;
+  }
+  
+  async getVatMappings(companyId: string, provider: string): Promise<any[]> {
+    // TODO: Implement database query
+    return [];
+  }
+  
+  async upsertVatMapping(mapping: any): Promise<any> {
+    // TODO: Implement database upsert
+    return mapping;
+  }
+  
+  async getAccountMappings(companyId: string, provider: string): Promise<any[]> {
+    // TODO: Implement database query
+    return [];
+  }
+  
+  async upsertAccountMapping(mapping: any): Promise<any> {
+    // TODO: Implement database upsert
+    return mapping;
+  }
+  
+  async getAccountingLink(provider: string, entityType: string, localId: string): Promise<any | null> {
+    // TODO: Implement database query
+    return null;
+  }
+  
+  async createAccountingLink(link: any): Promise<any> {
+    // TODO: Implement database insert
+    return link;
+  }
+  
+  async createSyncJob(job: any): Promise<any> {
+    // TODO: Implement database insert
+    return { ...job, id: crypto.randomUUID() };
+  }
+  
+  async getSyncJob(jobId: string): Promise<any | null> {
+    // TODO: Implement database query
+    return null;
+  }
+  
+  async updateSyncJob(jobId: string, updates: any): Promise<any> {
+    // TODO: Implement database update
+    return updates;
+  }
+  
+  async createSyncLog(log: any): Promise<any> {
+    // TODO: Implement database insert
+    return { ...log, id: crypto.randomUUID(), createdAt: new Date() };
+  }
+  
+  async getSyncLogs(companyId: string, limit: number): Promise<any[]> {
+    // TODO: Implement database query
+    return [];
+  }
+  
+  async updateContract(contractId: string, updates: any, userId: string): Promise<any> {
+    const [contract] = await db
+      .update(contracts)
+      .set({
+        ...updates,
+        updatedAt: new Date()
+      })
+      .where(eq(contracts.id, contractId))
+      .returning();
+    
+    return contract;
   }
 }
 
