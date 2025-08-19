@@ -6,13 +6,20 @@ export type UserHints = {
 
 import { storagePromise } from "./storage";
 
-export async function getCarByReg(reg: string, hints: UserHints) {
+function normReg(input: string): string {
+  return (input || "").toUpperCase().replace(/[\s-]/g, "");
+}
+
+export async function getCarByReg(regInput: string, hints: UserHints) {
   try {
     const storage = await storagePromise;
     const cars = await storage.getCars(hints.companyId || 'default-company');
-    const car = cars.find(c => 
-      c.registration?.toLowerCase().includes(reg.toLowerCase())
-    );
+    const normalizedInput = normReg(regInput);
+    
+    const car = cars.find(c => {
+      const carReg = normReg(c.registration || '');
+      return carReg === normalizedInput || carReg.includes(normalizedInput);
+    });
     
     if (!car) return null;
     
@@ -41,18 +48,36 @@ export async function getMostExpensiveSold(filterBrand: string | null, hints: Us
     const contracts = await storage.getContracts(hints.companyId || 'default-company');
     const cars = await storage.getCars(hints.companyId || 'default-company');
     
-    // Find completed/signed contracts
+    // Find completed/signed contracts - broader status matching
     const soldContracts = contracts.filter(c => 
-      c.status === 'Signert' || c.status === 'Fullført'
+      c.status === 'Signert' || 
+      c.status === 'Fullført' || 
+      c.status === 'Betalt' || 
+      c.status === 'Levert' ||
+      c.status === 'Completed'
     );
     
     if (!soldContracts.length) return null;
     
-    // Get cars from sold contracts
+    // Get cars from sold contracts with their final sale price
     const soldCars = soldContracts
       .map(contract => {
         const car = cars.find(c => c.id === contract.carId);
-        return car ? { ...car, finalPrice: contract.finalPrice } : null;
+        if (!car) return null;
+        
+        // Use final price from contract, fallback to car sale price
+        const salePrice = contract.finalPrice || car.salePrice || 0;
+        
+        return {
+          id: car.id,
+          registration: car.registration,
+          salePrice,
+          brand: car.brand,
+          model: car.model,
+          year: car.year,
+          status: car.status,
+          contractId: contract.id
+        };
       })
       .filter(Boolean);
     
@@ -68,20 +93,12 @@ export async function getMostExpensiveSold(filterBrand: string | null, hints: Us
     
     if (!filteredCars.length) return null;
     
-    // Find most expensive by final price
+    // Find most expensive by sale price
     const mostExpensive = filteredCars.reduce((max, car) => 
-      (car.finalPrice || 0) > (max.finalPrice || 0) ? car : max
+      (car.salePrice || 0) > (max.salePrice || 0) ? car : max
     );
     
-    return {
-      id: mostExpensive.id,
-      registration: mostExpensive.registration,
-      salePrice: mostExpensive.finalPrice,
-      brand: mostExpensive.brand,
-      model: mostExpensive.model,
-      year: mostExpensive.year,
-      status: mostExpensive.status
-    };
+    return mostExpensive;
   } catch (error) {
     console.error("Error getting most expensive sold car:", error);
     return null;
@@ -93,8 +110,15 @@ export async function getUnsignedContracts(hints: UserHints) {
     const storage = await storagePromise;
     const contracts = await storage.getContracts(hints.companyId || 'default-company');
     
+    // Filter out completed contracts - anything not fully processed
     const unsigned = contracts
-      .filter(c => c.status !== 'Signert' && c.status !== 'Fullført')
+      .filter(c => 
+        c.status !== 'Signert' && 
+        c.status !== 'Fullført' && 
+        c.status !== 'Betalt' && 
+        c.status !== 'Levert' &&
+        c.status !== 'Completed'
+      )
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
       .slice(0, 10);
     

@@ -1,0 +1,212 @@
+Prompt — “Fix assistant DB tools: regnr search + sold via contracts”
+
+Mål:
+
+Normaliser og indekser reg.nr.
+
+Oppdater assistantTools til å søke på riktig kolonne(r) og alltid scope til company_id.
+
+Hent “dyreste solgte” via contracts (Fullført/Betalt/Levert) med join til cars.
+
+Behold RLS og rolle‑maskering (bruk cars_secure).
+
+1) SQL: normalisert søk for registreringsnummer
+
+Kjør som migrasjon:
+
+-- 1) Finn faktisk regnr-kolonne. Mange prosjekter har en av disse:
+--    cars.registration, cars.regnr, cars.plate, cars.license_plate
+--    Juster COALESCE-listen under til det som finnes hos deg.
+
+create or replace view cars_secure_norm as
+select
+  c.id,
+  c.company_id,
+  /* eksponer hele bilen fra cars_secure hvis du har det som view,
+     ellers bytt c.* til feltlisten du trenger. */
+  c.*,
+  -- Normalisert regnr: upper-case, uten mellomrom/hyphen
+  upper(regexp_replace(
+    coalesce(c.registration, c.regnr, c.license_plate, ''),
+    '\s|-', '', 'g'
+  )) as regnr_norm
+from cars_secure c;
+
+-- 2) Legg på aldersfelt for rask “days_on_lot”
+create or replace view cars_secure_with_age as
+select
+  csn.*,
+  (current_date - csn.created_at::date) as days_on_lot
+from cars_secure_norm csn;
+
+-- 3) (Valgfritt, men anbefalt) Ekstra indeks hvis cars_secure_norm er MATERIALIZED VIEW;
+--    hvis det er et vanlig view over en tabell med indeks på regnr‑kolonne, holder det.
+--    Hvis underliggende tabell heter cars og lagrer regnr i 'registration' eller 'regnr', lag GIN/BTREE der.
+
+-- 4) “Solgte biler via kontrakter”
+--    Vi antar at contracts.status ∈ ('Fullført','Betalt','Levert','Signert','Utkast'…)
+--    og at contracts.car_id peker på cars.id.
+create or replace view sold_cars_v as
+select
+  ct.id as contract_id,
+  ct.company_id,
+  ct.status as contract_status,
+  ct.created_at as contract_created_at,
+  cr.id   as car_id,
+  cr.brand,
+  cr.model,
+  cr.year,
+  cr.sale_price,
+  cr.registration,
+  cr.regnr,
+  upper(regexp_replace(
+    coalesce(cr.registration, cr.regnr, cr.license_plate, ''),
+    '\s|-', '', 'g'
+  )) as regnr_norm
+from contracts ct
+join cars cr on cr.id = ct.car_id
+where ct.status in ('Fullført','Betalt','Levert');  -- juster hvis dine statuser er andre
+
+
+Viktig: Hvis din regnr‑kolonne heter noe annet, oppdater coalesce(...)‑listen over.
+Poenget er å få én standardisert regnr_norm som søk går mot.
+
+2) Server: oppdater assistantTools
+
+Lag/oppdater src/server/assistantTools.ts (sti kan være annerledes hos deg):
+
+import { createClient } from "@supabase/supabase-js";
+
+export type UserHints = { role?: "EIER"|"SELGER"|"REGNSKAP"|"VERKSTED"; companyId?: string; userId?: string };
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // server-side only
+);
+
+function normReg(input: string) {
+  return (input || "").toUpperCase().replace(/[\s-]/g, "");
+}
+
+export async function getCarByReg(regInput: string, hints: UserHints) {
+  const reg = normReg(regInput);
+  const { data, error } = await supabase
+    .from("cars_secure_with_age")
+    .select("id, company_id, regnr_norm, registration, status, sale_price, brand, model, year, days_on_lot")
+    .eq("company_id", hints.companyId)                     // scope til bedrift
+    .eq("regnr_norm", reg)                                // eksakt på normalisert verdi
+    .limit(1);
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
+
+export async function getMostExpensiveSold(brandFragment: string | null, hints: UserHints) {
+  let q = supabase
+    .from("sold_cars_v")
+    .select("contract_id, company_id, car_id, brand, model, year, sale_price")
+    .eq("company_id", hints.companyId)
+    .order("sale_price", { ascending: false })
+    .limit(1);
+
+  if (brandFragment) q = q.ilike("brand", `%${brandFragment}%`);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
+
+export async function getUnsignedContracts(hints: UserHints) {
+  const { data, error } = await supabase
+    .from("contracts")
+    .select("id, company_id, customer_id, car_id, status, created_at")
+    .eq("company_id", hints.companyId)
+    .not("status", "in", '("Fullført","Betalt","Levert")') // alt som IKKE er ferdig
+    .order("created_at", { ascending: true })
+    .limit(10);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function searchCustomerByName(name: string, hints: UserHints) {
+  const { data, error } = await supabase
+    .from("customers")
+    .select("id, company_id, name, email, phone")
+    .eq("company_id", hints.companyId)
+    .ilike("name", `%${name}%`)
+    .limit(5);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createFollowup(customerId: string, dueISO: string, note: string, hints: UserHints) {
+  const payload = {
+    company_id: hints.companyId!,
+    customer_id: customerId,
+    user_id: hints.userId!,
+    due_date: dueISO.slice(0,10),
+    note,
+    status: "OPEN"
+  };
+  const { data, error } = await supabase
+    .from("followups")
+    .insert(payload)
+    .select("id, due_date, note")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+3) /api/assistant: bruk de nye verktøyene
+
+I handleren din (der du tidligere hadde findCarByReg og “dyreste solgte”), bytt til assistantTools:
+
+import * as tools from "@/server/assistantTools"; // tilpass sti
+
+// ... inside handler, after parsing messages/hints/intent:
+
+/** CAR_PRICE / CAR_STATUS **/
+if (intent.intent === "CAR_PRICE" || intent.intent === "CAR_STATUS") {
+  const car = await tools.getCarByReg(intent.reg, { companyId: hints?.activeCompanyId, role, userId: hints?.userId });
+  if (!car) {
+    return res.json({ reply: `Jeg finner ingen bil med regnr **${intent.reg}**. Dobbelt­sjekk regnr eller om bilen tilhører aktiv bedrift.` });
+  }
+  const prisTxt = car.sale_price != null ? `${Number(car.sale_price).toLocaleString("no-NO")} kr` : "ukjent";
+  const statusTxt = car.status || "Ukjent";
+  const alderTxt = `${car.days_on_lot ?? "?"} dager på lager`;
+  const base = `**${car.brand ?? ""} ${car.model ?? ""} ${car.year ?? ""}** (${car.registration ?? intent.reg})`;
+  const reply =
+    intent.intent === "CAR_PRICE"
+      ? `${base} – salgspris: **${prisTxt}** (${statusTxt}, ${alderTxt}). Vil du åpne Rediger?`
+      : `${base} – status: **${statusTxt}** (${alderTxt}). Vil du åpne Rediger?`;
+
+  return res.json({ reply, tool: { name:"open", page:"#/cars", params:{ modal:"edit", id: car.id, tab: "pricing" } } });
+}
+
+/** MOST_EXPENSIVE (optional brand) **/
+if (intent.intent === "MOST_EXPENSIVE") {
+  const car = await tools.getMostExpensiveSold(intent.brand ?? null, { companyId: hints?.activeCompanyId, role, userId: hints?.userId });
+  if (!car) return res.json({ reply: "Fant ingen solgte biler enda i denne bedriften." });
+
+  const price = car.sale_price != null ? `${Number(car.sale_price).toLocaleString("no-NO")} kr` : "ukjent";
+  const reply = `Dyreste solgte ${intent.brand ?? "bil"}: **${car.brand ?? ""} ${car.model ?? ""} ${car.year ?? ""}** – **${price}**. Åpner Kontrakter?`;
+  return res.json({ reply, tool: { name:"open", page:"#/contracts" } });
+}
+
+
+Pass på at alle queries har .eq("company_id", hints.companyId) så RLS/tenancy blir riktig.
+Hvis dine kontrakt‑statuser heter noe annet, justér where ct.status in (...) og not("status","in",...).
+
+4) Intent‑regex (for bedre treff)
+
+I intent‑parseren din, sørg for at regnr fanges uansett mellomrom/lowercase:
+
+// BS19507, bs 19507, PR-52981 ...
+const reg = q.match(/([a-z]{2})[\s-]?(\d{5})/i);
+const regJoin = reg ? `${reg[1]}${reg[2]}` : null;
+
+if (/(pris(en)? på|hva koster)/i.test(q) && regJoin) return { intent: "CAR_PRICE", reg: regJoin.toUpperCase() };
+if (/er (bil|den)\s+.*(solgt|tilgjengelig|status)/i.test(q) && regJoin) return { intent: "CAR_STATUS", reg: regJoin.toUpperCase() };
+if (/(dyreste|høyeste pris).*solgt/i.test(q)) {
+  const brand = q.match(/(porsche|bmw|audi|mercedes|volkswagen)/i)?.[1] ?? null;
+  return { intent: "MOST_EXPENSIVE", brand };
+}

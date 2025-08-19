@@ -1231,16 +1231,24 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
 
       function detectIntent(q: string) {
         const t = q.toLowerCase();
-        const regMatch = t.match(/\b([a-z]{2}\d{5})\b/i)?.[1];
+        
+        // Enhanced registration number matching - handles BS19507, bs 19507, PR-52981, etc.
+        const regMatch = t.match(/([a-z]{2})[\s-]?(\d{5})/i);
+        const regJoin = regMatch ? `${regMatch[1]}${regMatch[2]}`.toUpperCase() : null;
 
-        // Data queries
-        const carPriceMatch = t.match(/(pris(en)? på|hva koster)\s+([a-z]{2}\s?\d{5})/i);
-        const mostExpensiveMatch = t.match(/(dyreste|høyeste pris) (solgte )?(porsche|merke\s+\w+)?/i);
+        // Data queries with better regex
+        const carPriceMatch = t.match(/(pris(en)? på|hva koster|hvor mye koster)/i);
+        const carStatusMatch = t.match(/er (bil|den)\s+.*(solgt|tilgjengelig|status)/i);
+        const mostExpensiveMatch = t.match(/(dyreste|høyeste pris).*solgt/i);
         const createFollowupMatch = t.match(/(lag|opprett).*oppf(ø|o)lging.*for\s+([^\s]+).*?(i morgen|i dag|den\s+\d{1,2}\.\d{1,2}\.\d{2,4})/i);
         const findCustomerMatch = t.match(/(kunde|kunder)\s+(som|med)?\s*navn\s+(.+)/i);
 
-        if (carPriceMatch) return { intent: "CAR_PRICE", reg: carPriceMatch[3].replace(/\s/g, '') };
-        if (mostExpensiveMatch) return { intent: "MOST_EXPENSIVE", brand: mostExpensiveMatch[3] };
+        // Extract brand for expensive car search
+        const brandMatch = t.match(/(porsche|bmw|audi|mercedes|volkswagen|tesla|ford|toyota|volvo)/i);
+
+        if (carPriceMatch && regJoin) return { intent: "CAR_PRICE", reg: regJoin };
+        if (carStatusMatch && regJoin) return { intent: "CAR_STATUS", reg: regJoin };
+        if (mostExpensiveMatch) return { intent: "MOST_EXPENSIVE", brand: brandMatch?.[1] || null };
         if (/(usignerte|mangler signatur|ikke signert)/.test(t) && /kontrakt/.test(t)) return { intent: "UNSIGNED_CONTRACTS" };
         if (createFollowupMatch) return { 
           intent: "CREATE_FOLLOWUP", 
@@ -1262,7 +1270,6 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
         if (/(innbytte|trade)/.test(t)) return { intent: "TRADEIN_HELP" };
         if (/(lagret visning|saved view)/.test(t)) return { intent: "SAVED_VIEWS_HELP" };
         if (/(oppfølging|follow)/.test(t)) return { intent: "FOLLOWUP_HELP" };
-        if (/(er bil|er.*solgt)/.test(t) && regMatch) return { intent: "CAR_STATUS", reg: regMatch };
 
         return { intent: "FREE" };
       }
@@ -1288,45 +1295,38 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
       };
 
       // Data queries with real database lookup
-      if (intent.intent === "CAR_PRICE") {
+      if (intent.intent === "CAR_PRICE" || intent.intent === "CAR_STATUS") {
         const car = await tools.getCarByReg(intent.reg, userHints);
-        if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg}**.` });
+        if (!car) {
+          return res.json({ 
+            reply: `Jeg finner ingen bil med regnr **${intent.reg}**. Dobbeltsjekk regnummer eller om bilen tilhører aktiv bedrift.` 
+          });
+        }
         
-        const price = car.salePrice 
-          ? `${Number(car.salePrice).toLocaleString("no-NO")} kr` 
-          : "ikke satt";
+        const prisTxt = car.salePrice != null ? `${Number(car.salePrice).toLocaleString("no-NO")} kr` : "ikke satt";
+        const statusTxt = car.status || "Ukjent";
+        const alderTxt = `${car.daysOnLot ?? "?"} dager på lager`;
+        const base = `**${car.brand ?? ""} ${car.model ?? ""} ${car.year ?? ""}** (${car.registration ?? intent.reg})`;
         
-        return res.json({
-          reply: `Salgspris for **${car.registration}**: **${price}** (status: ${car.status}).`,
-          ...tool("/cars", { modal: "edit", id: car.id, tab: "pricing" })
-        });
-      }
+        const reply = intent.intent === "CAR_PRICE"
+          ? `${base} – salgspris: **${prisTxt}** (${statusTxt}, ${alderTxt}). Vil du åpne Rediger?`
+          : `${base} – status: **${statusTxt}** (${alderTxt}). Vil du åpne Rediger?`;
 
-      if (intent.intent === "CAR_STATUS") {
-        const car = await tools.getCarByReg(intent.reg, userHints);
-        if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg}**.` });
-        
-        const stat = /solgt/i.test(car.status || '') ? "Solgt" : "Tilgjengelig";
-        const daysText = car.daysOnLot > 0 ? ` (${car.daysOnLot} dager på lager)` : "";
-        
         return res.json({
-          reply: `Bil **${car.registration}** er **${stat}**${daysText}.`,
-          ...tool("/cars", { modal: "edit", id: car.id })
+          reply,
+          ...tool("/cars", { modal: "edit", id: car.id, tab: "pricing" })
         });
       }
 
       if (intent.intent === "MOST_EXPENSIVE") {
         const car = await tools.getMostExpensiveSold(intent.brand || null, userHints);
-        if (!car) return res.json({ reply: "Fant ingen solgte biler enda." });
+        if (!car) return res.json({ reply: "Fant ingen solgte biler enda i denne bedriften." });
         
-        const price = car.salePrice 
-          ? `${Number(car.salePrice).toLocaleString("no-NO")} kr` 
-          : "ukjent";
-        const brand = car.brand ? `${car.brand} ` : "";
-        const filterText = intent.brand ? intent.brand : "bil";
+        const price = car.salePrice != null ? `${Number(car.salePrice).toLocaleString("no-NO")} kr` : "ukjent";
+        const reply = `Dyreste solgte ${intent.brand ?? "bil"}: **${car.brand ?? ""} ${car.model ?? ""} ${car.year ?? ""}** – **${price}**. Åpner Kontrakter?`;
         
         return res.json({
-          reply: `Dyreste solgte ${filterText}: **${brand}${car.model} ${car.year}** – **${price}**.`,
+          reply,
           ...tool("/contracts")
         });
       }
