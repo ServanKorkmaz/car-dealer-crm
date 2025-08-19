@@ -1190,6 +1190,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Assistant endpoint
+  app.post('/api/assistant', authMiddleware, async (req: any, res) => {
+    try {
+      const { messages, hints } = req.body as {
+        messages: Array<{ role: "user" | "assistant"; content: string }>;
+        hints?: { role?: string; activeCompanyId?: string; currentRoute?: string };
+      };
+
+      const lastMessage = messages?.at(-1)?.content || "";
+      const userRole = hints?.role || "SELGER";
+      
+      // Quick keyword router for common navigation requests
+      const keyword = lastMessage.toLowerCase();
+      const routes: Record<string, any> = {
+        "biler": { name: "open", page: "/cars" },
+        "kunder": { name: "open", page: "/customers" },
+        "kontrakt": { name: "open", page: "/contracts" },
+        "innstillinger": { name: "open", page: "/settings" },
+        "team": { name: "open", page: "/settings" },
+        "prisassistent": { name: "open", page: "/cars", params: { modal: "edit", tab: "pricing" } },
+        "varsler": { name: "open", page: "/activities" },
+        "aktiviteter": { name: "open", page: "/activities" },
+        "dashboard": { name: "open", page: "/" },
+      };
+      
+      // Check for navigation keywords
+      for (const [key, route] of Object.entries(routes)) {
+        if (keyword.includes(key) && (keyword.includes("gå til") || keyword.includes("åpne") || keyword.includes("vis"))) {
+          return res.json({
+            reply: `Åpner ${key} for deg. Er det noe spesielt du lurer på der?`,
+            tool: route
+          });
+        }
+      }
+
+      // Static responses based on common questions
+      if (keyword.includes("pris") && (keyword.includes("endre") || keyword.includes("justere"))) {
+        return res.json({
+          reply: "For å endre pris: 1) Gå til Biler → klikk på bilen. 2) Trykk Rediger-knappen. 3) Gå til Pris-fanen. 4) Endre salgspris eller bruk Prisassistent. 5) Lagre endringene.",
+          tool: { name: "open", page: "/cars" }
+        });
+      }
+      
+      if (keyword.includes("inviter") && keyword.includes("bruker")) {
+        const response = userRole === "EIER" 
+          ? "For å invitere brukere: Gå til Innstillinger → Team → klikk «Inviter bruker». Velg rolle (Selger, Regnskap, Verksted) og send invitasjonslenken."
+          : "Bare eiere kan invitere nye brukere. Kontakt en eier for å få sendt invitasjon.";
+        return res.json({ 
+          reply: response,
+          tool: userRole === "EIER" ? { name: "open", page: "/settings" } : null
+        });
+      }
+      
+      if (keyword.includes("kunde") && keyword.includes("status")) {
+        return res.json({
+          reply: "Kundestatus (Hot/Warm/Cold) vises automatisk basert på siste kontakt: Hot = siste 7 dager (grønn), Warm = 8-30 dager (gul), Cold = over 30 dager (blå). Du ser statusen som farget merke ved hver kunde.",
+          tool: { name: "open", page: "/customers" }
+        });
+      }
+      
+      if (keyword.includes("oppfølging")) {
+        return res.json({
+          reply: "Oppfølginger finner du: 1) På Dashboard under «Oppgaver i dag». 2) I Aktiviteter-siden for full oversikt. 3) På hver kundeprofil under Oppfølginger-fanen.",
+          tool: { name: "open", page: "/activities" }
+        });
+      }
+      
+      if (keyword.includes("margin") || keyword.includes("brutto")) {
+        const response = ['EIER', 'REGNSKAP'].includes(userRole)
+          ? "Marginchippen viser bruttofortjeneste: (Salgspris - Kostpris) / Salgspris × 100. Grønn = god margin (>15%), gul = ok (5-15%), rød = lav (<5%)."
+          : "Margininformasjon er kun tilgjengelig for eiere og regnskapsansvarlige.";
+        return res.json({ reply: response });
+      }
+
+      if (keyword.includes("firma") || keyword.includes("bytte")) {
+        return res.json({
+          reply: "Firmavelgeren finner du øverst til høyre i navigasjonen. Klikk på firmanavnet for å bytte mellom firmaer du har tilgang til, eller opprett nytt firma.",
+          tool: null
+        });
+      }
+
+      // Default helpful response
+      return res.json({
+        reply: "Jeg kan hjelpe deg med: navigering i systemet, finne funksjoner, forstå hvordan ting fungerer. Spør meg gjerne om noe spesifikt, så skal jeg guide deg!",
+        tool: null
+      });
+      
+    } catch (error) {
+      console.error("Assistant error:", error);
+      res.status(500).json({ 
+        reply: "Beklager, jeg har tekniske problemer akkurat nå. Prøv igjen om litt." 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

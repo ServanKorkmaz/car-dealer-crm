@@ -1,0 +1,407 @@
+Implement “ForhandlerPRO‑assistenten” (chat bubble + backend + RAG + actions)
+
+Goal: Add a floating chat bubble at bottom‑right that opens a chat panel. The assistant answers “where/how” questions about ForhandlerPRO, in Norwegian, and can open the right page/modal via a safe “tool” JSON. Include a minimal backend endpoint, optional RAG over /assistant_docs, role awareness, quick replies, and telemetry logs.
+
+0) Tech constraints
+
+Frontend: React + Tailwind (same stack as app).
+
+Backend: existing API route handler (Next.js/Express—use what we already have).
+
+DB: Supabase (Postgres) when needed.
+
+LLM provider: add a provider‑agnostic client wrapper with an ENV var (e.g., OPENAI_API_KEY). If no key present, return a mock reply so UI still works.
+
+1) Files to add
+1.1 components/AssistantBubble.tsx
+
+A floating FAB + panel with chat, message state, and action dispatch.
+
+import { useEffect, useRef, useState } from "react";
+
+type Msg = { role: "user" | "assistant"; content: string };
+type Tool = { name: "open"; page: string; params?: { id?: string; tab?: string; modal?: string } };
+
+export default function AssistantBubble({
+  userRole = "SELGER",
+  activeCompanyId,
+  currentRoute
+}: { userRole?: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"; activeCompanyId?: string; currentRoute?: string }) {
+  const [open, setOpen] = useState(false);
+  const [msgs, setMsgs] = useState<Msg[]>([
+    { role: "assistant", content: "Hei! Jeg er ForhandlerPRO‑assistenten. Spør meg hvor du finner ting, eller hvordan du gjør noe – jeg kan også åpne riktig side for deg." }
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, open]);
+
+  async function send() {
+    if (!input.trim()) return;
+    const newMsgs = [...msgs, { role: "user", content: input }];
+    setMsgs(newMsgs);
+    setInput("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newMsgs,
+          hints: { role: userRole, activeCompanyId, currentRoute }
+        })
+      });
+      const data = await res.json();
+      if (data?.tool) {
+        window.dispatchEvent(new CustomEvent("assistant:action", { detail: data.tool as Tool }));
+      }
+      if (data?.reply) setMsgs(m => [...m, { role: "assistant", content: data.reply }]);
+    } catch (e) {
+      setMsgs(m => [...m, { role: "assistant", content: "Beklager, noe gikk galt. Prøv igjen." }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Contextual quick replies
+  const quick = ((): string[] => {
+    const r = (currentRoute || "").toLowerCase();
+    if (r.includes("/cars")) return ["Hvordan justere pris?", "Hva betyr marginchippen?", "Lag lagret visning"];
+    if (r.includes("/contracts")) return ["Legg til innbytte", "Send til e‑sign", "Eksporter PDF"];
+    if (r.includes("/customers")) return ["Opprett oppfølging", "Siste kontakt / Hot/Warm/Cold", "Åpne kundeprofil"];
+    return ["Hvor endrer jeg pris?", "Hvordan inviterer jeg bruker?", "Vis varsler/aktiviteter"];
+  })();
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(!open)}
+        className="fixed bottom-4 right-4 z-50 rounded-full px-4 py-3 shadow-lg bg-blue-500/90 hover:bg-blue-500 text-white"
+        aria-label="Åpne assistent"
+      >
+        {open ? "×" : "Hjelp"}
+      </button>
+
+      {open && (
+        <div className="fixed bottom-20 right-4 z-50 w-[360px] max-h-[70vh] rounded-2xl border border-white/10 bg-[#0b1220]/95 backdrop-blur p-3 flex flex-col">
+          <div className="text-sm font-semibold mb-2">ForhandlerPRO‑assistent</div>
+
+          {/* Quick replies */}
+          <div className="flex gap-2 flex-wrap mb-2">
+            {quick.map((q, i) => (
+              <button
+                key={i}
+                className="text-xs rounded-full px-2.5 py-1 border border-white/10 bg-white/5 hover:bg-white/10"
+                onClick={() => { setInput(q); setTimeout(send, 0); }}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+            {msgs.map((m, i) => (
+              <div key={i} className={`text-sm leading-5 ${m.role === "assistant" ? "text-white/90" : "text-white/80 text-right"}`}>
+                <div className={`inline-block rounded-xl px-3 py-2 ${m.role === "assistant" ? "bg-white/5" : "bg-blue-500/20"}`}>
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {loading && <div className="text-xs text-white/60">…skriver</div>}
+            <div ref={endRef} />
+          </div>
+
+          <div className="mt-2 flex gap-2">
+            <input
+              className="flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm focus:outline-none"
+              placeholder="Spør f.eks. “Hvor endrer jeg pris?”"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && send()}
+            />
+            <button onClick={send} className="rounded-xl px-3 py-2 bg-blue-500 text-white text-sm">Send</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+
+Mount it somewhere global (e.g., AppRoot), passing userRole, activeCompanyId, currentRoute.
+
+1.2 Action listener (in your root layout/component)
+import { useEffect } from "react";
+export function AssistantActionListener({ router }: { router: any }) {
+  useEffect(() => {
+    function onAction(e: any) {
+      const t = e.detail as { name: string; page: string; params?: any };
+      if (!t) return;
+      if (t.name === "open") {
+        // Navigate (adapt to your router)
+        if (t.page) {
+          if (router?.push) router.push(t.page);
+          else window.location.hash = t.page;
+        }
+        // Optional: open modal/tab (adapt to your state mgmt)
+        // dispatch your UI events here, e.g., open edit modal, select tab
+      }
+    }
+    window.addEventListener("assistant:action", onAction);
+    return () => window.removeEventListener("assistant:action", onAction);
+  }, [router]);
+  return null;
+}
+
+
+Render <AssistantActionListener router={router} /> once.
+
+2) Backend endpoint
+2.1 pages/api/assistant.ts (or your server route)
+
+Builds a system prompt (below).
+
+Optional RAG: read top‑k docs from Supabase assistant_docs (or from filesystem if not using DB).
+
+Returns { reply, tool? }.
+
+If no API key set, return a mock reply plus a demo tool.
+
+import type { NextApiRequest, NextApiResponse } from "next";
+import { createClient } from "@supabase/supabase-js";
+
+// TODO: wire your LLM provider
+// import OpenAI from "openai";
+
+const SYSTEM_PROMPT = `
+You are ForhandlerPRO Assistenten — the in-app guide for a Norwegian car dealer DMS.
+Tone: warm, concise, pragmatic. Norwegian by default.
+
+Core behavior:
+- Answer with 3–6 short bullets or 1–2 short paragraphs.
+- When asked where/how: give exact path (e.g., "Biler → Rediger → Prisassistent") + offer to open page.
+- Prefer action + explanation. Return a single tool JSON when helpful (schema below).
+- Never invent features; if unsure, say "Jeg er ikke helt sikker" and suggest likely path or ask for screenshot.
+- Respect roles: EIER & REGNSKAP can see costs/gross. Others get generic wording.
+- Use app terms: Biler, Kunder, Kontrakter, Aktiviteter, Rapporter, Innstillinger → Team, Prisassistent, Innbytte, Brutto, Dager på lager, Lagret visning, Varsler.
+
+Tool schema:
+{ "tool": { "name": "open", "page": "<route>", "params": { "id": "<optional>", "tab": "<optional>", "modal": "<optional>" } } }
+
+Default routing map:
+- Dashboard: "#/dashboard"
+- Biler: "#/cars" (edit modal via params {modal:"edit", id:"…"}, pricing tab "pricing")
+- Kunder: "#/customers", customer 360 "#/customers/<ID>" (tabs: timeline|cars|contracts|notes|followups)
+- Kontrakter: "#/contracts", detail "#/contracts/<ID>"
+- Aktiviteter: "#/activities"
+- Rapporter: "#/reports"
+- Innstillinger → Team: "#/settings/team"
+
+Output: human reply (Norwegian). Optionally include a single tool JSON.
+`;
+
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+async function fetchContextSnippets(query: string, companyId?: string) {
+  // Minimal fallback: keyword search (no embeddings yet)
+  const { data } = await supabase
+    .from("assistant_docs")
+    .select("title, body")
+    .ilike("body", `%${query.slice(0, 60)}%`)
+    .limit(3);
+  return (data || []).map((d, i) => `[Kontekst ${i + 1}: "${d.title}"]\n${d.body}`).join("\n\n");
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const { messages, hints } = req.body as {
+    messages: Array<{ role: "user" | "assistant"; content: string }>;
+    hints?: { role?: string; activeCompanyId?: string; currentRoute?: string };
+  };
+
+  const last = messages?.at(-1)?.content || "";
+  const role = hints?.role || "SELGER";
+
+  // Snappy keyword router: return an "open" tool if the user clearly asks to navigate
+  const km = last.toLowerCase();
+  const routes: Record<string, any> = {
+    biler: { name: "open", page: "#/cars" },
+    kunder: { name: "open", page: "#/customers" },
+    kontrakt: { name: "open", page: "#/contracts" },
+    innstillinger: { name: "open", page: "#/settings/team" },
+    prisassistent: { name: "open", page: "#/cars", params: { modal: "edit", tab: "pricing" } },
+    varsler: { name: "open", page: "#/activities" },
+  };
+  for (const k of Object.keys(routes)) {
+    if (km.includes(k)) {
+      return res.json({
+        reply: `Åpner ${k} for deg. Trenger du trinnene også?`,
+        tool: routes[k]
+      });
+    }
+  }
+
+  // Optional RAG: fetch crude context snippets
+  const ctx = await fetchContextSnippets(last, hints?.activeCompanyId);
+
+  const llmMessages = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ctx ? { role: "system", content: ctx } : null,
+    { role: "system", content: `[Hints]\nrole=${role}\nactiveCompanyId=${hints?.activeCompanyId ?? ""}\ncurrentRoute=${hints?.currentRoute ?? ""}` },
+    ...messages
+  ].filter(Boolean) as { role: "system" | "user" | "assistant"; content: string }[];
+
+  // If no provider key, return a mock so UI works
+  if (!process.env.OPENAI_API_KEY && !process.env.LLM_API_KEY) {
+    return res.json({
+      reply:
+        "Slik endrer du pris: 1) Gå til Biler → Rediger. 2) Åpne Prisassistent. 3) Klikk «Bruk anbefalt pris» eller skriv inn manuelt. 4) Lagre.",
+      tool: { name: "open", page: "#/cars", params: { modal: "edit", tab: "pricing" } }
+    });
+  }
+
+  // TODO: call your LLM provider with llmMessages (streaming not required here)
+  // const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // const completion = await client.chat.completions.create({ model: "gpt-4o-mini", messages: llmMessages });
+  // const raw = completion.choices[0]?.message?.content ?? "";
+  // const tool = tryParseToolFrom(raw);
+
+  // For now: simple deterministic reply
+  const reply = role === "SELGER"
+    ? "For å invitere brukere: Innstillinger → Team. Bare eiere kan se dette. Bruk knappen «Inviter bruker», velg rolle, og send lenken."
+    : "For å invitere brukere: Gå til Innstillinger → Team → «Inviter bruker». Velg rolle og send invitasjonslenke.";
+  return res.json({ reply });
+}
+
+
+You may add a tiny tryParseToolFrom() that extracts a JSON block if your model returns one. For MVP, the keyword router already makes the assistant feel responsive.
+
+3) Supabase schema for RAG + telemetry
+3.1 Docs (optional but recommended)
+create table if not exists assistant_docs (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid null, -- null = global docs
+  title text not null,
+  body text not null,
+  created_at timestamptz default now()
+);
+alter table assistant_docs enable row level security;
+create policy "assistant_docs read" on assistant_docs for select using (company_id is null or is_company_member(company_id));
+create policy "assistant_docs write" on assistant_docs for insert with check (has_role(coalesce(company_id, '00000000-0000-0000-0000-000000000000')::uuid, array['EIER','REGNSKAP']::user_role[]));
+
+
+Seed a few global docs (see §4).
+
+3.2 Logs
+create table if not exists assistant_logs (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid null,
+  user_id uuid null,
+  route text,
+  role text,
+  question text,
+  reply text,
+  tool_json jsonb,
+  created_at timestamptz default now()
+);
+alter table assistant_logs enable row level security;
+create policy "assistant_logs read" on assistant_logs for select using (is_company_member(coalesce(company_id, '00000000-0000-0000-0000-000000000000')::uuid));
+create policy "assistant_logs write" on assistant_logs for insert with check (true);
+
+
+Add a quick server‑side insert after you produce { reply, tool }.
+
+4) Seed starter docs (/assistant_docs global)
+
+Insert these as rows in assistant_docs (titles + concise bodies):
+
+UI‑kart
+
+Routes: #/dashboard, #/cars, #/customers, #/contracts, #/activities, #/reports, #/settings/team.
+
+Patterns: edit car modal via params {modal:"edit", id:"…"}, pricing tab "pricing".
+
+Saved Views on Biler/Kunder toolbars.
+
+Hvordan endre pris
+
+Biler → Rediger → Prisassistent → “Bruk anbefalt pris” → Lagre.
+
+Bands: Lav / Anbefalt / Høy.
+
+Aldringsregler kan foreslå nedjustering i varsler.
+
+Invitere brukere og roller
+
+Innstillinger → Team → Inviter bruker.
+
+Roller: EIER, SELGER, REGNSKAP, VERKSTED.
+
+Kun EIER kan administrere medlemmer.
+
+Kontrakt med add‑ons og innbytte
+
+Kontrakter → åpne kontrakt → add‑ons (kost/pris/antall).
+
+Innbytte: verdivurdering + rekond-kost → påvirker brutto.
+
+Eksporter PDF; e‑sign (mock) status.
+
+Kunde 360 & oppfølging
+
+Kunder → velg kunde → Timeline / Notater / Follow-ups.
+
+Oppfølging: dato + notat + ansvarlig; dukker opp på Dashboard.
+
+Varsler/aktiviteter
+
+Regler: >60 dager, mangler signatur, lav margin, kunde uten oppfølging.
+
+Bell‑ikon viser siste 10; marker som løst.
+
+(Keep bodies short—5–10 lines each.)
+
+5) Env vars
+
+OPENAI_API_KEY (or LLM_API_KEY) for the model.
+
+NEXT_PUBLIC_SUPABASE_URL
+
+SUPABASE_SERVICE_ROLE_KEY (server‑side only)
+
+Ensure the API route runs server‑side and does not leak service keys to the client.
+
+6) Wire into UI
+
+Render <AssistantBubble userRole={currentUserRole} activeCompanyId={activeCompanyId} currentRoute={currentRoute} /> in your root layout.
+
+Render <AssistantActionListener router={router} /> once.
+
+7) Acceptance criteria (verify after deploy)
+
+A Hjelp bubble appears bottom‑right; opens a chat.
+
+Ask “Hvor endrer jeg pris?” → reply gives exact path and offers to open; a tool opens Biler → Rediger → Prisassistent (or general Biler if no id).
+
+Ask “Hvor inviterer jeg brukere?” → reply points to Innstillinger → Team; can open it.
+
+On /cars, quick chips show relevant prompts (e.g., “Hva betyr marginchippen?”).
+
+Without an API key, you still get a mock helpful reply + navigation tool.
+
+assistant_docs (optional) enrich answers; no hallucinations about features not in docs/routes.
+
+Role awareness: if role is SELGER, responses do not mention innkjøpspris/gross explicitly.
+
+Telemetry: questions & answers are logged in assistant_logs.
+
+8) Stretch (optional, if time permits now)
+
+Add a basic tryParseToolFrom() to parse a JSON block from the LLM reply so the model can autonomously navigate without keyword router.
+
+Add a /settings/assistant toggle to enable/disable the bubble per company.
+
+RAG embeddings (pgvector) later—MVP uses simple ilike.
+
+Please implement everything above.
+If any file/route already exists, update it instead of duplicating. Keep the design consistent with the rest of ForhandlerPRO (rounded‑2xl, white/5 borders, dark theme).

@@ -1,6 +1,6 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -17,6 +17,7 @@ import CustomerProfile from "@/pages/CustomerProfile";
 import { CustomerProfilePage } from "@/pages/CustomerProfilePage";
 import Contracts from "@/pages/Contracts";
 import Settings from "@/pages/Settings";
+import AssistantBubble from "@/components/AssistantBubble";
 
 // Database configuration - easily switch between Replit DB and Supabase
 const DATABASE_CONFIG = {
@@ -27,21 +28,36 @@ const DATABASE_CONFIG = {
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  
+  // Get user role for assistant
+  const { data: userRole } = useQuery({
+    queryKey: ['/api/user/role'],
+    enabled: isAuthenticated,
+  });
 
   return (
-    <Switch>
-      <Route path="/" component={isLoading || !isAuthenticated ? Landing : Dashboard} />
-      <Route path="/dashboard-pro" component={ProfessionalDashboard} />
-      <Route path="/cars" component={Cars} />
-      <Route path="/cars/:id" component={CarDetail} />
-      <Route path="/customers" component={Customers} />
-      <Route path="/customers/:id" component={CustomerProfile} />
-      <Route path="/customers/:id/profile" component={CustomerProfilePage} />
-      <Route path="/contracts" component={Contracts} />
-      <Route path="/activities" component={Activities} />
-      <Route path="/settings" component={Settings} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      <Switch>
+        <Route path="/" component={isLoading || !isAuthenticated ? Landing : Dashboard} />
+        <Route path="/dashboard-pro" component={ProfessionalDashboard} />
+        <Route path="/cars" component={Cars} />
+        <Route path="/cars/:id" component={CarDetail} />
+        <Route path="/customers" component={Customers} />
+        <Route path="/customers/:id" component={CustomerProfile} />
+        <Route path="/customers/:id/profile" component={CustomerProfilePage} />
+        <Route path="/contracts" component={Contracts} />
+        <Route path="/activities" component={Activities} />
+        <Route path="/settings" component={Settings} />
+        <Route component={NotFound} />
+      </Switch>
+      {/* Assistant bubble - show only when authenticated */}
+      {isAuthenticated && (
+        <AssistantBubble 
+          userRole={userRole?.role || "SELGER"} 
+          activeCompanyId={userRole?.companyId || "default-company"}
+        />
+      )}
+    </>
   );
 }
 
