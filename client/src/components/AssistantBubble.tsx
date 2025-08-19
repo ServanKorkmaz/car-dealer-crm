@@ -2,6 +2,38 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { X, MessageCircle } from "lucide-react";
 
+// AI Assistant Bear Mascot Component
+const AIBear = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" className={className}>
+    {/* Bear ears */}
+    <circle cx="7" cy="6" r="2.5" fill="#8B5CF6" />
+    <circle cx="17" cy="6" r="2.5" fill="#8B5CF6" />
+    <circle cx="7" cy="6" r="1.5" fill="#A78BFA" />
+    <circle cx="17" cy="6" r="1.5" fill="#A78BFA" />
+    
+    {/* Bear head */}
+    <circle cx="12" cy="12" r="7" fill="#8B5CF6" />
+    <circle cx="12" cy="12" r="6" fill="#A78BFA" />
+    
+    {/* Eyes */}
+    <circle cx="9.5" cy="10" r="1" fill="#1F2937" />
+    <circle cx="14.5" cy="10" r="1" fill="#1F2937" />
+    <circle cx="9.8" cy="9.7" r="0.3" fill="white" />
+    <circle cx="14.8" cy="9.7" r="0.3" fill="white" />
+    
+    {/* Nose */}
+    <ellipse cx="12" cy="13" rx="0.8" ry="0.5" fill="#1F2937" />
+    
+    {/* Mouth */}
+    <path d="M 10.5 14.5 Q 12 15.5 13.5 14.5" stroke="#1F2937" strokeWidth="0.8" fill="none" strokeLinecap="round" />
+    
+    {/* Brick pattern on forehead */}
+    <rect x="10" y="8" width="4" height="1.5" fill="#DC2626" rx="0.2" />
+    <rect x="9.5" y="9.5" width="2" height="1" fill="#DC2626" rx="0.1" />
+    <rect x="12.5" y="9.5" width="2" height="1" fill="#DC2626" rx="0.1" />
+  </svg>
+);
+
 type Msg = { role: "user" | "assistant"; content: string };
 type Tool = { name: "open"; page: string; params?: { id?: string; tab?: string; modal?: string } };
 
@@ -147,7 +179,7 @@ export default function AssistantBubble({
       {open && (
         <div className="fixed bottom-24 right-6 z-50 w-[380px] max-h-[70vh] rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl p-4 flex flex-col">
           <div className="text-lg font-semibold mb-3 text-slate-900 dark:text-white flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-blue-600" />
+            <AIBear className="w-6 h-6" />
             AI Assistent
           </div>
 
