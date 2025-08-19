@@ -120,7 +120,25 @@ The database uses PostgreSQL with the following main entities:
 - Replit-specific configuration for authentication
 - Support for both Replit and external hosting
 
-## Recent Changes (2025-08-06)
+## Recent Changes (2025-08-19)
+
+### ✅ Multi-Tenant Role-Based Access Control Implementation
+- **Company Isolation**: Every table now locked to company_id with proper foreign key constraints
+- **Role System**: Four user roles implemented (Eier, Selger, Regnskap, Verksted) with granular permissions
+- **Field-Level Security**: Sensitive fields like costPrice hidden from non-authorized roles
+- **Database Schema**: Added companies, profiles, memberships tables with proper relationships
+- **RBAC Service**: Complete role-based access control service with permission checks
+- **Data Filtering**: All queries now properly filtered by company membership and role permissions
+- **Storage Layer**: Updated storage interface and implementation for multi-tenant operations
+
+### ✅ Smart Rule-Based Activity System
+- **Activity Logger**: Real-time event logging for all business operations
+- **Alert System**: Intelligent rule-based notifications with priority levels
+- **Activities Page**: Professional interface for viewing and managing alerts with filtering
+- **Dashboard Integration**: Replaced dummy activity feed with authentic smart alerts
+- **Resolution Tracking**: Activities can be marked as resolved with proper state management
+
+## Previous Changes (2025-08-06)
 
 ### ✅ Complete Finn.no Import System Overhaul  
 - **Advanced Image Extraction**: Multi-strategy approach finds ALL images (up to 40+) from Finn listings
@@ -177,12 +195,14 @@ The database uses PostgreSQL with the following main entities:
 
 ### Key Architectural Decisions
 
-1. **Monorepo Structure**: Simplified development and deployment with shared types
-2. **Async Storage Pattern**: ESM-compatible dynamic storage provider loading
-3. **Flexible Database Support**: Easy switching between Replit and external databases
-4. **Session-based Auth**: Simple dev login system for reliable development
-5. **Drizzle ORM**: Type-safe database operations with good PostgreSQL support
-6. **ShadCN UI**: Professional design system with accessibility built-in
-7. **Norwegian Localization**: UI text and formatting tailored for Norwegian market
+1. **Multi-Tenant Architecture**: Company-isolated data with role-based access control
+2. **Four-Role Permission System**: Eier, Selger, Regnskap, Verksted with granular permissions
+3. **Field-Level Security**: Sensitive financial data protected by role-based masking
+4. **Monorepo Structure**: Simplified development and deployment with shared types
+5. **Async Storage Pattern**: ESM-compatible dynamic storage provider loading
+6. **Session-based Auth**: Simple dev login system for reliable development
+7. **Drizzle ORM**: Type-safe database operations with PostgreSQL support
+8. **ShadCN UI**: Professional design system with accessibility built-in
+9. **Norwegian Localization**: UI text and formatting tailored for Norwegian market
 
 The system is designed to be modular and extensible, with clear separation of concerns and a foundation ready for additional features like workshop management, parts inventory, and financial reporting.

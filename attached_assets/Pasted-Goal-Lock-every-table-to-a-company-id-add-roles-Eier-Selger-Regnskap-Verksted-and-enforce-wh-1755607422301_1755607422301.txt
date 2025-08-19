@@ -1,0 +1,220 @@
+Goal: Lock every table to a company_id, add roles (Eier, Selger, Regnskap, Verksted), and enforce what each role can see/do. Sensitive fields (like purchase_price) must be hidden unless allowed.
+
+1) Database schema (run as SQL migration)
+
+Create/extend core tables + helpers:
+
+-- 1) Companies
+create table if not exists companies (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  created_at timestamptz default now()
+);
+
+-- 2) Profiles (link to auth)
+create table if not exists profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  created_at timestamptz default now()
+);
+
+-- 3) Memberships (user <-> company with role)
+create type user_role as enum ('EIER','SELGER','REGNSKAP','VERKSTED');
+
+create table if not exists memberships (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles(id) on delete cascade,
+  company_id uuid not null references companies(id) on delete cascade,
+  role user_role not null default 'SELGER',
+  created_at timestamptz default now(),
+  unique (user_id, company_id)
+);
+
+-- 4) Helpers: current user role in a company
+create or replace function current_user_membership(p_company uuid)
+returns memberships
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select m.* from memberships m
+  where m.user_id = auth.uid() and m.company_id = p_company
+  limit 1
+$$;
+
+create or replace function is_company_member(p_company uuid)
+returns boolean
+language sql
+stable
+security definer
+as $$
+  select exists (
+    select 1 from memberships
+    where user_id = auth.uid() and company_id = p_company
+  );
+$$;
+
+create or replace function has_role(p_company uuid, roles user_role[])
+returns boolean
+language sql
+stable
+security definer
+as $$
+  select exists (
+    select 1 from memberships
+    where user_id = auth.uid() and company_id = p_company
+      and role = any(roles)
+  );
+$$;
+
+-- 5) Add company_id to your domain tables if missing
+-- cars
+alter table if exists cars add column if not exists company_id uuid not null default '00000000-0000-0000-0000-000000000000';
+alter table cars drop constraint if exists cars_company_fk;
+alter table cars add constraint cars_company_fk foreign key (company_id) references companies(id) on delete cascade;
+
+-- customers
+alter table if exists customers add column if not exists company_id uuid not null default '00000000-0000-0000-0000-000000000000';
+alter table customers add constraint customers_company_fk foreign key (company_id) references companies(id) on delete cascade;
+
+-- contracts
+alter table if exists contracts add column if not exists company_id uuid not null default '00000000-0000-0000-0000-000000000000';
+alter table contracts add constraint contracts_company_fk foreign key (company_id) references companies(id) on delete cascade;
+
+-- activities
+create table if not exists activities (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id) on delete cascade,
+  user_id uuid references profiles(id) on delete set null,
+  type text not null,
+  entity_id uuid,
+  message text not null,
+  priority text not null default 'normal' check (priority in ('low','normal','high')),
+  resolved boolean not null default false,
+  created_at timestamptz default now()
+);
+
+-- saved views (from Prompt 2)
+create table if not exists user_saved_views (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles(id) on delete cascade,
+  company_id uuid not null references companies(id) on delete cascade,
+  page text not null check (page in ('cars','customers')),
+  name text not null,
+  payload jsonb not null,
+  created_at timestamptz default now()
+);
+create index if not exists idx_views_user on user_saved_views(user_id, company_id, page);
+
+-- 6) Sensitive field masking via VIEW
+-- We expose cars through cars_secure view. Non-authorized roles see purchase_price as null.
+create or replace view cars_secure as
+select
+  c.*,
+  case
+    when has_role(c.company_id, array['EIER','REGNSKAP']::user_role[]) then c.purchase_price
+    else null::numeric
+  end as purchase_price_masked
+from cars c;
+
+-- 7) Enable RLS
+alter table companies enable row level security;
+alter table profiles enable row level security;
+alter table memberships enable row level security;
+alter table cars enable row level security;
+alter table customers enable row level security;
+alter table contracts enable row level security;
+alter table activities enable row level security;
+alter table user_saved_views enable row level security;
+
+-- 8) RLS policies
+
+-- profiles: each user sees self
+drop policy if exists "profiles self" on profiles;
+create policy "profiles self"
+on profiles for select
+using (id = auth.uid());
+create policy "profiles insert self"
+on profiles for insert
+with check (id = auth.uid());
+create policy "profiles update self"
+on profiles for update
+using (id = auth.uid());
+
+-- companies: visible if member
+drop policy if exists "companies by members" on companies;
+create policy "companies by members"
+on companies for all
+using (is_company_member(id))
+with check (true);
+
+-- memberships: user can read members of own companies; only EIER can change
+drop policy if exists "memberships read" on memberships;
+create policy "memberships read"
+on memberships for select
+using (is_company_member(company_id));
+
+drop policy if exists "memberships manage" on memberships;
+create policy "memberships manage"
+on memberships for insert
+with check (has_role(company_id, array['EIER']::user_role[]));
+
+create policy "memberships update"
+on memberships for update
+using (has_role(company_id, array['EIER']::user_role[]));
+
+create policy "memberships delete"
+on memberships for delete
+using (has_role(company_id, array['EIER']::user_role[]));
+
+-- cars/customers/contracts/activities/views: CRUD within company
+-- READ
+create policy "cars read" on cars for select using (is_company_member(company_id));
+create policy "customers read" on customers for select using (is_company_member(company_id));
+create policy "contracts read" on contracts for select using (is_company_member(company_id));
+create policy "activities read" on activities for select using (is_company_member(company_id));
+create policy "views read" on user_saved_views for select using (user_id = auth.uid() and is_company_member(company_id));
+
+-- INSERT (must belong to same company; non-sellers may be restricted later)
+create policy "cars insert" on cars for insert with check (has_role(company_id, array['EIER','SELGER','REGNSKAP','VERKSTED']::user_role[]));
+create policy "customers insert" on customers for insert with check (is_company_member(company_id));
+create policy "contracts insert" on contracts for insert with check (has_role(company_id, array['EIER','SELGER','REGNSKAP']::user_role[]));
+create policy "activities insert" on activities for insert with check (is_company_member(company_id));
+create policy "views insert" on user_saved_views for insert with check (user_id = auth.uid() and is_company_member(company_id));
+
+-- UPDATE
+create policy "cars update" on cars for update using (is_company_member(company_id));
+create policy "customers update" on customers for update using (is_company_member(company_id));
+create policy "contracts update" on contracts for update using (is_company_member(company_id));
+create policy "activities update" on activities for update using (is_company_member(company_id));
+create policy "views update" on user_saved_views for update using (user_id = auth.uid() and is_company_member(company_id));
+
+-- DELETE (restrict to EIER for core assets; activities/views user can delete own)
+create policy "cars delete" on cars for delete using (has_role(company_id, array['EIER']::user_role[]));
+create policy "customers delete" on customers for delete using (has_role(company_id, array['EIER']::user_role[]));
+create policy "contracts delete" on contracts for delete using (has_role(company_id, array['EIER']::user_role[]));
+create policy "activities delete" on activities for delete using (has_role(company_id, array['EIER','REGNSKAP']::user_role[]));
+create policy "views delete" on user_saved_views for delete using (user_id = auth.uid() and is_company_member(company_id));
+
+-- 9) Seed (optional): create a company for the current user
+do $$
+declare
+  uid uuid := auth.uid();
+  cid uuid;
+begin
+  if uid is null then
+    raise notice 'Run this with an authenticated service role for initial seed';
+  end if;
+
+  insert into profiles (id, full_name)
+  values (uid, 'Owner')
+  on conflict (id) do nothing;
+
+  insert into companies (name) values ('Demo Forhandler') returning id into cid;
+
+  insert into memberships (user_id, company_id, role) values (uid, cid, 'EIER');
+end $$;
+
+
+Note: We used a view cars_secure to mask purchase_price for non‑authorized roles. Your app should read from this view instead of cars when listing cars. Writes still go to cars

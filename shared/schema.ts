@@ -39,9 +39,33 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Multi-tenant support tables
+export const companies = pgTable("companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const profiles = pgTable("profiles", {
+  id: varchar("id").primaryKey(), // Auth user ID
+  fullName: text("full_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const memberships = pgTable("memberships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  role: varchar("role").notNull().default("SELGER").$type<"EIER" | "SELGER" | "REGNSKAP" | "VERKSTED">(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_memberships_user_company").on(table.userId, table.companyId),
+]);
+
 // Cars table
 export const cars = pgTable("cars", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().default("default-company").references(() => companies.id, { onDelete: "cascade" }),
   registrationNumber: varchar("registration_number").notNull().unique(),
   make: varchar("make").notNull(),
   model: varchar("model").notNull(),
@@ -75,6 +99,7 @@ export const cars = pgTable("cars", {
 // Customers table
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().default("default-company").references(() => companies.id, { onDelete: "cascade" }),
   name: varchar("name").notNull(),
   email: varchar("email"),
   phone: varchar("phone"),
@@ -89,6 +114,7 @@ export const customers = pgTable("customers", {
 // Contracts table
 export const contracts = pgTable("contracts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().default("default-company").references(() => companies.id, { onDelete: "cascade" }),
   contractNumber: varchar("contract_number").notNull().unique(),
   carId: varchar("car_id").notNull().references(() => cars.id),
   customerId: varchar("customer_id").notNull().references(() => customers.id),
@@ -154,7 +180,7 @@ export const activityLog = pgTable("activity_log", {
 // Enhanced Activities table for smart alerts and notifications
 export const activities = pgTable("activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().default("default-company"),
+  companyId: varchar("company_id").notNull().default("default-company").references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id"),
   type: varchar("type").notNull(), // IMPORT, CAR_UPDATE, CONTRACT_CREATED, CONTRACT_SIGNED, SALE, PRICE_CHANGE, FOLLOW_UP, ALERT
   entityId: varchar("entity_id"), // ID of the related entity (car, customer, contract)

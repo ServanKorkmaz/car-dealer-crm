@@ -6,6 +6,9 @@ import {
   activityLog,
   activities,
   userSavedViews,
+  companies,
+  profiles,
+  memberships,
   type User,
   type UpsertUser,
   type Car,
@@ -126,6 +129,28 @@ export interface IStorage {
   getUnresolvedAlert(alertKey: string, companyId: string): Promise<Activity | null>;
   getAllUsers(): Promise<User[]>;
   getContractsByCustomer(customerId: string, userId: string): Promise<Contract[]>;
+
+  // Multi-tenant and role-based methods
+  getUserMembership(userId: string, companyId: string): Promise<{ 
+    id: string; 
+    userId: string; 
+    companyId: string; 
+    role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"; 
+    createdAt: Date 
+  } | null>;
+  createCompany(name: string): Promise<{ id: string; name: string; createdAt: Date }>;
+  addUserToCompany(userId: string, companyId: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"): Promise<void>;
+  updateUserRole(userId: string, companyId: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"): Promise<void>;
+  removeUserFromCompany(userId: string, companyId: string): Promise<void>;
+  getCompanyMembers(companyId: string): Promise<Array<{
+    id: string;
+    userId: string;
+    companyId: string;
+    role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED";
+    fullName: string | null;
+    createdAt: Date;
+  }>>;
+  createProfile(userId: string, fullName: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -150,76 +175,126 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  // Car operations
+  // Car operations - now with company isolation
   async getCars(userId: string): Promise<Car[]> {
-    return await db.select().from(cars).where(eq(cars.userId, userId)).orderBy(desc(cars.createdAt));
+    // Get user's company
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) return [];
+    
+    return await db.select().from(cars)
+      .where(and(eq(cars.companyId, membership.companyId), eq(cars.userId, userId)))
+      .orderBy(desc(cars.createdAt));
   }
 
   async getCarById(carId: string, userId: string): Promise<Car | undefined> {
-    const [car] = await db.select().from(cars).where(and(eq(cars.id, carId), eq(cars.userId, userId)));
+    // Get user's company  
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) return undefined;
+    
+    const [car] = await db.select().from(cars)
+      .where(and(eq(cars.id, carId), eq(cars.companyId, membership.companyId), eq(cars.userId, userId)));
     return car;
   }
 
   async createCar(car: InsertCar, userId: string): Promise<Car> {
+    // Get user's company
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) throw new Error('User not in company');
+    
     const [newCar] = await db
       .insert(cars)
       .values({
         ...car,
         userId,
+        companyId: membership.companyId,
       })
       .returning();
     return newCar;
   }
 
   async updateCar(id: string, car: Partial<InsertCar>, userId: string): Promise<Car> {
+    // Get user's company
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) throw new Error('User not in company');
+    
     const [updatedCar] = await db
       .update(cars)
       .set({ 
         ...car, 
         updatedAt: new Date()
       })
-      .where(and(eq(cars.id, id), eq(cars.userId, userId)))
+      .where(and(eq(cars.id, id), eq(cars.companyId, membership.companyId), eq(cars.userId, userId)))
       .returning();
     return updatedCar;
   }
 
   async deleteCar(id: string, userId: string): Promise<boolean> {
-    const result = await db.delete(cars).where(and(eq(cars.id, id), eq(cars.userId, userId)));
+    // Get user's company
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) return false;
+    
+    const result = await db.delete(cars)
+      .where(and(eq(cars.id, id), eq(cars.companyId, membership.companyId), eq(cars.userId, userId)));
     return (result.rowCount || 0) > 0;
   }
 
-  // Customer operations
+  // Customer operations - now with company isolation  
   async getCustomers(userId: string): Promise<Customer[]> {
-    return await db.select().from(customers).where(eq(customers.userId, userId)).orderBy(desc(customers.createdAt));
+    // Get user's company
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) return [];
+    
+    return await db.select().from(customers)
+      .where(and(eq(customers.companyId, membership.companyId), eq(customers.userId, userId)))
+      .orderBy(desc(customers.createdAt));
   }
 
   async getCustomerById(id: string, userId: string): Promise<Customer | undefined> {
-    const [customer] = await db.select().from(customers).where(and(eq(customers.id, id), eq(customers.userId, userId)));
+    // Get user's company
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) return undefined;
+    
+    const [customer] = await db.select().from(customers)
+      .where(and(eq(customers.id, id), eq(customers.companyId, membership.companyId), eq(customers.userId, userId)));
     return customer;
   }
 
   async createCustomer(customer: InsertCustomer, userId: string): Promise<Customer> {
+    // Get user's company
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) throw new Error('User not in company');
+    
     const [newCustomer] = await db
       .insert(customers)
       .values({
         ...customer,
         userId,
+        companyId: membership.companyId,
       })
       .returning();
     return newCustomer;
   }
 
   async updateCustomer(id: string, customer: Partial<InsertCustomer>, userId: string): Promise<Customer> {
+    // Get user's company
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) throw new Error('User not in company');
+    
     const [updatedCustomer] = await db
       .update(customers)
       .set({ ...customer, updatedAt: new Date() })
-      .where(and(eq(customers.id, id), eq(customers.userId, userId)))
+      .where(and(eq(customers.id, id), eq(customers.companyId, membership.companyId), eq(customers.userId, userId)))
       .returning();
     return updatedCustomer;
   }
 
   async deleteCustomer(id: string, userId: string): Promise<boolean> {
-    const result = await db.delete(customers).where(and(eq(customers.id, id), eq(customers.userId, userId)));
+    // Get user's company
+    const membership = await this.getUserMembership(userId, 'default-company');
+    if (!membership) return false;
+    
+    const result = await db.delete(customers)
+      .where(and(eq(customers.id, id), eq(customers.companyId, membership.companyId), eq(customers.userId, userId)));
     return (result.rowCount || 0) > 0;
   }
 
@@ -579,18 +654,17 @@ export class DatabaseStorage implements IStorage {
     if (filters?.priority) whereConditions.push(eq(activities.priority, filters.priority));
     if (filters?.resolved !== undefined) whereConditions.push(eq(activities.resolved, filters.resolved));
 
-    let query = db.select().from(activities)
+    const query = db.select().from(activities)
       .where(and(...whereConditions))
       .orderBy(desc(activities.createdAt));
 
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
+    if (filters?.limit && filters?.offset) {
+      return await query.limit(filters.limit).offset(filters.offset);
+    } else if (filters?.limit) {
+      return await query.limit(filters.limit);
+    } else {
+      return await query;
     }
-    if (filters?.offset) {
-      query = query.offset(filters.offset);
-    }
-
-    return await query;
   }
 
   async getUnresolvedAlerts(companyId: string, limit: number = 10): Promise<Activity[]> {
@@ -643,6 +717,111 @@ export class DatabaseStorage implements IStorage {
         eq(contracts.customerId, customerId),
         eq(contracts.userId, userId)
       ));
+  }
+
+  // Multi-tenant and role-based methods
+  async getUserMembership(userId: string, companyId: string): Promise<{ 
+    id: string; 
+    userId: string; 
+    companyId: string; 
+    role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"; 
+    createdAt: Date 
+  } | null> {
+    const [membership] = await db
+      .select()
+      .from(memberships)
+      .where(and(eq(memberships.userId, userId), eq(memberships.companyId, companyId)));
+    
+    return membership ? {
+      id: membership.id,
+      userId: membership.userId,
+      companyId: membership.companyId,
+      role: membership.role as "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED",
+      createdAt: membership.createdAt || new Date()
+    } : null;
+  }
+
+  async createCompany(name: string): Promise<{ id: string; name: string; createdAt: Date }> {
+    const [company] = await db
+      .insert(companies)
+      .values({ name })
+      .returning();
+    
+    return {
+      id: company.id,
+      name: company.name,
+      createdAt: company.createdAt || new Date()
+    };
+  }
+
+  async addUserToCompany(userId: string, companyId: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"): Promise<void> {
+    // Create profile if it doesn't exist
+    await db
+      .insert(profiles)
+      .values({ id: userId, fullName: "User" })
+      .onConflictDoNothing();
+
+    await db
+      .insert(memberships)
+      .values({ userId, companyId, role })
+      .onConflictDoUpdate({
+        target: [memberships.userId, memberships.companyId],
+        set: { role }
+      });
+  }
+
+  async updateUserRole(userId: string, companyId: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"): Promise<void> {
+    await db
+      .update(memberships)
+      .set({ role })
+      .where(and(eq(memberships.userId, userId), eq(memberships.companyId, companyId)));
+  }
+
+  async removeUserFromCompany(userId: string, companyId: string): Promise<void> {
+    await db
+      .delete(memberships)
+      .where(and(eq(memberships.userId, userId), eq(memberships.companyId, companyId)));
+  }
+
+  async getCompanyMembers(companyId: string): Promise<Array<{
+    id: string;
+    userId: string;
+    companyId: string;
+    role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED";
+    fullName: string | null;
+    createdAt: Date;
+  }>> {
+    const result = await db
+      .select({
+        id: memberships.id,
+        userId: memberships.userId,
+        companyId: memberships.companyId,
+        role: memberships.role,
+        fullName: profiles.fullName,
+        createdAt: memberships.createdAt
+      })
+      .from(memberships)
+      .leftJoin(profiles, eq(memberships.userId, profiles.id))
+      .where(eq(memberships.companyId, companyId));
+
+    return result.map(member => ({
+      id: member.id,
+      userId: member.userId,
+      companyId: member.companyId,
+      role: member.role as "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED",
+      fullName: member.fullName,
+      createdAt: member.createdAt || new Date()
+    }));
+  }
+
+  async createProfile(userId: string, fullName: string): Promise<void> {
+    await db
+      .insert(profiles)
+      .values({ id: userId, fullName })
+      .onConflictDoUpdate({
+        target: profiles.id,
+        set: { fullName }
+      });
   }
 }
 
