@@ -98,7 +98,28 @@ export const contracts = pgTable("contracts", {
   pdfUrl: varchar("pdf_url"), // stored PDF file URL
   notes: text("notes"),
   
-  // E-signing fields
+  // Template and enhanced fields
+  contractTemplate: varchar("contract_template").notNull().default("privatsalg"), // privatsalg, innbytte, kommisjon, mva_pliktig
+  
+  // Trade-in fields
+  tradeInCarId: varchar("trade_in_car_id").references(() => cars.id),
+  tradeInValuation: varchar("trade_in_valuation"),
+  tradeInReconCost: varchar("trade_in_recon_cost"),
+  tradeInNet: varchar("trade_in_net"),
+  tradeInOwedToCustomer: varchar("trade_in_owed_to_customer"),
+  
+  // Add-ons stored as JSON array
+  addOns: jsonb("add_ons").$type<Array<{
+    id: string;
+    description: string;
+    cost: string;
+    price: string;
+    quantity: number;
+  }>>().default([]),
+  
+  // E-signing fields - enhanced
+  eSignStatus: varchar("e_sign_status").notNull().default("ikke_sendt"), // ikke_sendt, sendt, signert
+  eSignSentAt: timestamp("e_sign_sent_at"),
   signingProvider: varchar("signing_provider"), // verified.no, scrive, signant
   signingDocumentId: varchar("signing_document_id"), // provider's document ID
   signingUrl: varchar("signing_url"), // link for customer to sign
@@ -245,6 +266,8 @@ export const insertContractSchema = createInsertSchema(contracts).omit({
   signerPhone: true,
   signingMethod: true,
   webhookStatus: true,
+  eSignSentAt: true,
+  tradeInCarId: true,
 }).extend({
   // Override field types to match frontend data
   salePrice: z.union([z.string(), z.number()]).transform(val => val.toString()),
@@ -254,6 +277,18 @@ export const insertContractSchema = createInsertSchema(contracts).omit({
     }
     return val;
   }),
+  // Add-ons array validation
+  addOns: z.array(z.object({
+    id: z.string(),
+    description: z.string(),
+    cost: z.string(),
+    price: z.string(),
+    quantity: z.number().min(1).default(1),
+  })).default([]),
+  // Contract template validation
+  contractTemplate: z.enum(["privatsalg", "innbytte", "kommisjon", "mva_pliktig"]).default("privatsalg"),
+  // E-sign status validation  
+  eSignStatus: z.enum(["ikke_sendt", "sendt", "signert"]).default("ikke_sendt"),
 });
 
 // Types

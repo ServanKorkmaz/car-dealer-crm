@@ -605,15 +605,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/contracts', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      // Debug: log contract creation
       console.log("Creating contract with data:", JSON.stringify(req.body, null, 2));
       const contractData = insertContractSchema.parse(req.body);
       const storage = await storagePromise;
       const contract = await storage.createContract(contractData, userId);
       
+      // Mark car as sold
+      await storage.updateCar(contractData.carId, { 
+        status: "sold",
+        soldDate: contractData.saleDate,
+        soldPrice: contractData.salePrice,
+        soldToCustomerId: contractData.customerId
+      });
+
+      // If this is a trade-in contract, create the trade-in car record
+      if (contractData.contractTemplate === "innbytte" && contractData.tradeInValuation) {
+        const tradeInCar = {
+          registrationNumber: `INNBYTTE-${Date.now()}`, // Temporary reg number
+          make: "Innbytte",
+          model: "Ukjent",
+          year: new Date().getFullYear(),
+          mileage: "0",
+          fuelType: "Ukjent",
+          costPrice: contractData.tradeInNet || "0",
+          salePrice: contractData.tradeInValuation || "0",
+          recondCost: contractData.tradeInReconCost || "0",
+          status: "innkommende",
+          notes: `Innbytte fra kontrakt ${contract.contractNumber}`,
+          images: [],
+          euControl: false,
+        };
+        
+        const tradeInCarRecord = await storage.createCar({ ...tradeInCar, userId });
+        
+        // Update contract with trade-in car reference
+        await storage.updateContract(contract.id, {
+          tradeInCarId: tradeInCarRecord.id,
+        }, userId);
+      }
+      
       // Log contract creation activity
       try {
-        // Get customer and car details for better activity message
         const customer = await storage.getCustomerById(contract.customerId, userId);
         const car = await storage.getCarById(contract.carId, userId);
         
@@ -697,6 +729,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating PDF:", error);
       res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
+  // E-sign endpoints
+  app.post('/api/contracts/:id/send-for-esign', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const contract = await storage.getContractById(req.params.id, userId);
+      
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+
+      // Mock e-sign sending (2 second delay)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Update contract with sent status
+      await storage.updateContract(req.params.id, {
+        eSignStatus: 'sendt',
+        eSignSentAt: new Date(),
+      }, userId);
+
+      res.json({ success: true, message: "Contract sent for e-signing" });
+    } catch (error) {
+      console.error("Error sending for e-sign:", error);
+      res.status(500).json({ message: "Failed to send for e-signing" });
     }
   });
 

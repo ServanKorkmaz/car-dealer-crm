@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import ContractGenerator from "@/components/contracts/ContractGenerator";
+import EnhancedContractGenerator from "@/components/contracts/EnhancedContractGenerator";
 import { Plus, Search, Edit, Trash2, FileText, Download, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Contract, Customer } from "@shared/schema";
@@ -374,7 +375,7 @@ export default function Contracts() {
       </div>
 
       {(showGenerator || editingContract) && (
-        <ContractGenerator
+        <EnhancedContractGenerator
           contract={editingContract}
           onClose={() => {
             setShowGenerator(false);
