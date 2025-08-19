@@ -1291,13 +1291,13 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
       switch (intent.kind) {
         case "OPEN":
           return res.json({ 
-            reply: `Åpner ${intent.page.includes("cars") ? "**Biler**" : intent.page}.`, 
-            tool: { name: "open", page: intent.page, auto: true } 
+            reply: `Åpner ${intent.page?.includes("cars") ? "**Biler**" : intent.page}.`, 
+            tool: { name: "open", page: intent.page || "#/dashboard", auto: true } 
           });
 
         case "CAR_PRICE": {
-          const car = await tools.getCarByReg(intent.reg, userHints);
-          if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg}** i aktiv bedrift.` });
+          const car = await tools.getCarByReg(intent.reg || "", userHints);
+          if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg || ""}** i aktiv bedrift.` });
           const pris = car.salePrice != null ? `${Number(car.salePrice).toLocaleString("no-NO")} kr` : "ukjent";
           return res.json({
             reply: `**${car.brand ?? ""} ${car.model ?? ""} ${car.year ?? ""}** (${car.registration ?? intent.reg}) – salgspris: **${pris}**.`,
@@ -1306,8 +1306,8 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
         }
 
         case "CAR_STATUS": {
-          const car = await tools.getCarByReg(intent.reg, userHints);
-          if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg}** i aktiv bedrift.` });
+          const car = await tools.getCarByReg(intent.reg || "", userHints);
+          if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg || ""}** i aktiv bedrift.` });
           const status = car.status || "Ukjent";
           const alder = `${car.daysOnLot ?? "?"} dager på lager`;
           return res.json({

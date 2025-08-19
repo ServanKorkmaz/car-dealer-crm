@@ -122,17 +122,16 @@ The database uses PostgreSQL with the following main entities:
 
 ## Recent Changes (2025-08-19)
 
-### ✅ ForhandlerPRO AI Assistant Implementation (COMPLETE)
-- **Floating Chat Bubble**: Intelligent assistant bubble at bottom-right with professional UI design
-- **AI-Powered Responses**: Enhanced backend with OpenAI integration for natural language understanding
-- **Intent Recognition**: Smart keyword detection for navigation, car lookups, and complex database queries
-- **Real Data Tools**: Assistant can query live database for car prices, status, expensive sales, contracts
-- **Contextual Navigation**: Tool system that can open specific pages and modals directly
-- **Role-Aware Responses**: Different help content based on user role (EIER, SELGER, etc.) with field-level security
-- **Live Database Integration**: Real-time lookups of cars, customers, contracts, and follow-up creation
-- **Norwegian Language**: All responses and guidance in Norwegian for local market
-- **Action Capabilities**: Can create follow-ups, search customers, find unsigned contracts
-- **Fallback System**: Works without API key with static responses, enhanced with OpenAI when available
+### ✅ Enhanced ForhandlerPRO AI Assistant with Answer-First Logic (COMPLETE)
+- **Answer-First Intent System**: New logic distinguishes between questions (provide data answers) vs commands (navigate immediately)
+- **Confirm Button Navigation**: Non-auto tools display confirm buttons instead of auto-opening pages for better UX
+- **Enhanced Database Tools**: Added `countAvailable()` and `mostExpensiveSold()` with proper field mapping
+- **Fixed Database Field Mapping**: Updated all assistant tools to use correct schema (`registrationNumber`, `make` vs `brand`, etc.)
+- **Smart Context Hints**: Frontend properly sends `activeCompanyId`, `userId`, and `currentRoute` to backend
+- **Improved User Experience**: Questions get immediate data answers with optional navigation confirm buttons
+- **Production-Ready Integration**: Authentic database queries with multi-tenant scoping and role-based access
+- **Norwegian Language Support**: All responses in Norwegian with proper error handling and fallbacks
+- **Real-Time Data Access**: Live queries for car inventory, contract status, pricing, and sales analytics
 
 ### ✅ Complete Multi-Tenant Row-Level Security Implementation (ACCEPTANCE CRITERIA MET)
 - **RLS Policies**: Enabled Row Level Security on all main tables (cars, customers, contracts, activities, user_saved_views, memberships, invites)
