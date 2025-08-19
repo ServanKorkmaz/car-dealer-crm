@@ -21,11 +21,12 @@ import { CustomerProfilePage } from "@/pages/CustomerProfilePage";
 import Contracts from "@/pages/Contracts";
 import Settings from "@/pages/Settings";
 import AssistantBubble from "@/components/AssistantBubble";
+import { useAuth } from "@/contexts/AuthContext";
 import { SettingsAccounting } from "@/features/accounting/pages/SettingsAccounting";
 import { SyncMonitor } from "@/features/accounting/pages/SyncMonitor";
 import { SettingsOrganization } from "@/pages/settings/SettingsOrganization";
-import { SettingsUsers } from "@/pages/settings/SettingsUsers";
-import { SettingsPlan } from "@/pages/settings/SettingsPlan";
+// import { SettingsUsers } from "@/pages/settings/SettingsUsers";
+// import { SettingsPlan } from "@/pages/settings/SettingsPlan";
 
 // Database configuration - easily switch between Replit DB and Supabase
 const DATABASE_CONFIG = {
@@ -104,7 +105,7 @@ function Router() {
           <SettingsOrganization />
         </ProtectedRoute>
       </Route>
-      <Route path="/settings/brukere">
+      {/* <Route path="/settings/brukere">
         <ProtectedRoute>
           <SettingsUsers />
         </ProtectedRoute>
@@ -113,7 +114,7 @@ function Router() {
         <ProtectedRoute>
           <SettingsPlan />
         </ProtectedRoute>
-      </Route>
+      </Route> */}
       <Route path="/settings/regnskap">
         <ProtectedRoute>
           <SettingsAccounting />
@@ -130,6 +131,42 @@ function Router() {
   );
 }
 
+// Wrapper component to provide auth context to AssistantBubble
+function AssistantBubbleWrapper() {
+  const { user, currentOrg, userRole } = useAuth();
+  
+  // Only show assistant if user is authenticated and has an org
+  if (!user || !currentOrg) {
+    return null;
+  }
+  
+  // Map auth roles to assistant roles
+  const mapRole = (role: string | null): "SELGER" | "EIER" | "REGNSKAP" | "VERKSTED" => {
+    if (!role) return "SELGER";
+    switch (role.toLowerCase()) {
+      case "owner":
+      case "eier":
+        return "EIER";
+      case "accountant":
+      case "regnskap":
+        return "REGNSKAP";
+      case "workshop":
+      case "verksted":
+        return "VERKSTED";
+      default:
+        return "SELGER";
+    }
+  };
+  
+  return (
+    <AssistantBubble 
+      userRole={mapRole(userRole)} 
+      activeCompanyId={currentOrg.id} 
+      userId={user.id} 
+    />
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -139,6 +176,7 @@ function App() {
             <Toaster />
             <div className="min-h-screen bg-background">
               <Router />
+              <AssistantBubbleWrapper />
             </div>
           </TooltipProvider>
         </ThemeProvider>
