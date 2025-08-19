@@ -8,7 +8,7 @@ ForhandlerPRO is a modern, secure, and scalable Dealer Management System (DMS) d
 
 Preferred communication style: Simple, everyday language.
 Assistant name: "AI Assistent" (changed from "ForhandlerPRO-assistent")
-Assistant mascot: Custom AI Bear figure with brick pattern (replaced MessageCircle icon)
+Assistant mascot: Custom full-body AI Bear figure with brick pattern (replaced MessageCircle icon)
 
 ## System Architecture
 

@@ -2,35 +2,54 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { X, MessageCircle } from "lucide-react";
 
-// AI Assistant Bear Mascot Component
+// AI Assistant Bear Mascot Component - Full body
 const AIBear = ({ className = "w-5 h-5" }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" className={className}>
+  <svg viewBox="0 0 32 40" className={className}>
     {/* Bear ears */}
-    <circle cx="7" cy="6" r="2.5" fill="#8B5CF6" />
-    <circle cx="17" cy="6" r="2.5" fill="#8B5CF6" />
-    <circle cx="7" cy="6" r="1.5" fill="#A78BFA" />
-    <circle cx="17" cy="6" r="1.5" fill="#A78BFA" />
+    <circle cx="9" cy="7" r="3" fill="#8B5CF6" />
+    <circle cx="23" cy="7" r="3" fill="#8B5CF6" />
+    <circle cx="9" cy="7" r="2" fill="#A78BFA" />
+    <circle cx="23" cy="7" r="2" fill="#A78BFA" />
     
     {/* Bear head */}
-    <circle cx="12" cy="12" r="7" fill="#8B5CF6" />
-    <circle cx="12" cy="12" r="6" fill="#A78BFA" />
+    <circle cx="16" cy="14" r="8" fill="#8B5CF6" />
+    <circle cx="16" cy="14" r="7" fill="#A78BFA" />
     
     {/* Eyes */}
-    <circle cx="9.5" cy="10" r="1" fill="#1F2937" />
-    <circle cx="14.5" cy="10" r="1" fill="#1F2937" />
-    <circle cx="9.8" cy="9.7" r="0.3" fill="white" />
-    <circle cx="14.8" cy="9.7" r="0.3" fill="white" />
+    <circle cx="12.5" cy="12" r="1.2" fill="#1F2937" />
+    <circle cx="19.5" cy="12" r="1.2" fill="#1F2937" />
+    <circle cx="12.8" cy="11.7" r="0.4" fill="white" />
+    <circle cx="19.8" cy="11.7" r="0.4" fill="white" />
     
     {/* Nose */}
-    <ellipse cx="12" cy="13" rx="0.8" ry="0.5" fill="#1F2937" />
+    <ellipse cx="16" cy="15.5" rx="1" ry="0.6" fill="#1F2937" />
     
     {/* Mouth */}
-    <path d="M 10.5 14.5 Q 12 15.5 13.5 14.5" stroke="#1F2937" strokeWidth="0.8" fill="none" strokeLinecap="round" />
+    <path d="M 13.5 17 Q 16 18.5 18.5 17" stroke="#1F2937" strokeWidth="1" fill="none" strokeLinecap="round" />
     
     {/* Brick pattern on forehead */}
-    <rect x="10" y="8" width="4" height="1.5" fill="#DC2626" rx="0.2" />
-    <rect x="9.5" y="9.5" width="2" height="1" fill="#DC2626" rx="0.1" />
-    <rect x="12.5" y="9.5" width="2" height="1" fill="#DC2626" rx="0.1" />
+    <rect x="13" y="9" width="6" height="2" fill="#DC2626" rx="0.3" />
+    <rect x="12" y="11" width="3" height="1.5" fill="#DC2626" rx="0.2" />
+    <rect x="17" y="11" width="3" height="1.5" fill="#DC2626" rx="0.2" />
+    
+    {/* Body */}
+    <ellipse cx="16" cy="28" rx="6" ry="8" fill="#8B5CF6" />
+    <ellipse cx="16" cy="28" rx="5" ry="7" fill="#A78BFA" />
+    
+    {/* Arms */}
+    <ellipse cx="9" cy="25" rx="2.5" ry="4" fill="#8B5CF6" />
+    <ellipse cx="23" cy="25" rx="2.5" ry="4" fill="#8B5CF6" />
+    <circle cx="9" cy="29" r="2" fill="#A78BFA" />
+    <circle cx="23" cy="29" r="2" fill="#A78BFA" />
+    
+    {/* Legs */}
+    <ellipse cx="12" cy="36" rx="2" ry="3" fill="#8B5CF6" />
+    <ellipse cx="20" cy="36" rx="2" ry="3" fill="#8B5CF6" />
+    <ellipse cx="12" cy="38" rx="2.5" ry="1.5" fill="#A78BFA" />
+    <ellipse cx="20" cy="38" rx="2.5" ry="1.5" fill="#A78BFA" />
+    
+    {/* Belly accent */}
+    <ellipse cx="16" cy="28" rx="3" ry="5" fill="#C4B5FD" opacity="0.6" />
   </svg>
 );
 
