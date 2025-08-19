@@ -1,0 +1,175 @@
+Title: Auth + Org + Roles + Plan-gating UI for ForhandlerPRO
+
+Objective
+Add a full authentication and authorization system with a polished UI:
+- Sign in / Sign up (Supabase Auth)
+- Org (dealer) onboarding wizard
+- Plan selection (Basic / Pro / Enterprise) with feature gating
+- Role-based permissions (Owner, Admin, Sales, Workshop, Accountant, Viewer)
+- Protected routes and RLS-safe backend
+- Invitations & seat management
+
+Context
+- Stack: React + TypeScript + Vite, Tailwind + shadcn/ui, lucide-react, React Router, React Query.
+- Backend: Node/TS, Drizzle ORM, Supabase (DB + Auth). RLS is enabled.
+- Existing entities: users, customers, cars, contracts, (accounting integration groundwork).
+- Env already has SUPABASE creds.
+
+Non-goals (MVP)
+- Full Stripe billing. Add a clean placeholder with test hooks. (We will store plan/status locally; Stripe can be plugged in later.)
+- SSO beyond Google (optional toggle).
+
+High-level features
+1) Public Auth pages
+   - `/login`: Email + password, “Logg inn” button, “Fortsett med Google” (optional), “Opprett konto”.
+   - `/register`: Email, password, confirm password → creates user → starts onboarding wizard.
+   - “Glemt passord?” with reset flow.
+   - Polished, professional visuals (hero, card layout, logo, dark/light).
+
+2) Onboarding wizard (after register or first login without org):
+   Steps:
+   a) “Om forhandleren”: org name, orgnr (optional), adresse, telefon.
+   b) “Velg pakke”: Basic / Pro / Enterprise (cards show features & limits).
+   c) “Seter og inviter”: antall seter (max per plan), invitasjoner via e-post (roles per invite).
+   d) “Ferdig”: CTA “Gå til dashboard”.
+   - If billing not wired, set status=`trialing` (14 dager) and show banner “Gratis prøveperiode”.
+
+3) Org switcher & profile menu
+   - Topbar avatar menu with “Bytt forhandler”, “Min profil”, “Logg ut”.
+   - Org switcher dropdown if user has multiple orgs.
+
+4) Roles & plan gating (frontend + backend)
+   - Roles:
+     - Owner: full, kan endre plan/betaling/tilganger.
+     - Admin: alt unntatt billing.
+     - Sales: kunder, biler, kontrakter (CRUD), ikke endre plan/rollenivåer.
+     - Workshop: lese biler/kunder, opprette/endre verkstedordre (når modul er aktiv).
+     - Accountant: lese kontrakter, bruke regnskapsintegrasjon, ikke slette data.
+     - Viewer: read-only.
+   - Plan features (examples, adjust to current app):
+     - Basic: Lager (biler), Kunder, Kontrakter (uten e-sign), Enkel rapport.
+     - Pro: + E-sign, + PowerOffice Go-sending, + Filvedlegg.
+     - Enterprise: + Multi-avdeling, API-nøkler, Avansert rapport, Prioritert support.
+   - Feature flags served from DB and cached client-side.
+
+5) Invitations & seat management
+   - Owner/Admin can invite users (email, role) from `/settings/brukere`.
+   - Accept invite via secure token link → login/attach to org → consume seat.
+   - Show seats used/available (based on subscription.seats).
+
+6) Settings UIs
+   - `/settings/organisasjon`: org info, logo, avdelinger (empty for now), delete org (Owner only).
+   - `/settings/plan`: show current plan, limits, “Oppgrader”, “Nedgrader”, “Administrer seter”, “Start fakturering” (Stripe placeholder).
+   - `/settings/brukere`: list members (name, email, role, last seen), change role, revoke, resend invite.
+
+Database (Supabase + Drizzle)
+Create new tables (and drizzle models) with RLS:
+- profiles
+  - user_id (uuid pk = auth.uid()), full_name, phone, avatar_url, created_at, updated_at
+- organizations
+  - id (uuid pk), name, orgnr, slug unique, created_by (uuid), created_at, updated_at
+- org_members
+  - org_id uuid fk, user_id uuid, role enum('owner','admin','sales','workshop','accountant','viewer'), invited_by uuid, status enum('active','invited','revoked')
+  - pk (org_id, user_id)
+- invites
+  - id uuid pk, org_id, email, role, token unique, status enum('pending','accepted','expired'), invited_by, created_at, expires_at
+- subscriptions
+  - org_id pk, plan enum('basic','pro','enterprise'), status enum('trialing','active','past_due','canceled'), trial_end timestamptz, seats int, stripe_customer_id text null, stripe_subscription_id text null, updated_at
+- feature_flags
+  - org_id pk, data jsonb  // derived or manual overrides; keep small
+- audit_log
+  - id uuid pk, org_id, actor_user_id, action, entity, entity_id, meta jsonb, created_at
+
+Seed (SQL) for default feature flags per plan (server function can compute union of base plan + overrides).
+
+RLS policies (examples; implement for SELECT/INSERT/UPDATE/DELETE as appropriate):
+- organizations: USING (id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid()))
+- org_members: USING (user_id = auth.uid() OR org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid()))
+- invites: USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid() AND role IN ('owner','admin')))
+- subscriptions & feature_flags: USING (org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid()))
+- profiles: USING (user_id = auth.uid())
+
+Helper SQL (view or function):
+- `is_org_member(org uuid) returns boolean`
+- `current_roles(org uuid) returns setof text`
+- `current_plan(org uuid) returns text`
+- `effective_features(org uuid) returns jsonb`
+
+Backend API (Node/TS)
+Routes (REST) under `/api/auth` and `/api/org`:
+- `GET /api/auth/me` → session & profile
+- `POST /api/org` → create org (name,...), auto-add creator as owner, create subscriptions (trialing 14d, plan=basic, seats=3)
+- `GET /api/org` → list orgs for user
+- `POST /api/invites` → {orgId, email, role} → create invite + email (stub logger now)
+- `POST /api/invites/accept` → {token} → attach to org, set status=accepted
+- `GET /api/subscription/:orgId` → plan/status/seats/features
+- `POST /api/subscription/:orgId/change-plan` → {plan} (no billing yet; enforce owner)
+- `POST /api/members/:orgId/role` → {userId, role} (owner/admin)
+- `DELETE /api/members/:orgId` → remove member (owner/admin)
+- `GET /api/features/:orgId` → effective features json
+
+Middleware
+- Supabase JWT decode; attach `req.user`.
+- `requireAuth`, `requireOrgMember(orgId)`, `requireRole(orgId, roles[])`.
+- `featureGate(orgId, 'e_sign')`, etc.
+- All queries **must** scope by `org_id` and respect RLS.
+
+Frontend (React)
+Routes:
+- Public: `/login`, `/register`, `/reset-password`
+- Onboarding: `/onboarding` (multi-step)
+- Protected app: existing routes
+- Settings: `/settings/organisasjon`, `/settings/plan`, `/settings/brukere`
+
+UI/UX (use shadcn/ui components)
+- Auth pages: centered Card, app logo, inputs with validation, error toasts, success banners.
+- Onboarding Wizard:
+  - Stepper top; Card sections; primary/secondary buttons; progress save.
+  - Copy (Norwegian), short and clear.
+- Org switcher in topbar (Command palette style).
+- Settings pages: responsive grid, Cards with headings and subtle descriptions.
+- Users page: Table with search, role Select, status Badge, Invite Dialog.
+- Plan page: Pricing cards with ticks; current plan badge; action buttons.
+
+Feature gating in UI
+- Small `useFeatures(orgId)` hook; hide/disable gated actions with tooltips “Tilgjengelig i Pro og høyere”.
+
+Access matrix (examples)
+- contracts: Sales/Admin/Owner can create; Accountant read + send to accounting; Viewer read; Workshop read.
+- accounting actions: Pro+ and roles Owner/Admin/Accountant only.
+- settings/plan: Owner only; settings/users: Owner/Admin.
+
+Email stubs
+- Invite email (console log now) with token link `${APP_BASE_URL}/accept-invite?token=…`.
+
+Env vars
+- NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY (frontend)
+- SUPABASE_SERVICE_ROLE_KEY (server only)
+- APP_BASE_URL
+- (Optional) GOOGLE_OAUTH on/off flag
+
+Testing
+- Unit: role checks, feature gate hook, org API handlers (mocks).
+- E2E (Playwright):
+  - Register → Onboarding → Org created → Dashboard loads.
+  - Invite flow: send invite, accept in incognito, role applied, seat decremented.
+  - Plan change updates feature gates instantly.
+  - Unauthorized role is blocked from restricted pages (proper toast/redirect).
+
+Acceptance Criteria (must pass)
+1) Users can register, logge inn/ut, og fullføre onboarding for å opprette organisasjon.
+2) Ruter bak innlogging er beskyttet; direkte-URL uten auth sender til `/login`.
+3) Org-bytte fungerer; alle dataforespørsler er org-scopet.
+4) Roller håndheves i UI + backend. Forsøk på ikke-tillatt handling gir tydelig feil.
+5) Plan-gating fungerer: Basic skjuler/disable funksjoner som er Pro/Enterprise.
+6) Invitasjoner fungerer (send/aksepter); seter teller ned; roller settes korrekt.
+7) RLS-regler verifisert: en bruker kan ikke lese/endre data utenfor egne org-rader.
+8) UI er responsivt, tilgjengelig, og matcher eksisterende design (shadcn + Tailwind).
+
+Deliverables
+- DB migrations + Drizzle models for nye tabeller.
+- RLS policies + helper SQL funcs.
+- Auth/Onboarding/Settings/Users UI med shadcn/ui.
+- Org switcher + ProtectedRoute/guards + feature-gate hook.
+- API-ruter og middleware for auth/roles.
+- README: hvordan sette opp supabase-keys, admin seed, og hvordan legge til nye planer/roller/feature-flagg.

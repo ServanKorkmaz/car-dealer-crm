@@ -1,12 +1,15 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { useAuth } from "@/hooks/useAuth";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import NotFound from "@/pages/not-found";
-import Landing from "@/pages/Landing";
+import Login from "@/pages/auth/Login";
+import Register from "@/pages/auth/Register";
+import Onboarding from "@/pages/auth/Onboarding";
 import Dashboard from "@/pages/Dashboard";
 import ProfessionalDashboard from "@/pages/ProfessionalDashboard";
 import Activities from "@/pages/Activities";
@@ -20,6 +23,9 @@ import Settings from "@/pages/Settings";
 import AssistantBubble from "@/components/AssistantBubble";
 import { SettingsAccounting } from "@/features/accounting/pages/SettingsAccounting";
 import { SyncMonitor } from "@/features/accounting/pages/SyncMonitor";
+import { SettingsOrganization } from "@/pages/settings/SettingsOrganization";
+import { SettingsUsers } from "@/pages/settings/SettingsUsers";
+import { SettingsPlan } from "@/pages/settings/SettingsPlan";
 
 // Database configuration - easily switch between Replit DB and Supabase
 const DATABASE_CONFIG = {
@@ -29,63 +35,114 @@ const DATABASE_CONFIG = {
 };
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
-  
-  // Get user role for assistant
-  const { data: userRole } = useQuery({
-    queryKey: ['/api/user/role'],
-    enabled: isAuthenticated,
-  });
-
-  // Get current user data
-  const { data: currentUser } = useQuery({
-    queryKey: ['/api/auth/user'],
-    enabled: isAuthenticated,
-  });
-
   return (
-    <>
-      <Switch>
-        <Route path="/" component={isLoading || !isAuthenticated ? Landing : Dashboard} />
-        <Route path="/dashboard-pro" component={ProfessionalDashboard} />
-        <Route path="/cars" component={Cars} />
-        <Route path="/cars/:id" component={CarDetail} />
-        <Route path="/customers" component={Customers} />
-        <Route path="/customers/:id" component={CustomerProfile} />
-        <Route path="/customers/:id/profile" component={CustomerProfilePage} />
-        <Route path="/contracts" component={Contracts} />
-        <Route path="/activities" component={Activities} />
-        <Route path="/settings" component={Settings} />
-        <Route path="/settings/regnskap" component={SettingsAccounting} />
-        <Route path="/sync" component={SyncMonitor} />
-        <Route component={NotFound} />
-      </Switch>
-      {/* Assistant bubble - show only when authenticated */}
-      {isAuthenticated && (
-        <AssistantBubble 
-          userRole={userRole?.role || "SELGER"} 
-          activeCompanyId={userRole?.companyId || "default-company"}
-          userId={currentUser?.id || "test-user-123"}
-        />
-      )}
-    </>
+    <Switch>
+      {/* Public routes */}
+      <Route path="/login" component={Login} />
+      <Route path="/register" component={Register} />
+      
+      {/* Semi-protected routes (need auth but not org) */}
+      <Route path="/onboarding">
+        <ProtectedRoute requireOrg={false}>
+          <Onboarding />
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Protected routes */}
+      <Route path="/">
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dashboard-pro">
+        <ProtectedRoute>
+          <ProfessionalDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/cars">
+        <ProtectedRoute>
+          <Cars />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/cars/:id">
+        <ProtectedRoute>
+          <CarDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customers">
+        <ProtectedRoute>
+          <Customers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customers/:id">
+        <ProtectedRoute>
+          <CustomerProfile />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customers/:id/profile">
+        <ProtectedRoute>
+          <CustomerProfilePage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/contracts">
+        <ProtectedRoute>
+          <Contracts />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/activities">
+        <ProtectedRoute>
+          <Activities />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute>
+          <Settings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/organisasjon">
+        <ProtectedRoute>
+          <SettingsOrganization />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/brukere">
+        <ProtectedRoute>
+          <SettingsUsers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/plan">
+        <ProtectedRoute>
+          <SettingsPlan />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings/regnskap">
+        <ProtectedRoute>
+          <SettingsAccounting />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/sync">
+        <ProtectedRoute>
+          <SyncMonitor />
+        </ProtectedRoute>
+      </Route>
+      
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
 function App() {
-  // Log database configuration for debugging
-  console.log('Database Provider:', DATABASE_CONFIG.provider);
-  
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <Toaster />
-          <div className="min-h-screen bg-background">
-            <Router />
-          </div>
-        </TooltipProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <TooltipProvider>
+            <Toaster />
+            <div className="min-h-screen bg-background">
+              <Router />
+            </div>
+          </TooltipProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
