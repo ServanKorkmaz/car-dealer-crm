@@ -1,5 +1,4 @@
 import { Link, useLocation } from "wouter";
-import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -33,7 +32,6 @@ const navigation = [
 
 export default function Sidebar() {
   const [location] = useLocation();
-  const { user } = useAuth();
   const { theme, setTheme } = useTheme();
 
   return (
@@ -106,7 +104,7 @@ export default function Sidebar() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                {user && typeof user === 'object' && 'email' in user && user.email ? user.email : "Bruker"}
+                Bruker
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Forhandler
@@ -115,7 +113,15 @@ export default function Sidebar() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.location.href = "/api/logout"}
+              onClick={() => {
+                // Clear mock session data
+                localStorage.removeItem('mockSession');
+                localStorage.removeItem('mockUser');
+                localStorage.removeItem('mockOrg');
+                localStorage.removeItem('currentOrgId');
+                // Redirect to login
+                window.location.href = '/login';
+              }}
               className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
             >
               <LogOut className="w-4 h-4" />
