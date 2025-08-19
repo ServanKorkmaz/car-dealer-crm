@@ -9,6 +9,12 @@ import { generateContractHTML, generatePDF } from "./pdf-generator";
 import { scrapeFinnAd } from "./finn-scraper";
 import { ActivityLogger } from "./activityLogger";
 import { AlertSystem } from "./alerts";
+import OpenAI from "openai";
+
+// Initialize OpenAI if API key is available
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Use simple auth for development instead of Replit auth
@@ -1202,6 +1208,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const role = (hints?.role || "SELGER").toUpperCase();
       const companyId = hints?.activeCompanyId;
 
+      // Debug logging
+      console.log("OpenAI enabled?", !!openai);
+      console.log("Last message:", lastMessage);
+
       const SYSTEM_PROMPT = `
 Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen (norsk).
 - Svar alltid naturlig, som en ekte kollega.
@@ -1306,13 +1316,9 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
           ...tool("/customers"),
         });
 
-      // Try OpenAI if available
-      if (process.env.OPENAI_API_KEY) {
+      // Use OpenAI if available
+      if (openai) {
         try {
-          const openai = new (await import('openai')).default({ 
-            apiKey: process.env.OPENAI_API_KEY 
-          });
-          
           const llmMessages = [
             { role: "system" as const, content: SYSTEM_PROMPT },
             { role: "system" as const, content: `[Hints]\nrole=${role}\nactiveCompanyId=${companyId || ""}\n` },
@@ -1334,7 +1340,7 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
         }
       }
 
-      // Fallback responses
+      // Fallback responses when openai is null
       return res.json({
         reply: "Jeg kan guide deg stegvis (f.eks. «Hvor finner jeg biler?»). For mer naturlige svar kan du sette OPENAI_API_KEY.",
       });
