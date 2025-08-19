@@ -1,0 +1,220 @@
+Prompt 6 — Price Assistant + Aging Rules
+
+Goal: Suggest a competitive salgspris per car using Finn/SVV data + your own margins, and auto‑propose markdowns as cars age.
+
+1) Database: comps cache + price rules
+
+Create a table for comparable listings (we’ll fill it from your existing Finn/SVV import or a stub for now) and a small table for pricing rules.
+
+-- Comparable market listings (normalized)
+create table if not exists market_comps (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id) on delete cascade,
+  source text not null check (source in ('FINN','SVV','MANUAL')),
+  regnr text,
+  brand text,
+  model text,
+  year int,
+  variant text,
+  fuel text,
+  gearbox text,
+  km int,
+  price numeric,
+  location text,
+  listed_at timestamptz default now(),
+  fetched_at timestamptz default now()
+);
+alter table market_comps enable row level security;
+create policy "read comps" on market_comps for select using (is_company_member(company_id));
+create policy "write comps" on market_comps for insert with check (is_company_member(company_id));
+create index if not exists market_comps_idx on market_comps(company_id, brand, model, year, fuel, gearbox, km, price);
+
+-- Pricing rules (one row per company; feel free to add UI later)
+create table if not exists pricing_rules (
+  company_id uuid primary key references companies(id) on delete cascade,
+  target_gross_pct numeric not null default 0.12,    -- 12%
+  min_gross_pct numeric not null default 0.05,       -- 5%
+  aging_days_1 int not null default 30,
+  aging_disc_1 numeric not null default 0.02,        -- -2%
+  aging_days_2 int not null default 45,
+  aging_disc_2 numeric not null default 0.03,        -- -3% (additional)
+  aging_days_3 int not null default 60,
+  aging_disc_3 numeric not null default 0.05,        -- -5% (additional)
+  updated_at timestamptz default now()
+);
+alter table pricing_rules enable row level security;
+create policy "rw rules" on pricing_rules for all using (has_role(company_id, array['EIER','REGNSKAP']::user_role[])) with check (has_role(company_id, array['EIER','REGNSKAP']::user_role[]));
+
+2) Server function: compute suggested price
+
+Add a server endpoint or TS utility getSuggestedPrice(carId):
+
+Inputs (from cars_secure + joined data): brand, model, year, fuel, gearbox, km, purchase_price (masked may be null), recond_cost (0 default), days_on_lot, current price.
+
+Steps:
+
+Fetch comps from market_comps for same brand/model/year ±1 year, same fuel/gearbox where possible.
+
+Filter km within a dynamic band: car.km * [0.7 .. 1.3].
+
+Compute adjusted comp price = comp.price * adj_km, where adj_km = 1 + clamp((car.km - comp.km)/10000 * 0.02, -0.2, 0.2).
+(≈ 2% price change per 10k km difference, capped ±20%.)
+
+Market anchor = median of adjusted comp prices (drop top/bottom 10% for robustness).
+
+Company guardrails:
+
+If we know costs: floor_for_gross = (purchase_price + recond_cost) / (1 - target_gross_pct).
+
+If purchase_price is null (user not allowed), skip cost guardrails and only show market‑based suggestion.
+
+Aging adjustments (from pricing_rules):
+
+Start at market_anchor.
+
+If days_on_lot >= aging_days_1 → apply aging_disc_1 (multiply by 1 - disc).
+
+If >= days_2 → additional aging_disc_2, etc.
+
+Final suggestion = max( floor_for_gross, market_anchor_with_aging ).
+
+Also compute low/medium/high band:
+
+low = market_anchor_with_aging * 0.98
+
+mid = final_suggestion
+
+high = market_anchor_with_aging * 1.03
+
+Return:
+
+{
+  marketAnchor,                   // number
+  agingAppliedAnchor,             // number
+  finalSuggestion,                // number
+  lowBand, midBand, highBand,     // numbers
+  sampleComps: [{price, km, year, adjustedPrice, source}], // 5-10 rows for UI
+  reasons: [ "Median of 23 comps", "Aging 45d → -3%", "Target gross 12%" ]
+}
+
+
+Performance: Cache result per car in memory for 5 minutes; recompute on demand and via nightly job.
+
+3) UI — “Prisassistent” in Rediger bil modal
+
+Add a right‑side panel or collapsible section:
+
+Header: Prisassistent
+
+Show:
+
+Anbefalt pris: finalSuggestion (large)
+
+Band chips: Lav, Anbefalt, Høy
+
+Markedsanker: marketAnchor and “(n=XX komper)”
+
+Aldringsjustering: −X% with tooltip explaining rule
+
+Målmargin: show target % if user can see cost; else hide
+
+Buttons:
+
+Bruk anbefalt pris → sets sale_price to finalSuggestion (rounded to nearest 500 kr).
+
+Rund ned til psykologisk pris → e.g., 199 990 kr.
+
+Comps mini‑table (scrollable 6–8 rows): Year, KM, Price, AdjPrice, Source.
+
+Styling (Tailwind):
+
+Panel: rounded-2xl border border-white/5 bg-white/5 p-4 space-y-3
+
+Suggestion: text-2xl font-semibold
+
+Bands: chips rounded-full px-2.5 py-0.5 text-xs border border-white/10
+
+4) Aging suggestions in Biler list + Alerts
+
+On car cards, if daysOnLot ≥ thresholds, show a tiny “Prisforslag tilgjengelig” badge.
+
+In Alerts (Prompt 4), when a car crosses a threshold, add an activity:
+“[REGNR] har stått 45 dager. Foreslått prisendring: −3% → NN kr.”
+
+Quick action on the card kebab: “Bruk prisforslag” (applies mid band).
+
+5) Nightly job
+
+Create a scheduled task (cron/worker) that:
+
+Rebuilds market anchors for all Tilgjengelig cars.
+
+Inserts activity alerts for newly crossed thresholds.
+
+(Optional) Refreshes market_comps from your Finn/SVV fetcher.
+
+6) TypeScript skeleton (server util)
+export async function getSuggestedPrice(carId: string, companyId: string) {
+  const car = await db.carsSecure.get(carId, companyId); // includes masked purchase_price
+  const rules = await db.pricingRules.get(companyId);
+
+  const comps = await db.marketComps.query({
+    companyId,
+    brand: car.brand, model: car.model,
+    yearMin: car.year - 1, yearMax: car.year + 1,
+    fuel: car.fuel, gearbox: car.gearbox,
+    kmMin: Math.floor(car.km * 0.7), kmMax: Math.ceil(car.km * 1.3),
+    limit: 200
+  });
+
+  const adjusted = comps.map(c => {
+    const delta = (car.km - (c.km ?? car.km)) / 10000; // per 10k
+    const adjKm = 1 + Math.max(-0.2, Math.min(0.2, 0.02 * delta));
+    return { ...c, adjustedPrice: Math.round(c.price * adjKm) };
+  });
+
+  const trimmed = takeMiddle80PercentBy(adjusted, x => x.adjustedPrice);
+  const marketAnchor = medianBy(trimmed, x => x.adjustedPrice);
+
+  let agingAnchor = marketAnchor;
+  const d = car.daysOnLot;
+  if (d >= rules.aging_days_1) agingAnchor *= (1 - Number(rules.aging_disc_1));
+  if (d >= rules.aging_days_2) agingAnchor *= (1 - Number(rules.aging_disc_2));
+  if (d >= rules.aging_days_3) agingAnchor *= (1 - Number(rules.aging_disc_3));
+
+  const cost = car.purchase_price ?? null;
+  const floorForGross = cost != null
+    ? Math.ceil((Number(cost) + (car.recond_cost ?? 0)) / (1 - Number(rules.target_gross_pct)))
+    : null;
+
+  let finalSuggestion = Math.round(agingAnchor / 500) * 500;
+  if (floorForGross != null) finalSuggestion = Math.max(finalSuggestion, round500(floorForGross));
+
+  const lowBand  = round500(agingAnchor * 0.98);
+  const highBand = round500(agingAnchor * 1.03);
+
+  return {
+    marketAnchor, agingAppliedAnchor: agingAnchor,
+    finalSuggestion, lowBand, midBand: finalSuggestion, highBand,
+    sampleComps: trimmed.slice(0, 10),
+    reasons: [
+      `Median of ${trimmed.length} comps`,
+      d >= rules.aging_days_1 ? `Aging ${d}d → discounts applied` : 'Fresh stock',
+      cost != null ? `Target gross ${Number(rules.target_gross_pct)*100}%` : 'Cost hidden for your role'
+    ]
+  };
+}
+
+7) Acceptance criteria
+
+In Rediger bil, I see “Prisassistent” with an Anbefalt pris and a short rationale.
+
+Clicking Bruk anbefalt pris updates the salgspris and gross preview.
+
+When a car passes 30/45/60 dager, I receive an alert with a suggested markdown.
+
+If the user’s role hides costs, the assistant still works but omits margin info.
+
+Market comps are cached; recomputation is fast (<300ms for typical case).
+
+Bands round to the nearest 500 kr (or 1 000 kr if price > 500k).

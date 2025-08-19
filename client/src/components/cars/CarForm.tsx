@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { CloudUpload, Search, Loader2, X, Plus } from "lucide-react";
+import PriceAssistant from "./PriceAssistant";
 
 interface CarFormProps {
   onClose: () => void;
@@ -625,6 +626,17 @@ export default function CarForm({ onClose, car }: CarFormProps) {
               </div>
             </div>
           </div>
+          
+          {/* Price Assistant - only show for edit mode with car ID */}
+          {car?.id && (
+            <PriceAssistant
+              carId={car.id}
+              currentPrice={form.watch("salePrice")}
+              onPriceUpdate={(newPrice) => {
+                form.setValue("salePrice", newPrice.toString(), { shouldValidate: true, shouldDirty: true });
+              }}
+            />
+          )}
         </div>
 
         {/* Notes */}

@@ -10,6 +10,8 @@ import {
   integer,
   decimal,
   boolean,
+  uuid,
+  numeric,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -402,3 +404,70 @@ export type InsertSavedView = z.infer<typeof insertSavedViewSchema>;
 // Activities types
 export type Activity = typeof activities.$inferSelect;
 export type InsertActivity = z.infer<typeof insertActivitySchema>;
+
+// Market comparables table
+export const marketComps = pgTable("market_comps", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  source: text("source").notNull(),
+  regnr: text("regnr"),
+  brand: text("brand"),
+  model: text("model"),
+  year: integer("year"),
+  variant: text("variant"),
+  fuel: text("fuel"),
+  gearbox: text("gearbox"),
+  km: integer("km"),
+  price: numeric("price"),
+  location: text("location"),
+  listedAt: timestamp("listed_at", { withTimezone: true }).defaultNow(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const insertMarketCompSchema = createInsertSchema(marketComps).omit({ 
+  id: true, 
+  createdAt: true,
+  fetchedAt: true 
+});
+export type MarketComp = typeof marketComps.$inferSelect;
+export type InsertMarketComp = z.infer<typeof insertMarketCompSchema>;
+
+// Pricing rules table
+export const pricingRules = pgTable("pricing_rules", {
+  companyId: varchar("company_id").primaryKey().references(() => companies.id, { onDelete: "cascade" }),
+  targetGrossPct: numeric("target_gross_pct").notNull().default("0.12"),
+  minGrossPct: numeric("min_gross_pct").notNull().default("0.05"),
+  agingDays1: integer("aging_days_1").notNull().default(30),
+  agingDisc1: numeric("aging_disc_1").notNull().default("0.02"),
+  agingDays2: integer("aging_days_2").notNull().default(45),
+  agingDisc2: numeric("aging_disc_2").notNull().default("0.03"),
+  agingDays3: integer("aging_days_3").notNull().default(60),
+  agingDisc3: numeric("aging_disc_3").notNull().default("0.05"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const insertPricingRulesSchema = createInsertSchema(pricingRules).omit({ 
+  createdAt: true 
+});
+export type PricingRules = typeof pricingRules.$inferSelect;
+export type InsertPricingRules = z.infer<typeof insertPricingRulesSchema>;
+
+// Price suggestion response type
+export type PriceSuggestion = {
+  marketAnchor: number;
+  agingAppliedAnchor: number;
+  finalSuggestion: number;
+  lowBand: number;
+  midBand: number;
+  highBand: number;
+  sampleComps: {
+    price: number;
+    km: number;
+    year: number;
+    adjustedPrice: number;
+    source: string;
+  }[];
+  reasons: string[];
+};

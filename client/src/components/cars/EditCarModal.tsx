@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { apiRequest } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import type { Car } from "@shared/schema";
+import PriceAssistant from "./PriceAssistant";
 
 interface EditCarModalProps {
   car: Car;
@@ -253,7 +254,7 @@ export default function EditCarModal({ car, onClose }: EditCarModalProps) {
               <Input
                 id="lastEuControl"
                 type="date"
-                value={formData.lastEuControl || ""}
+                value={typeof formData.lastEuControl === 'string' ? formData.lastEuControl : formData.lastEuControl?.toISOString().split('T')[0] || ""}
                 onChange={(e) => handleInputChange("lastEuControl", e.target.value)}
                 data-testid="input-last-eu-control"
               />
@@ -264,7 +265,7 @@ export default function EditCarModal({ car, onClose }: EditCarModalProps) {
               <Input
                 id="nextEuControl"
                 type="date"
-                value={formData.nextEuControl || ""}
+                value={typeof formData.nextEuControl === 'string' ? formData.nextEuControl : formData.nextEuControl?.toISOString().split('T')[0] || ""}
                 onChange={(e) => handleInputChange("nextEuControl", e.target.value)}
                 data-testid="input-next-eu-control"
               />
@@ -305,6 +306,15 @@ export default function EditCarModal({ car, onClose }: EditCarModalProps) {
               />
             </div>
           </div>
+
+          {/* Price Assistant */}
+          <PriceAssistant
+            carId={car.id}
+            currentPrice={formData.salePrice}
+            onPriceUpdate={(newPrice) => {
+              setFormData({ ...formData, salePrice: newPrice.toString() });
+            }}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notater</Label>

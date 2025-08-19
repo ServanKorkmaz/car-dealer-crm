@@ -1005,6 +1005,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Pricing API routes
+  app.get('/api/cars/:id/price-suggestion', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const suggestion = await storage.getSuggestedPrice(req.params.id, userId);
+      res.json(suggestion);
+    } catch (error: any) {
+      console.error("Error getting price suggestion:", error);
+      res.status(500).json({ message: error.message || "Failed to get price suggestion" });
+    }
+  });
+
+  app.post('/api/cars/:id/apply-suggested-price', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { suggestedPrice } = req.body;
+      
+      if (!suggestedPrice || typeof suggestedPrice !== 'number') {
+        return res.status(400).json({ message: "Valid suggested price is required" });
+      }
+
+      const storage = await storagePromise;
+      const car = await storage.updateCar(req.params.id, {
+        salePrice: suggestedPrice.toString()
+      }, userId);
+
+      res.json({ 
+        success: true, 
+        message: `Salgspris oppdatert til ${suggestedPrice.toLocaleString('no-NO')} kr`,
+        car 
+      });
+    } catch (error: any) {
+      console.error("Error applying suggested price:", error);
+      res.status(500).json({ message: error.message || "Failed to apply suggested price" });
+    }
+  });
+
+  app.get('/api/pricing-rules', authMiddleware, async (req: any, res) => {
+    try {
+      const storage = await storagePromise;
+      const rules = await storage.getPricingRules('default-company');
+      res.json(rules || {
+        targetGrossPct: '0.12',
+        minGrossPct: '0.05',
+        agingDays1: 30,
+        agingDisc1: '0.02',
+        agingDays2: 45,
+        agingDisc2: '0.03',
+        agingDays3: 60,
+        agingDisc3: '0.05'
+      });
+    } catch (error: any) {
+      console.error("Error fetching pricing rules:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch pricing rules" });
+    }
+  });
+
+  app.post('/api/pricing-rules', authMiddleware, async (req: any, res) => {
+    try {
+      const storage = await storagePromise;
+      const rules = await storage.upsertPricingRules(req.body, 'default-company');
+      res.json(rules);
+    } catch (error: any) {
+      console.error("Error updating pricing rules:", error);
+      res.status(500).json({ message: error.message || "Failed to update pricing rules" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

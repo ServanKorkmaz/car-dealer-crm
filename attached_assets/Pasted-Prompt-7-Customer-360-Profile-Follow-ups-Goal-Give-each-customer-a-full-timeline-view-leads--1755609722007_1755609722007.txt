@@ -1,0 +1,160 @@
+Prompt 7 — Customer 360° Profile + Follow-ups
+
+Goal: Give each customer a full timeline view (leads, prøvekjøringer, tilbud, kontrakter, biler, oppgaver), plus reminders/follow-ups with alerts.
+
+1) Database changes
+Extend customers
+alter table customers
+  add column if not exists type text check (type in ('PRIVAT','BEDRIFT')) default 'PRIVAT',
+  add column if not exists phone text,
+  add column if not exists email text,
+  add column if not exists address text,
+  add column if not exists gdpr_consent boolean default false,
+  add column if not exists gdpr_consent_at timestamptz;
+
+Follow-ups table
+create table if not exists followups (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id) on delete cascade,
+  customer_id uuid not null references customers(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  due_date date not null,
+  note text,
+  status text not null default 'OPEN' check (status in ('OPEN','DONE','SKIPPED')),
+  created_at timestamptz default now()
+);
+alter table followups enable row level security;
+create policy "read followups" on followups for select using (is_company_member(company_id));
+create policy "write followups" on followups for all using (is_company_member(company_id));
+
+2) Customer 360 page
+
+When clicking a customer, open a full-page profile:
+
+Header
+
+Name + type chip (Privat/Bedrift)
+
+Contact actions: 📞, ✉️, 📍 (launch maps)
+
+GDPR flag if consent given
+
+Quick stats: total kjøp, total innbytte, active contracts
+
+Tabs/sections
+
+Timeline
+
+Merge events from activities where entity_id=customer.id OR linked cars/contracts.
+
+Show icons per type: 👤 Kunde, 🚗 Bil, 📄 Kontrakt, 📝 Notat, 🔔 Varsel.
+
+Infinite scroll.
+
+Biler
+
+Table of cars bought, sold, traded in.
+
+Show status + gross where allowed.
+
+Kontrakter
+
+List contracts with status bar (Opprettet → Signert → Betalt → Levert).
+
+Notater
+
+Free-text notes per customer (notes table optional or just activities type NOTE).
+
+Follow-ups
+
+Inline list of open/done follow-ups.
+
+Button “Ny oppfølging”.
+
+3) Follow-ups UX
+
+Create follow-up modal:
+
+Fields: Due date, Note, Assign to (user in company).
+
+Default assign = current user.
+
+Display:
+
+On customer profile under Follow-ups.
+
+In dashboard “Oppgaver i dag” widget (per user).
+
+Actions: mark Done/Skipped, edit note/date.
+
+Alerts integration (Prompt 4):
+
+If follow-up due_date = today → Activity/alert: “Følg opp [kundenavn] i dag.”
+
+If overdue by >2 days → high priority alert.
+
+4) UI details
+
+Customer list view
+
+Columns: Name, Type, Phone, Email, Siste kontakt (last activity date), Follow-ups (next due).
+
+Chip: Hot / Warm / Cold → rule of thumb:
+
+Hot = activity in last 7d
+
+Warm = 8–30d
+
+Cold = >30d without activity.
+
+Profile layout (Tailwind)
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 space-y-4">
+    <!-- Timeline / Biler / Kontrakter / Notater -->
+  </div>
+  <div class="space-y-4">
+    <!-- Follow-ups panel -->
+  </div>
+</div>
+
+
+Timeline card: border-l-2 pl-3 with colored border per type.
+
+Follow-up card: rounded-xl bg-white/5 p-3 flex justify-between items-center.
+
+5) Server helpers
+
+Function getCustomerProfile(customerId):
+
+Load customer.
+
+Join cars, contracts, follow-ups.
+
+Query activities (limit 50, newest first).
+
+Return as JSON.
+
+Function createFollowup(customerId, userId, dueDate, note) → inserts + creates activity row.
+
+Cron job: each morning, scan followups where due_date <= today and status='OPEN'. Insert alerts.
+
+6) Acceptance criteria
+
+Clicking a customer opens a profile with timeline, cars, contracts, notes, follow-ups.
+
+I can add a follow-up; it shows under the customer and in my dashboard.
+
+If a follow-up is due today, I see an alert in Aktiviteter + bell.
+
+Customer list shows “Siste kontakt” and “Hot/Warm/Cold”.
+
+GDPR consent toggle visible on customer edit.
+
+7) Next steps
+
+After this, we can queue:
+
+Prompt 8 — Company switcher + invites UI (let dealers add teammates easily).
+
+Prompt 9 — Accounting/export module (Tripletex/Visma EHF integration).
