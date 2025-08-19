@@ -808,7 +808,7 @@ export class DatabaseStorage implements IStorage {
       .insert(activities)
       .values({
         type,
-        description,
+        description: description,
         entityId,
         companyId,
         userId,
@@ -1163,8 +1163,12 @@ export class DatabaseStorage implements IStorage {
     const [newFollowup] = await db
       .insert(followups)
       .values({
-        ...followup,
+        customerId: followup.customerId,
+        userId: followup.userId,
+        dueDate: followup.dueDate,
+        note: followup.note,
         companyId: membership.companyId,
+        status: 'OPEN' as const,
       })
       .returning();
     
@@ -1187,7 +1191,10 @@ export class DatabaseStorage implements IStorage {
     
     const [updatedFollowup] = await db
       .update(followups)
-      .set(followup)
+      .set({
+        ...followup,
+        updatedAt: new Date(),
+      })
       .where(and(eq(followups.id, id), eq(followups.companyId, membership.companyId)))
       .returning();
     
@@ -1235,6 +1242,52 @@ export class DatabaseStorage implements IStorage {
       followups: customerFollowups,
       activities: customerActivities,
     };
+  }
+
+  // Company management methods for multi-tenant support
+  async getUserCompanies(userId: string): Promise<Array<{
+    id: string;
+    name: string;
+    role: 'EIER' | 'SELGER' | 'REGNSKAP' | 'VERKSTED';
+  }>> {
+    const results = await db
+      .select({
+        id: companies.id,
+        name: companies.name,
+        role: memberships.role,
+      })
+      .from(memberships)
+      .innerJoin(companies, eq(memberships.companyId, companies.id))
+      .where(eq(memberships.userId, userId));
+
+    return results;
+  }
+
+  async switchActiveCompany(userId: string, companyId: string): Promise<boolean> {
+    // Verify user has access to this company
+    const membership = await db
+      .select()
+      .from(memberships)
+      .where(and(
+        eq(memberships.userId, userId),
+        eq(memberships.companyId, companyId)
+      ))
+      .limit(1);
+
+    return membership.length > 0;
+  }
+
+  async createNewCompany(name: string, userId: string): Promise<{ id: string; name: string; createdAt: Date }> {
+    // Create the company
+    const [company] = await db
+      .insert(companies)
+      .values({ name })
+      .returning();
+
+    // Add user as EIER of the new company
+    await this.addUserToCompany(userId, company.id, 'EIER');
+
+    return company;
   }
 
   async getSuggestedPrice(carId: string, userId: string): Promise<PriceSuggestion> {

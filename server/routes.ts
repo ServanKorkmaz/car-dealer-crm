@@ -1124,6 +1124,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Company management routes
+  app.get('/api/companies/user', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      const companies = await storage.getUserCompanies(userId);
+      res.json(companies);
+    } catch (error: any) {
+      console.error('Error getting user companies:', error);
+      res.status(500).json({ message: error.message || 'Failed to get companies' });
+    }
+  });
+
+  app.post('/api/companies', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name } = req.body;
+      
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ message: 'Company name is required' });
+      }
+
+      const storage = await storagePromise;
+      const company = await storage.createNewCompany(name.trim(), userId);
+      res.status(201).json(company);
+    } catch (error: any) {
+      console.error('Error creating company:', error);
+      res.status(500).json({ message: error.message || 'Failed to create company' });
+    }
+  });
+
+  app.post('/api/companies/switch', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { companyId } = req.body;
+      
+      if (!companyId) {
+        return res.status(400).json({ message: 'Company ID is required' });
+      }
+
+      const storage = await storagePromise;
+      const hasAccess = await storage.switchActiveCompany(userId, companyId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied to this company' });
+      }
+
+      res.json({ success: true, message: 'Company switched successfully' });
+    } catch (error: any) {
+      console.error('Error switching company:', error);
+      res.status(500).json({ message: error.message || 'Failed to switch company' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

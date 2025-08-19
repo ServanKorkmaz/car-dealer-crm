@@ -14,6 +14,7 @@ import Cars from "@/pages/Cars";
 import CarDetail from "@/pages/CarDetail";
 import Customers from "@/pages/Customers";
 import CustomerProfile from "@/pages/CustomerProfile";
+import { CustomerProfilePage } from "@/pages/CustomerProfilePage";
 import Contracts from "@/pages/Contracts";
 
 // Database configuration - easily switch between Replit DB and Supabase
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/cars/:id" component={CarDetail} />
       <Route path="/customers" component={Customers} />
       <Route path="/customers/:id" component={CustomerProfile} />
+      <Route path="/customers/:id/profile" component={CustomerProfilePage} />
       <Route path="/contracts" component={Contracts} />
       <Route path="/activities" component={Activities} />
       <Route component={NotFound} />

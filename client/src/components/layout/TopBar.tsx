@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import AddCarModal from "@/components/cars/AddCarModal";
 import CustomerForm from "@/components/customers/CustomerForm";
+import { CompanySwitcher } from "./CompanySwitcher";
 import { Plus, UserPlus } from "lucide-react";
 
 export default function TopBar() {
@@ -11,8 +12,11 @@ export default function TopBar() {
   return (
     <>
       <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
-        <div className="flex items-center justify-end">
-          {/* Quick Actions */}
+        <div className="flex items-center justify-between">
+          {/* Left side - Company Switcher */}
+          <CompanySwitcher />
+          
+          {/* Right side - Quick Actions */}
           <div className="flex items-center space-x-3">
             <Button
               onClick={() => setShowAddCar(true)}
