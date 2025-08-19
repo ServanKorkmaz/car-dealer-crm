@@ -19,11 +19,30 @@ export default function Contracts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showGenerator, setShowGenerator] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
+  const [prefilledData, setPrefilledData] = useState<{customerId?: string, carId?: string} | null>(null);
 
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
   const canDelete = useCanDelete();
+
+  // Check URL parameters for pre-filled contract data
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const customerId = params.get('customerId');
+    const carId = params.get('carId');
+    const shouldPrefill = params.get('prefill') === 'true';
+    
+    if (shouldPrefill && customerId && carId) {
+      setPrefilledData({ customerId, carId });
+      setShowGenerator(true);
+      
+      // Clean up URL parameters
+      const url = new URL(window.location.href);
+      url.search = '';
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
 
   // Fetch customers for signing modal
   const { data: customers = [] } = useQuery<Customer[]>({
@@ -381,9 +400,11 @@ export default function Contracts() {
       {(showGenerator || editingContract) && (
         <EnhancedContractGenerator
           contract={editingContract}
+          prefilledData={prefilledData}
           onClose={() => {
             setShowGenerator(false);
             setEditingContract(null);
+            setPrefilledData(null);
           }}
         />
       )}

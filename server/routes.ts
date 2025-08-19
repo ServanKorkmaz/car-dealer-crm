@@ -1248,6 +1248,11 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
         if (isCommand && /(innstillinger|team)/i.test(t))return { kind: "OPEN", page: "#/settings/team" };
         if (isCommand && /(varsler|aktiviteter)/i.test(t))return { kind: "OPEN", page: "#/activities" };
 
+        // Contract creation command
+        if (/(opprett|lag|ny).*kontrakt.*med/i.test(t)) {
+          return { kind: "CREATE_CONTRACT", command: q };
+        }
+
         // Data Q&A (prefer answering)
         if (/(pris(en)? på|hva koster)/i.test(t) && regJoin)           return { kind: "CAR_PRICE", reg: regJoin };
         if (/(er).*?(solgt|tilgjengelig|status)/i.test(t) && regJoin)  return { kind: "CAR_STATUS", reg: regJoin };
@@ -1338,6 +1343,33 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
         case "COUNT_AVAILABLE": {
           const n = await tools.countAvailable(userHints.companyId);
           return res.json({ reply: `Du har **${n}** biler til salgs akkurat nå.` });
+        }
+
+        case "CREATE_CONTRACT": {
+          const result = await tools.parseContractCreationCommand(intent.command || "", userHints);
+          
+          if (result.error) {
+            return res.json({ reply: result.error });
+          }
+          
+          if (result.success) {
+            const params = new URLSearchParams({
+              customerId: result.customer.id,
+              carId: result.car.id,
+              prefill: 'true'
+            });
+            
+            return res.json({
+              reply: `Perfekt! Jeg fant kunde **${result.customer.name}** og bil **${result.car.make} ${result.car.model}** (${result.car.registrationNumber}). Åpner kontraktskjema...`,
+              tool: { 
+                name: "open", 
+                page: `#/contracts?${params.toString()}`, 
+                auto: true 
+              }
+            });
+          }
+          
+          return res.json({ reply: "Noe gikk galt ved tolkning av kommandoen." });
         }
 
         case "UNSIGNED_CONTRACTS": {

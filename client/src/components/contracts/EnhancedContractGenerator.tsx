@@ -51,6 +51,7 @@ import {
 interface EnhancedContractGeneratorProps {
   onClose: () => void;
   contract?: Contract | null;
+  prefilledData?: {customerId?: string, carId?: string} | null;
 }
 
 // Contract form schema with enhanced validation
@@ -123,7 +124,7 @@ const contractTemplates = {
   },
 };
 
-export default function EnhancedContractGenerator({ onClose, contract }: EnhancedContractGeneratorProps) {
+export default function EnhancedContractGenerator({ onClose, contract, prefilledData }: EnhancedContractGeneratorProps) {
   const [previewMode, setPreviewMode] = useState(false);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -137,14 +138,14 @@ export default function EnhancedContractGenerator({ onClose, contract }: Enhance
   
   const availableCars = (cars as Car[]).filter((car: Car) => car.status === "available" || car.id === contract?.carId);
 
-  // Form setup
+  // Form setup with prefill support
   const form = useForm<ContractForm>({
     resolver: zodResolver(contractFormSchema),
     defaultValues: {
       contractNumber: contract?.contractNumber || `KONTRAKT-${Date.now()}`,
       contractTemplate: (contract as any)?.contractTemplate || "privatsalg",
-      carId: contract?.carId || "",
-      customerId: contract?.customerId || "",
+      carId: contract?.carId || prefilledData?.carId || "",
+      customerId: contract?.customerId || prefilledData?.customerId || "",
       salePrice: contract?.salePrice?.toString() || "0",
       saleDate: contract ? new Date(contract.saleDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
       status: contract?.status || "draft",
@@ -171,6 +172,29 @@ export default function EnhancedContractGenerator({ onClose, contract }: Enhance
   const watchedValues = form.watch();
   const currentTemplate = watchedValues.contractTemplate;
   const currentAddOns = watchedValues.addOns || [];
+
+  // Handle prefilled data
+  useEffect(() => {
+    if (prefilledData?.carId && cars.length > 0) {
+      const car = cars.find((c: Car) => c.id === prefilledData.carId);
+      if (car) {
+        setSelectedCar(car);
+        // Update sale price based on car
+        if (car.salePrice && !contract) {
+          form.setValue('salePrice', car.salePrice.toString());
+        }
+      }
+    }
+  }, [prefilledData?.carId, cars, form, contract]);
+
+  useEffect(() => {
+    if (prefilledData?.customerId && customers.length > 0) {
+      const customer = customers.find((c: Customer) => c.id === prefilledData.customerId);
+      if (customer) {
+        setSelectedCustomer(customer);
+      }
+    }
+  }, [prefilledData?.customerId, customers]);
 
   // Update selected entities when form values change
   useEffect(() => {
