@@ -1,0 +1,165 @@
+Title: PowerOffice Go integration for ForhandlerPRO (end‑to‑end)
+
+Objective
+Build a robust accounting integration with PowerOffice Go (PO Go) so a car sale contract in ForhandlerPRO can be turned into an order/invoice in PO Go with correct VAT/accounts, and payment status flows back into ForhandlerPRO. No double entry.
+
+Context (existing app)
+- Stack: React frontend + Node/TypeScript backend with Drizzle ORM and Supabase (auth + DB).
+- Entities: customers, cars, contracts, add‑ons (e.g., registreringsavgift), workshop (optional later).
+- Contract page (“Ny kontrakt”) already calculates gross profit and supports add‑ons and e‑sign (stub).
+
+Non‑Goals (for MVP)
+- Don’t replace existing flows; add PO Go as an optional provider.
+- Don’t implement full workshop/payroll syncing yet (prepare hooks).
+
+High‑Level Features (MVP)
+1) OAuth2 connect/disconnect to PowerOffice Go; secure token storage (access/refresh).
+2) Customer sync: Upsert customer to PO Go on demand (create or update).
+3) Product/Item sync:
+   - Car = item (SKU = VIN or REGNR; name includes make/model/year).
+   - Add‑ons/services/parts = items with correct VAT code and account mapping.
+4) Contract → Order:
+   - From the contract page, “Send til PowerOffice Go” creates an **Order** in PO Go with contract lines.
+5) “Invoice now”:
+   - Convert order to **Invoice** in PO Go; store invoiceId and link back on the contract.
+6) Payment status:
+   - Ingest payment status (webhook if available, else poll) and show badges in ForhandlerPRO: Draft / Order / Invoiced / Sent / Partially paid / Paid / Overdue.
+7) Settings UI (Regnskap):
+   - Connect/disconnect OAuth, show current connection.
+   - Mapping tables for VAT codes and GL accounts per category (Car, AddOn, Parts, Labor, Fees).
+   - Defaults: payment terms (days), project/department, invoice delivery channel.
+8) Sync Monitor:
+   - Table with last 50 syncs (entity, action, status, message, retry).
+
+Security & Reliability
+- Encrypt tokens at rest; never log secrets.
+- Idempotency: use the local contractId as externalRef on all PO Go payloads.
+- Retry with exponential backoff for 5xx/network; dead‑letter queue for manual retry.
+- Validate all mappings before sending; fail fast with clear UI error.
+
+Environment Variables (placeholder names)
+- POWEROFFICEGO_CLIENT_ID
+- POWEROFFICEGO_CLIENT_SECRET
+- POWEROFFICEGO_REDIRECT_URI
+- POWEROFFICEGO_BASE_URL (prod/sandbox)
+- APP_BASE_URL (for OAuth callback)
+
+Database (Supabase) — create new tables
+- accounting_settings
+  - id (uuid pk), user_id/org_id (fk), provider enum ('powerofficego')
+  - project_code text, department_code text, default_payment_terms int
+  - is_connected boolean, created_at, updated_at
+- accounting_vat_map
+  - id, org_id, provider, category enum('car','addon','part','labor','fee'), local_vat_label text, remote_vat_code text
+- accounting_account_map
+  - id, org_id, provider, category, income_account text, cogs_account text, inventory_account text, fee_account text
+- accounting_links
+  - id, org_id, provider, entity_type enum('customer','item','contract','order','invoice','payment'),
+    local_id uuid, remote_id text, unique(provider, entity_type, local_id)
+- sync_queue
+  - id, org_id, job_type text, payload jsonb, status enum('queued','running','failed','done'), attempts int, last_error text, created_at, updated_at
+- sync_log
+  - id, org_id, provider, entity_type, local_id, action, status, message text, created_at
+
+RLS: Restrict rows by org_id/user_id like existing tables.
+
+Backend Architecture
+- Introduce an AccountingProvider interface:
+  - upsertCustomer(localCustomer) -> {remoteId}
+  - upsertItem(localItem) -> {remoteId}
+  - createOrderFromContract(contractId) -> {orderId, url}
+  - invoiceOrder(orderId) -> {invoiceId, url}
+  - getInvoiceStatus(invoiceId) -> {status, paidAmount, dueDate}
+  - listPayments(since?) -> [payments]
+- Implement PowerOfficeGoProvider using official API (consult PO Go docs for endpoints/fields).
+- OAuth2 routes:
+  - GET /api/accounting/pogo/connect → redirect to PO Go auth
+  - GET /api/accounting/pogo/callback → exchange code, store tokens (encrypted), mark is_connected=true
+  - POST /api/accounting/pogo/disconnect → revoke tokens, is_connected=false
+- Sync routes:
+  - POST /api/accounting/pogo/send-order (body: {contractId})
+  - POST /api/accounting/pogo/invoice (body: {contractId})  // or by orderId
+- Webhook (if available):
+  - POST /api/accounting/pogo/webhook → verify signature, handle payment/invoice status events
+- Poller (fallback):
+  - CRON/worker checks invoices updated since last run and updates statuses.
+- Worker:
+  - Processes sync_queue with idempotency and retries; writes to sync_log.
+
+Mapping Rules
+- Customer:
+  - Match by orgnr (if B2B), else email/phone; otherwise create.
+  - Store remoteId in accounting_links.
+- Item categories:
+  - Car: SKU = VIN or REGNR. Name: “{year} {make} {model} ({REGNR})”.
+  - AddOn/Part/Labor/Fee: create items as needed; tag with category to pick correct VAT/account mapping.
+- Accounts & VAT:
+  - Use accounting_vat_map + accounting_account_map to set VAT code and ledger accounts per line.
+  - If mapping missing → block send and show actionable error with link to settings.
+- Contract → Order payload:
+  - Lines include: car (qty=1, unit price = sales price), add‑ons/services (qty, price).
+  - Include project/department if configured.
+  - externalRef = contractId for idempotency.
+- Order → Invoice:
+  - When “Invoice now” is clicked, convert order to invoice; store invoiceId and link.
+- Payments:
+  - On payment event or poll, update contract status and show paid/remaining; write sync_log.
+
+Frontend (React) — new/updated views
+1) Settings → Regnskap
+   - “Koble til PowerOffice Go” button (connect/disconnect).
+   - Status card showing connected org, last sync, and a “Test connection” action.
+   - Mapping editor:
+     - VAT map: rows per category (Car, AddOn, Parts, Labor, Fee) → remote VAT code selector (fetched from PO Go).
+     - Account map: per category → income, cogs, inventory/fee accounts (fetched).
+   - Defaults: payment terms (14/30), project, department, invoice channel.
+   - Save, reset, and validate buttons; show inline validation errors.
+2) Contract page (“Ny kontrakt”)
+   - New primary button: “Send til PowerOffice Go”
+     - Disabled until validation passes (customer, car, mappings, connection).
+     - On success: toast “Ordre #XXXX opprettet i PowerOffice Go” + link.
+   - “Fakturer nå” button appears when order exists.
+   - Status badge (PO Go): Draft / Order / Invoiced / Sent / Partially paid / Paid / Overdue.
+   - Side panel shows: OrderId, InvoiceId, last sync, payment status.
+3) Customer profile
+   - “PowerOffice Go ID” (read‑only) and “Synk kunde” action.
+4) Sync Monitor
+   - Table with last 50 syncs: time, entity, action, status, message, retry button on failures.
+
+UX & Copy
+- Success toast: “Sendt til PowerOffice Go ✔”
+- Error toast: “Mangler MVA‑mapping for ‘AddOn’. Gå til Regnskap → Mapping.”
+- Inline loading states and disabled actions during sync.
+- Never block UI while polling; show small live badge.
+
+Testing
+- Unit: payload builders (customer, item, order, invoice) with fixture data; mapping resolver; idempotency (externalRef).
+- E2E (mocked API): 
+  - Create contract → Send → Order created.
+  - Invoice now → Invoice created.
+  - Payment webhook → status becomes Paid.
+- Settings validation tests (missing mapping prohibits send).
+
+Telemetry & Logging
+- Log (info/error) with entity, localId, action, providerResponseCode (no PII).
+- Add simple metrics counters: orders_sent, invoices_created, payments_synced, sync_failures.
+
+Acceptance Criteria (must pass)
+1) A contract with car + one add‑on becomes an Order in PO Go with correct VAT and accounts.
+2) “Invoice now” produces an Invoice in PO Go; ForhandlerPRO stores invoiceId and displays a link.
+3) When a payment is registered in PO Go, ForhandlerPRO shows “Betalt” within 5 minutes (webhook or poller).
+4) If a VAT/account mapping is missing, the action is blocked with a clear error and a deep‑link to the mapping page.
+5) All sync operations are idempotent: re‑clicking “Send til PowerOffice Go” does not duplicate orders/invoices.
+6) Sync Monitor lists recent operations and lets me retry failed jobs.
+7) Tokens are stored encrypted; disconnect revokes access and clears local connection state.
+
+Deliverables
+- Backend: PowerOfficeGoProvider + routes, worker, webhook/poller, migrations for new tables, tests.
+- Frontend: Settings (Regnskap), Contract page actions & badges, Customer profile field, Sync Monitor.
+- README: where code lives, how to configure env vars, how to add new item categories, and how to extend to credit notes and workshop hours.
+- A demo script (steps) to verify all acceptance criteria.
+
+Notes to implementer
+- Consult the official PowerOffice Go API docs for OAuth scopes, endpoints, and field names. Adapt payload builders accordingly.
+- Prefer typed SDK wrappers or lightweight fetch with strict TypeScript types.
+- Keep provider‑agnostic interfaces so future providers (Tripletex, Uni, etc.) can plug in with minimal UI changes.
