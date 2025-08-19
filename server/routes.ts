@@ -1289,11 +1289,20 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
 
       // Handle the new intent system - Answer first, offer confirm to open
       switch (intent.kind) {
-        case "OPEN":
+        case "OPEN": {
+          let pageName = "siden";
+          if (intent.page?.includes("cars")) pageName = "**Biler**";
+          else if (intent.page?.includes("customers")) pageName = "**Kunder**";
+          else if (intent.page?.includes("contracts")) pageName = "**Kontrakter**";
+          else if (intent.page?.includes("activities")) pageName = "**Aktiviteter**";
+          else if (intent.page?.includes("settings")) pageName = "**Innstillinger**";
+          else if (intent.page?.includes("dashboard")) pageName = "**Dashboard**";
+          
           return res.json({ 
-            reply: `Åpner ${intent.page?.includes("cars") ? "**Biler**" : intent.page}.`, 
+            reply: `Åpner ${pageName}.`, 
             tool: { name: "open", page: intent.page || "#/dashboard", auto: true } 
           });
+        }
 
         case "CAR_PRICE": {
           const car = await tools.getCarByReg(intent.reg || "", userHints);
@@ -1301,7 +1310,7 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
           const pris = car.salePrice != null ? `${Number(car.salePrice).toLocaleString("no-NO")} kr` : "ukjent";
           return res.json({
             reply: `**${car.brand ?? ""} ${car.model ?? ""} ${car.year ?? ""}** (${car.registration ?? intent.reg}) – salgspris: **${pris}**.`,
-            tool: { name: "open", page: "#/cars", params: { modal: "edit", id: car.id, tab: "pricing" }, auto: false, label: "Åpne bilen i Rediger" }
+            tool: { name: "open", page: "#/cars", params: { modal: "edit", id: car.id, tab: "pricing" }, auto: false, label: "Rediger bil" }
           });
         }
 
@@ -1312,7 +1321,7 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
           const alder = `${car.daysOnLot ?? "?"} dager på lager`;
           return res.json({
             reply: `**${car.brand ?? ""} ${car.model ?? ""} ${car.year ?? ""}** (${car.registration ?? intent.reg}) – status: **${status}** (${alder}).`,
-            tool: { name: "open", page: "#/cars", params: { modal: "edit", id: car.id }, auto: false, label: "Åpne bilen" }
+            tool: { name: "open", page: "#/cars", params: { modal: "edit", id: car.id }, auto: false, label: "Vis bil" }
           });
         }
 
@@ -1322,7 +1331,7 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
           const price = row.sale_price != null ? `${Number(row.sale_price).toLocaleString("no-NO")} kr` : "ukjent";
           return res.json({
             reply: `Dyraste solgte ${intent.brand ?? "bil"}: **${row.brand ?? ""} ${row.model ?? ""} ${row.year ?? ""}** – **${price}**.`,
-            tool: { name: "open", page: "#/contracts", auto: false, label: "Åpne Kontrakter" }
+            tool: { name: "open", page: "#/contracts", auto: false, label: "Vis kontrakter" }
           });
         }
 
@@ -1338,7 +1347,7 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
             : "Ingen usignerte kontrakter 🎉";
           return res.json({ 
             reply, 
-            tool: { name: "open", page: "#/activities", auto: false, label: "Åpne Aktiviteter" } 
+            tool: { name: "open", page: "#/contracts", auto: false, label: "Vis kontrakter" } 
           });
         }
 
