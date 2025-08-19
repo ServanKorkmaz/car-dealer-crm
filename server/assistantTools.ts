@@ -213,22 +213,45 @@ export async function parseContractCreationCommand(command: string, hints: UserH
   try {
     const storage = await storagePromise;
     
-    // Parse customer name (first quoted name or name after "med")
-    const customerMatch = command.match(/med\s+([A-ZÆØÅ][a-zæøå]+(?:\s+[A-ZÆØÅ][a-zæøå]+)*)/i) ||
-                         command.match(/"([^"]+)"/) ||
-                         command.match(/kunde[n]?\s+([A-ZÆØÅ][a-zæøå]+(?:\s+[A-ZÆØÅ][a-zæøå]+)*)/i);
+    // Parse customer name - more flexible patterns with better boundaries
+    // Stop at keywords like "på", "med telefon", "tlf", etc.
+    let customerName: string | undefined;
     
-    const customerName = customerMatch?.[1]?.trim();
+    // Try pattern: "til [Name]" (stop at comma or "på")
+    let match = command.match(/til\s+([^,]+?)(?:,|\s+på\s+|$)/i);
+    if (match) {
+      customerName = match[1].trim();
+      // Clean up if it contains phone keywords
+      customerName = customerName.split(/\s+(?:telefon|tlf|mob|nummer)/i)[0].trim();
+    }
     
-    // Parse phone number (8 digits, optionally with spaces/dashes)
-    const phoneMatch = command.match(/(?:telefon|tlf|mob|nummer|phone)[\w\s]*?(\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d[\s-]?\d)/i) ||
-                      command.match(/(\d{8})/);
+    // Try pattern: "med [Name]" (stop at comma or "på")
+    if (!customerName) {
+      match = command.match(/med\s+([^,]+?)(?:,|\s+på\s+|\s+telefon|\s+tlf|$)/i);
+      if (match) {
+        customerName = match[1].trim();
+        // Clean up if it contains phone keywords
+        customerName = customerName.split(/\s+(?:telefon|tlf|mob|nummer)/i)[0].trim();
+      }
+    }
     
-    const phoneNumber = phoneMatch?.[1]?.replace(/[\s-]/g, '');
+    // Try quoted name
+    if (!customerName) {
+      match = command.match(/"([^"]+)"/);
+      if (match) {
+        customerName = match[1].trim();
+      }
+    }
     
-    // Parse car registration (2 letters + 5 digits format)
-    const carMatch = command.match(/(?:bil|regnr|reg|registrering)[\w\s]*?([A-Z]{2}[\s-]?\d{5})/i) ||
-                    command.match(/([A-Z]{2}[\s-]?\d{5})/);
+    // Parse phone number - handle spaces better (e.g., "900 00 000" or "90000000")
+    const phoneMatch = command.match(/(?:telefon|tlf|mob|nummer|phone)[\s:]*(\d+(?:\s+\d+)*)/i) ||
+                      command.match(/(\d{8,})/);
+    
+    const phoneNumber = phoneMatch?.[1]?.replace(/\s+/g, '');
+    
+    // Parse car registration - Norwegian format (2 letters + 5 digits)
+    const carMatch = command.match(/(?:bil|regnr|reg|registrering)[\s:]*([A-Z]{2}[\s-]?\d{5})/i) ||
+                    command.match(/([A-Z]{2}[\s-]?\d{5})/i);
     
     const carRegistration = carMatch?.[1]?.replace(/[\s-]/g, '').toUpperCase();
     
@@ -257,31 +280,33 @@ export async function parseContractCreationCommand(command: string, hints: UserH
     );
     
     if (!customer && phoneNumber) {
-      // Create new customer
+      // Create new customer with proper structure
       const newCustomer = {
-        id: crypto.randomUUID(),
         name: customerName,
-        createdAt: new Date(),
-        companyId: hints.companyId || 'default-company',
-        updatedAt: new Date(),
         email: '',
-        userId: hints.userId || 'system',
         phone: phoneNumber,
-        organizationNumber: null,
         address: '',
         type: 'PRIVAT' as const,
-        gdprConsent: true,
-        gdprConsentAt: new Date(),
         notes: 'Opprettet automatisk fra assistent'
       };
       
-      await storage.createCustomer(newCustomer);
-      customer = newCustomer;
+      // createCustomer will add the proper fields
+      const createdCustomer = await storage.createCustomer(newCustomer as any);
+      customer = createdCustomer;
     }
     
     if (!customer) {
+      // If no phone number provided, ask for it
+      if (!phoneNumber) {
+        return { 
+          error: `Hva er telefonnummeret til ${customerName}?`,
+          needsPhone: true,
+          customerName,
+          carRegistration
+        };
+      }
       return { 
-        error: `Kunde "${customerName}" finnes ikke. ${phoneNumber ? 'Legg til telefonnummer for å opprette ny kunde automatisk.' : 'Skriv full kommando med telefonnummer: "Opprett kontrakt med John Doe, telefon 12345678, på bil AB12345"'}`
+        error: `Kunde "${customerName}" finnes ikke og kunne ikke opprettes. Sjekk at telefonnummeret er korrekt.`
       };
     }
     

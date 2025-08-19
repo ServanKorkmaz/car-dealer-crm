@@ -1,0 +1,42 @@
+Goal: Natural-language → prefilled “Ny kontrakt” form.
+
+User example:
+"Opprett en kontrakt med Servan Korkmaz, med telefonnnummer 41383322, på bil SV33419"
+
+Requirements:
+1) Intent & entities
+   - Detect {customer_name}, {phone}, {regnr}. Support variants (navn først/sist, tlf med/uten mellomrom).
+   - If any missing, ask a short follow‑up in chat (one clarifying question max).
+
+2) Data access (Supabase/DB)
+   - Customer: find by (phone) OR (name+phone). If not exists → create.
+   - Car: find by registration_number (e.g. “SV33419”). If not found → return friendly error in chat and do NOT open form.
+
+3) Prefill Contract UI (Contract Create Modal/Page)
+   - Open the “Ny kontrakt” view.
+   - Set selected customer = found/created customer.
+   - Set selected car = found car.
+   - Keep auto contract no. + date as is.
+   - Leave price/fees unchanged unless provided in prompt.
+   - Do not trigger e‑sign yet.
+
+4) UX & errors
+   - Show a concise toast/state message: “Kontrakt forhåndsutfylt for {name} – {regnr}”.
+   - Robust against duplicate clicks and slow network.
+   - Log failures to console with context.
+
+5) Architecture preferences (you choose the libs)
+   - Keep parsing modular: `extractContractEntities(text) -> {name, phone, regnr, missing:[]}`.
+   - Keep data ops modular: `upsertCustomer({name, phone})`, `getCarByRegnr(regnr)`.
+   - Keep UI bridge modular: `prefillContractForm({customerId, carId})`.
+   - Write light unit tests for the extractor (3–5 cases).
+
+6) Acceptance tests (must pass)
+   - A) Exact example above → customer created/selected, car SV33419 selected, modal prefilled.
+   - B) “Opprett kontrakt på bil SV33419 til Ola Normann, tlf 900 00 000” → same result.
+   - C) Unknown regnr → chat: “Fant ikke bil med regnr …”, nothing prefilled.
+   - D) Missing phone → ask one follow‑up; after reply, continue flow.
+
+Deliverables:
+- Implementations + minimal tests.
+- Short README note: where parsing/data/UI code lives and how to extend with price, add‑ons, e‑sign later.

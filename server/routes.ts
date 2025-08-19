@@ -1248,8 +1248,8 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
         if (isCommand && /(innstillinger|team)/i.test(t))return { kind: "OPEN", page: "#/settings/team" };
         if (isCommand && /(varsler|aktiviteter)/i.test(t))return { kind: "OPEN", page: "#/activities" };
 
-        // Contract creation command
-        if (/(opprett|lag|ny).*kontrakt.*med/i.test(t)) {
+        // Contract creation command - support more variations
+        if (/(opprett|lag|ny).*kontrakt.*(med|til|på)/i.test(t)) {
           return { kind: "CREATE_CONTRACT", command: q };
         }
 
@@ -1348,6 +1348,18 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
         case "CREATE_CONTRACT": {
           const result = await tools.parseContractCreationCommand(intent.command || "", userHints);
           
+          if ((result as any).needsPhone) {
+            // Store context for follow-up
+            return res.json({ 
+              reply: result.error,
+              context: {
+                waitingFor: 'phone',
+                customerName: (result as any).customerName,
+                carRegistration: (result as any).carRegistration
+              }
+            });
+          }
+          
           if (result.error) {
             return res.json({ reply: result.error });
           }
@@ -1360,7 +1372,7 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
             });
             
             return res.json({
-              reply: `Perfekt! Jeg fant kunde **${result.customer.name}** og bil **${result.car.make} ${result.car.model}** (${result.car.registrationNumber}). Åpner kontraktskjema...`,
+              reply: `Kontrakt forhåndsutfylt for **${result.customer.name}** – **${result.car.registrationNumber}**. Åpner kontraktskjema...`,
               tool: { 
                 name: "open", 
                 page: `#/contracts?${params.toString()}`, 

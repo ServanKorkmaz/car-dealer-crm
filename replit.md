@@ -122,6 +122,16 @@ The database uses PostgreSQL with the following main entities:
 
 ## Recent Changes (2025-08-19)
 
+### ✅ Natural Language Contract Creation System (COMPLETE)
+- **Intelligent Command Parsing**: Parse commands like "Opprett kontrakt på bil PR52981 til Ola Normann, tlf 900 00 000"
+- **Flexible Entity Extraction**: Handles multiple Norwegian patterns ("til", "med", "på") with smart boundaries
+- **Auto Customer Creation**: Creates new customer if not exists when phone number provided
+- **Car Validation**: Validates car exists in database before proceeding
+- **Smart Pre-filling**: Contract form automatically filled with customer, car, and sale price
+- **Follow-up Questions**: Asks for missing information (e.g., phone number) when needed
+- **URL Parameter Handling**: Contracts page detects prefill params and opens form automatically
+- **Robust Error Handling**: Clear Norwegian error messages for missing cars or failed operations
+
 ### ✅ Enhanced ForhandlerPRO AI Assistant with Answer-First Logic (COMPLETE)
 - **Answer-First Intent System**: New logic distinguishes between questions (provide data answers) vs commands (navigate immediately)
 - **Confirm Button Navigation**: Non-auto tools display confirm buttons instead of auto-opening pages for better UX
