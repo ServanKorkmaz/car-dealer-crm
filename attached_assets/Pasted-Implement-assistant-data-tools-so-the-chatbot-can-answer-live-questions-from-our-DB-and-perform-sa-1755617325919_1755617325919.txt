@@ -1,0 +1,162 @@
+Implement assistant "data tools" so the chatbot can answer live questions from our DB and perform safe actions.
+
+## 1) Supabase SQL (run as migration)
+-- Fast helper view for assistants (read only via RLS)
+-- Make sure cars_secure already exposes: id, registration, status, sale_price, created_at, brand, model, year
+-- If not, alter the view accordingly.
+
+-- Optional helper function: days_on_lot (computed in SQL)
+create or replace view cars_secure_with_age as
+select
+  id, company_id, registration, status, sale_price, brand, model, year, created_at,
+  (current_date - created_at::date) as days_on_lot
+from cars_secure;
+
+-- Followups insert is already protected by RLS on followups table.
+
+
+## 2) Server: create a tiny "tools" module the assistant can call
+Create file: src/server/assistantTools.ts (or /lib/server/assistantTools.ts)
+
+export type UserHints = { role?: "EIER"|"SELGER"|"REGNSKAP"|"VERKSTED"; companyId?: string; userId?: string };
+
+import { createClient } from "@supabase/supabase-js";
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+
+export async function getCarByReg(reg: string, hints: UserHints) {
+  const { data, error } = await supabase
+    .from("cars_secure_with_age")
+    .select("id, registration, status, sale_price, brand, model, year, days_on_lot")
+    .ilike("registration", `%${reg}%`)
+    .limit(1);
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
+
+export async function getMostExpensiveSold(filterBrand: string | null, hints: UserHints) {
+  let q = supabase
+    .from("cars_secure")  // if you store sold units in cars with status='Solgt'; else join contracts
+    .select("id, registration, sale_price, brand, model, year, status")
+    .ilike("status", "%solgt%")
+    .order("sale_price", { ascending: false })
+    .limit(1);
+  if (filterBrand) q = q.ilike("brand", filterBrand);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
+
+export async function getUnsignedContracts(hints: UserHints) {
+  const { data, error } = await supabase
+    .from("contracts")
+    .select("id, customer_id, car_id, status, created_at")
+    .neq("status", "Signert")
+    .order("created_at", { ascending: true })
+    .limit(10);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function searchCustomerByName(name: string, hints: UserHints) {
+  const { data, error } = await supabase
+    .from("customers")
+    .select("id, name, email, phone")
+    .ilike("name", `%${name}%`)
+    .limit(5);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createFollowup(customerId: string, dueISO: string, note: string, hints: UserHints) {
+  const payload = {
+    company_id: hints.companyId!,
+    customer_id: customerId,
+    user_id: hints.userId!,
+    due_date: dueISO.slice(0,10),
+    note,
+    status: "OPEN"
+  };
+  const { data, error } = await supabase.from("followups").insert(payload).select("id, due_date, note").single();
+  if (error) throw error;
+  return data;
+}
+
+
+## 3) Update /api/assistant to use these tools before/after LLM
+- Add intents for:
+  CAR_PRICE, CAR_STATUS (regnr),
+  MOST_EXPENSIVE (optional brand),
+  UNSIGNED_CONTRACTS,
+  CREATE_FOLLOWUP (e.g., "lag oppfølging for Kaiwan i morgen: ring om pris"),
+  FIND_CUSTOMER (name).
+
+- Call assistantTools.* and craft short Norwegian replies that respect role masking.
+- Keep the "open" tool JSON to navigate.
+
+Pseudo-changes inside handler:
+
+import * as tools from "@/server/assistantTools";
+
+Add patterns:
+- CAR_PRICE: /(pris(en)? på|hva koster)\s+([a-z]{2}\s?\d{5})/i  -> group 3 = reg
+- MOST_EXPENSIVE: /(dyreste|høyeste pris) (solgte )?(porsche|merke\s+\w+)?/i  -> optional brand
+- CREATE_FOLLOWUP: /(lag|opprett).*oppf(ø|o)lging.*for\s+([^\s]+).*?(i morgen|i dag|den\s+\d{1,2}\.\d{1,2}\.\d{2,4})/i
+- FIND_CUSTOMER: /(kunde|kunder)\s+(som|med)?\s*navn\s+(.+)/i
+
+Then implement:
+
+if (intent.CAR_PRICE) {
+  const car = await tools.getCarByReg(reg, hints);
+  if (!car) return json("Fant ingen bil med regnr **...**.");
+  const p = car.sale_price ? `${Number(car.sale_price).toLocaleString("no-NO")} kr` : "ukjent";
+  return { reply: `Salgspris for **${car.registration}**: **${p}** (status: ${car.status}).`, tool: {name:"open", page:"#/cars", params:{ modal:"edit", id:car.id, tab:"pricing" }}};
+}
+
+if (intent.CAR_STATUS) { ...similar... include days_on_lot: `${car.days_on_lot} dager på lager`. }
+
+if (intent.MOST_EXPENSIVE) {
+  const car = await tools.getMostExpensiveSold(brandOrNull, hints);
+  if (!car) return json("Fant ingen solgte biler enda.");
+  const price = car.sale_price ? `${Number(car.sale_price).toLocaleString("no-NO")} kr` : "ukjent";
+  const b = car.brand ? `${car.brand} ` : "";
+  return { reply: `Dyreste solgte ${brandOrNull || "bil"}: **${b}${car.model} ${car.year}** – **${price}**.`, tool:{name:"open", page:"#/contracts"} };
+}
+
+if (intent.UNSIGNED_CONTRACTS) {
+  const rows = await tools.getUnsignedContracts(hints);
+  const reply = rows.length ? `Usignerte kontrakter: ${rows.map(r=>`#${r.id.slice(0,8)} (${new Date(r.created_at).toLocaleDateString("no-NO")})`).join(", ")}.` : "Ingen usignerte kontrakter.";
+  return { reply, tool:{name:"open", page:"#/activities"} };
+}
+
+if (intent.FIND_CUSTOMER) {
+  const rows = await tools.searchCustomerByName(name, hints);
+  if (!rows.length) return json("Fant ingen kunder med det navnet.");
+  return { reply: `Fant ${rows.length} kunde(r): ${rows.map(k=>k.name).join(", ")}. Skal jeg åpne profilen til ${rows[0].name}?`, tool:{name:"open", page:`#/customers/${rows[0].id}`} };
+}
+
+if (intent.CREATE_FOLLOWUP) {
+  // require logged in + companyId
+  if (!hints?.userId || !hints?.companyId) return json("Jeg trenger at du er innlogget for å lage oppfølging.");
+  // You may need a mapping from display name to customer id; for MVP, try searchCustomerByName
+  const customers = await tools.searchCustomerByName(customerName, hints);
+  if (!customers.length) return json(`Fant ingen kunde som ligner "${customerName}".`);
+  const c = customers[0];
+  const iso = parseNorwegianDateOrRelative("i morgen"/"i dag"/"dd.mm.yyyy");
+  const row = await tools.createFollowup(c.id, iso, note, hints);
+  return { reply: `Oppfølging opprettet for **${c.name}** (${row.due_date}): ${row.note}.`, tool:{name:"open", page:`#/customers/${c.id}`, params:{ tab:"followups" }} };
+}
+
+Keep LLM fallback for everything else, but now answers like "Hvor mye koster SV33419?" and "Hvilken Porsche er den dyreste vi har solgt?" will be handled by tools first.
+
+
+## 4) Privacy & role wording
+- When role ∉ {EIER, REGNSKAP}, never mention innkjøpspris/gross; only show sale_price or generic wording.
+- Do not return raw emails/phones unless user explicitly asks.
+- All Supabase reads are already protected by RLS.
+
+## 5) Acceptance
+- “Hva koster SV33419?” → returns price & link to open edit modal.
+- “Er SV33419 solgt?” → returns status + days-on-lot.
+- “Hvilken Porsche er den dyreste vi har solgt?” → returns a concrete car & opens contracts page.
+- “Hvilke kontrakter mangler signatur?” → short list + opens Aktiviteter.
+- “Lag oppfølging for Kaiwan i morgen: ring om pris” → creates follow-up and opens customer → followups.

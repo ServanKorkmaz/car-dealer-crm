@@ -10,6 +10,8 @@ import { scrapeFinnAd } from "./finn-scraper";
 import { ActivityLogger } from "./activityLogger";
 import { AlertSystem } from "./alerts";
 import OpenAI from "openai";
+import * as tools from "./assistantTools";
+import type { UserHints } from "./assistantTools";
 
 // Initialize OpenAI if API key is available
 const openai = process.env.OPENAI_API_KEY
@@ -1231,6 +1233,24 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
         const t = q.toLowerCase();
         const regMatch = t.match(/\b([a-z]{2}\d{5})\b/i)?.[1];
 
+        // Data queries
+        const carPriceMatch = t.match(/(pris(en)? på|hva koster)\s+([a-z]{2}\s?\d{5})/i);
+        const mostExpensiveMatch = t.match(/(dyreste|høyeste pris) (solgte )?(porsche|merke\s+\w+)?/i);
+        const createFollowupMatch = t.match(/(lag|opprett).*oppf(ø|o)lging.*for\s+([^\s]+).*?(i morgen|i dag|den\s+\d{1,2}\.\d{1,2}\.\d{2,4})/i);
+        const findCustomerMatch = t.match(/(kunde|kunder)\s+(som|med)?\s*navn\s+(.+)/i);
+
+        if (carPriceMatch) return { intent: "CAR_PRICE", reg: carPriceMatch[3].replace(/\s/g, '') };
+        if (mostExpensiveMatch) return { intent: "MOST_EXPENSIVE", brand: mostExpensiveMatch[3] };
+        if (/(usignerte|mangler signatur|ikke signert)/.test(t) && /kontrakt/.test(t)) return { intent: "UNSIGNED_CONTRACTS" };
+        if (createFollowupMatch) return { 
+          intent: "CREATE_FOLLOWUP", 
+          customerName: createFollowupMatch[3],
+          dateStr: createFollowupMatch[4],
+          note: t
+        };
+        if (findCustomerMatch) return { intent: "FIND_CUSTOMER", name: findCustomerMatch[3] };
+
+        // Navigation
         if (/(biler|lager)/.test(t)) return { intent: "OPEN_CARS" };
         if (/(kunder)/.test(t)) return { intent: "OPEN_CUSTOMERS" };
         if (/(kontrakt)/.test(t)) return { intent: "OPEN_CONTRACTS" };
@@ -1261,6 +1281,107 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
       }
 
       const intent = detectIntent(lastMessage);
+      const userHints: UserHints = {
+        role: role as any,
+        companyId: companyId || 'default-company',
+        userId: req.user?.claims?.sub
+      };
+
+      // Data queries with real database lookup
+      if (intent.intent === "CAR_PRICE") {
+        const car = await tools.getCarByReg(intent.reg, userHints);
+        if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg}**.` });
+        
+        const price = car.salePrice 
+          ? `${Number(car.salePrice).toLocaleString("no-NO")} kr` 
+          : "ikke satt";
+        
+        return res.json({
+          reply: `Salgspris for **${car.registration}**: **${price}** (status: ${car.status}).`,
+          ...tool("/cars", { modal: "edit", id: car.id, tab: "pricing" })
+        });
+      }
+
+      if (intent.intent === "CAR_STATUS") {
+        const car = await tools.getCarByReg(intent.reg, userHints);
+        if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg}**.` });
+        
+        const stat = /solgt/i.test(car.status || '') ? "Solgt" : "Tilgjengelig";
+        const daysText = car.daysOnLot > 0 ? ` (${car.daysOnLot} dager på lager)` : "";
+        
+        return res.json({
+          reply: `Bil **${car.registration}** er **${stat}**${daysText}.`,
+          ...tool("/cars", { modal: "edit", id: car.id })
+        });
+      }
+
+      if (intent.intent === "MOST_EXPENSIVE") {
+        const car = await tools.getMostExpensiveSold(intent.brand || null, userHints);
+        if (!car) return res.json({ reply: "Fant ingen solgte biler enda." });
+        
+        const price = car.salePrice 
+          ? `${Number(car.salePrice).toLocaleString("no-NO")} kr` 
+          : "ukjent";
+        const brand = car.brand ? `${car.brand} ` : "";
+        const filterText = intent.brand ? intent.brand : "bil";
+        
+        return res.json({
+          reply: `Dyreste solgte ${filterText}: **${brand}${car.model} ${car.year}** – **${price}**.`,
+          ...tool("/contracts")
+        });
+      }
+
+      if (intent.intent === "UNSIGNED_CONTRACTS") {
+        const contracts = await tools.getUnsignedContracts(userHints);
+        const reply = contracts.length 
+          ? `Usignerte kontrakter: ${contracts.map(c => `#${c.id.slice(0,8)} (${new Date(c.createdAt).toLocaleDateString("no-NO")})`).join(", ")}.`
+          : "Ingen usignerte kontrakter.";
+        
+        return res.json({
+          reply,
+          ...tool("/contracts")
+        });
+      }
+
+      if (intent.intent === "FIND_CUSTOMER") {
+        const customers = await tools.searchCustomerByName(intent.name, userHints);
+        if (!customers.length) return res.json({ reply: `Fant ingen kunder med navnet "${intent.name}".` });
+        
+        const customerList = customers.map(c => c.name).join(", ");
+        const reply = customers.length === 1 
+          ? `Fant kunde: **${customers[0].name}**. Skal jeg åpne profilen?`
+          : `Fant ${customers.length} kunder: ${customerList}. Skal jeg åpne profilen til **${customers[0].name}**?`;
+        
+        return res.json({
+          reply,
+          ...tool(`/customers/${customers[0].id}`)
+        });
+      }
+
+      if (intent.intent === "CREATE_FOLLOWUP") {
+        if (!userHints.userId || !userHints.companyId) {
+          return res.json({ reply: "Jeg trenger at du er innlogget for å lage oppfølging." });
+        }
+        
+        const customers = await tools.searchCustomerByName(intent.customerName, userHints);
+        if (!customers.length) {
+          return res.json({ reply: `Fant ingen kunde som ligner "${intent.customerName}".` });
+        }
+        
+        const customer = customers[0];
+        const dueISO = tools.parseNorwegianDateOrRelative(intent.dateStr);
+        const note = intent.note || "Oppfølging opprettet via assistent";
+        
+        try {
+          const followup = await tools.createFollowup(customer.id, dueISO, note, userHints);
+          return res.json({
+            reply: `Oppfølging opprettet for **${customer.name}** (${followup.dueDate}): ${followup.note}.`,
+            ...tool(`/customers/${customer.id}`, { tab: "followups" })
+          });
+        } catch (error) {
+          return res.json({ reply: "Kunne ikke opprette oppfølging. Prøv igjen senere." });
+        }
+      }
 
       // Quick navigation
       if (intent.intent === "OPEN_CARS")
@@ -1273,17 +1394,6 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
         return res.json({ reply: "Åpner **Innstillinger → Team**.", ...tool("/settings") });
       if (intent.intent === "OPEN_ACTIVITIES")
         return res.json({ reply: "Åpner **Aktiviteter**.", ...tool("/activities") });
-
-      // Car status lookup
-      if (intent.intent === "CAR_STATUS") {
-        const car = await findCarByReg(intent.reg);
-        if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg}**.` });
-        const stat = /solgt/i.test(car.status || '') ? "Solgt" : "Tilgjengelig";
-        return res.json({
-          reply: `Bil **${car.registration}** er **${stat}**.`,
-          ...tool("/cars", { modal: "edit", id: car.id }),
-        });
-      }
 
       // Deterministic how-tos
       if (intent.intent === "PRICE_HELP")

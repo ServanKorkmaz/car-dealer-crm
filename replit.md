@@ -125,11 +125,13 @@ The database uses PostgreSQL with the following main entities:
 ### ✅ ForhandlerPRO AI Assistant Implementation (COMPLETE)
 - **Floating Chat Bubble**: Intelligent assistant bubble at bottom-right with professional UI design
 - **AI-Powered Responses**: Enhanced backend with OpenAI integration for natural language understanding
-- **Intent Recognition**: Smart keyword detection for navigation, car lookups, and common tasks
+- **Intent Recognition**: Smart keyword detection for navigation, car lookups, and complex database queries
+- **Real Data Tools**: Assistant can query live database for car prices, status, expensive sales, contracts
 - **Contextual Navigation**: Tool system that can open specific pages and modals directly
-- **Role-Aware Responses**: Different help content based on user role (EIER, SELGER, etc.)
-- **Real Data Integration**: Assistant can lookup car status by registration number
+- **Role-Aware Responses**: Different help content based on user role (EIER, SELGER, etc.) with field-level security
+- **Live Database Integration**: Real-time lookups of cars, customers, contracts, and follow-up creation
 - **Norwegian Language**: All responses and guidance in Norwegian for local market
+- **Action Capabilities**: Can create follow-ups, search customers, find unsigned contracts
 - **Fallback System**: Works without API key with static responses, enhanced with OpenAI when available
 
 ### ✅ Complete Multi-Tenant Row-Level Security Implementation (ACCEPTANCE CRITERIA MET)
