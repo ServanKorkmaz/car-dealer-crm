@@ -193,21 +193,54 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  // Car operations - now with company isolation and role-based field masking
+  // Car operations - now with company isolation and RLS enforced
   async getCars(userId: string): Promise<Car[]> {
-    // Get user's company
-    const membership = await this.getUserMembership(userId, 'default-company');
-    if (!membership) return [];
-    
-    // Set user context for database functions
+    // Set user context for RLS
     await db.execute(sql`SELECT set_config('app.current_user_id', ${userId}, false)`);
     
-    const results = await db.select().from(cars)
-      .where(and(eq(cars.companyId, membership.companyId)))
-      .orderBy(desc(cars.createdAt));
+    // RLS will automatically filter by company_id
+    const results = await db.execute(sql`
+      SELECT * FROM cars_secure 
+      ORDER BY created_at DESC
+    `);
     
-    // Apply role-based field masking
-    return results.map(car => this.maskSensitiveCarFields(car, membership.role));
+    return results.rows.map(row => this.mapRowToCar(row as any));
+  }
+
+  // Helper method to map raw database row to Car type
+  private mapRowToCar(row: any): Car {
+    return {
+      id: row.id,
+      registrationNumber: row.registration_number,
+      make: row.make,
+      model: row.model,
+      year: row.year,
+      mileage: row.mileage,
+      costPrice: row.cost_price, // Will be null for SELGER/VERKSTED roles
+      salePrice: row.sale_price,
+      profitMargin: row.profit_margin,
+      notes: row.notes,
+      images: row.images,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      userId: row.user_id,
+      color: row.color,
+      fuelType: row.fuel_type,
+      transmission: row.transmission,
+      power: row.power,
+      co2Emissions: row.co2_emissions,
+      lastEuControl: row.last_eu_control,
+      nextEuControl: row.next_eu_control,
+      vehicleClass: row.vehicle_class,
+      soldDate: row.sold_date,
+      soldPrice: row.sold_price,
+      soldToCustomerId: row.sold_to_customer_id,
+      recondCost: row.recond_cost,
+      euControl: row.eu_control,
+      finnUrl: row.finn_url,
+      companyId: row.company_id
+    };
   }
 
   async getCarById(carId: string, userId: string): Promise<Car | undefined> {
@@ -262,15 +295,13 @@ export class DatabaseStorage implements IStorage {
     return (result.rowCount || 0) > 0;
   }
 
-  // Customer operations - now with company isolation  
+  // Customer operations - RLS enforced
   async getCustomers(userId: string): Promise<Customer[]> {
-    // Get user's company
-    const membership = await this.getUserMembership(userId, 'default-company');
-    if (!membership) return [];
+    // Set user context for RLS
+    await db.execute(sql`SELECT set_config('app.current_user_id', ${userId}, false)`);
     
-    return await db.select().from(customers)
-      .where(and(eq(customers.companyId, membership.companyId), eq(customers.userId, userId)))
-      .orderBy(desc(customers.createdAt));
+    // RLS will automatically filter by company_id
+    return await db.select().from(customers).orderBy(desc(customers.createdAt));
   }
 
   async getCustomerById(id: string, userId: string): Promise<Customer | undefined> {
@@ -324,7 +355,11 @@ export class DatabaseStorage implements IStorage {
 
   // Contract operations
   async getContracts(userId: string): Promise<Contract[]> {
-    return await db.select().from(contracts).where(eq(contracts.userId, userId)).orderBy(desc(contracts.createdAt));
+    // Set user context for RLS
+    await db.execute(sql`SELECT set_config('app.current_user_id', ${userId}, false)`);
+    
+    // RLS will automatically filter by company_id
+    return await db.select().from(contracts).orderBy(desc(contracts.createdAt));
   }
 
   async getContractById(id: string, userId: string): Promise<Contract | undefined> {
@@ -353,7 +388,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteContract(id: string, userId: string): Promise<boolean> {
-    const result = await db.delete(contracts).where(and(eq(contracts.id, id), eq(contracts.userId, userId)));
+    // Set user context for RLS
+    await db.execute(sql`SELECT set_config('app.current_user_id', ${userId}, false)`);
+    
+    // RLS will enforce company isolation
+    const result = await db.delete(contracts).where(eq(contracts.id, id));
     return (result.rowCount || 0) > 0;
   }
 

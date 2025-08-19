@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useCanDelete } from "@/hooks/useUserRole";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ export default function Contracts() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
+  const canDelete = useCanDelete();
 
   // Fetch customers for signing modal
   const { data: customers = [] } = useQuery<Customer[]>({
@@ -355,16 +357,18 @@ export default function Contracts() {
                         <Edit className="w-4 h-4" />
                       </Button>
                       
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteMutation.mutate(contract.id)}
-                        disabled={deleteMutation.isPending}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                        data-testid={`button-delete-${contract.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => deleteMutation.mutate(contract.id)}
+                          disabled={deleteMutation.isPending}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          data-testid={`button-delete-${contract.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>

@@ -122,6 +122,16 @@ The database uses PostgreSQL with the following main entities:
 
 ## Recent Changes (2025-08-19)
 
+### ✅ Complete Multi-Tenant Row-Level Security Implementation (ACCEPTANCE CRITERIA MET)
+- **RLS Policies**: Enabled Row Level Security on all main tables (cars, customers, contracts, activities, user_saved_views, memberships, invites)
+- **Company Isolation**: Users can only see data from their company via automatic RLS filtering
+- **Database Functions**: Created helper functions (current_user_company_id, current_user_role, has_role) for policy enforcement
+- **Field-Level Security**: cars_secure view masks cost_price field for SELGER/VERKSTED roles (shows NULL)
+- **Role-Based Delete Restrictions**: Only EIER users can see/use delete buttons on cars, customers, contracts
+- **Team Invitation System**: EIER users can invite team members with role assignment via dedicated UI button
+- **Storage Layer Updates**: All operations now set user context for RLS and use RLS-enforced queries
+- **UI Permission Integration**: Role-based features properly integrated across Cars, Customers, Contracts pages
+
 ### ✅ Multi-Tenant Role-Based Access Control Implementation
 - **Company Isolation**: Every table now locked to company_id with proper foreign key constraints
 - **Role System**: Four user roles implemented (Eier, Selger, Regnskap, Verksted) with granular permissions

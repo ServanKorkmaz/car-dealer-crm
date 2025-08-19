@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useCanDelete } from "@/hooks/useUserRole";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ export default function Customers() {
   const { isAuthenticated, isLoading } = useAuth();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const canDelete = useCanDelete();
 
   // Redirect to home if not authenticated
   useEffect(() => {
