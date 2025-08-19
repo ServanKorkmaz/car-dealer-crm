@@ -122,6 +122,16 @@ The database uses PostgreSQL with the following main entities:
 
 ## Recent Changes (2025-08-19)
 
+### ✅ ForhandlerPRO AI Assistant Implementation (COMPLETE)
+- **Floating Chat Bubble**: Intelligent assistant bubble at bottom-right with professional UI design
+- **AI-Powered Responses**: Enhanced backend with OpenAI integration for natural language understanding
+- **Intent Recognition**: Smart keyword detection for navigation, car lookups, and common tasks
+- **Contextual Navigation**: Tool system that can open specific pages and modals directly
+- **Role-Aware Responses**: Different help content based on user role (EIER, SELGER, etc.)
+- **Real Data Integration**: Assistant can lookup car status by registration number
+- **Norwegian Language**: All responses and guidance in Norwegian for local market
+- **Fallback System**: Works without API key with static responses, enhanced with OpenAI when available
+
 ### ✅ Complete Multi-Tenant Row-Level Security Implementation (ACCEPTANCE CRITERIA MET)
 - **RLS Policies**: Enabled Row Level Security on all main tables (cars, customers, contracts, activities, user_saved_views, memberships, invites)
 - **Company Isolation**: Users can only see data from their company via automatic RLS filtering

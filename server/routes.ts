@@ -1190,7 +1190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assistant endpoint
+  // Enhanced AI Assistant endpoint
   app.post('/api/assistant', authMiddleware, async (req: any, res) => {
     try {
       const { messages, hints } = req.body as {
@@ -1199,82 +1199,144 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const lastMessage = messages?.at(-1)?.content || "";
-      const userRole = hints?.role || "SELGER";
-      
-      // Quick keyword router for common navigation requests
-      const keyword = lastMessage.toLowerCase();
-      const routes: Record<string, any> = {
-        "biler": { name: "open", page: "/cars" },
-        "kunder": { name: "open", page: "/customers" },
-        "kontrakt": { name: "open", page: "/contracts" },
-        "innstillinger": { name: "open", page: "/settings" },
-        "team": { name: "open", page: "/settings" },
-        "prisassistent": { name: "open", page: "/cars", params: { modal: "edit", tab: "pricing" } },
-        "varsler": { name: "open", page: "/activities" },
-        "aktiviteter": { name: "open", page: "/activities" },
-        "dashboard": { name: "open", page: "/" },
-      };
-      
-      // Check for navigation keywords
-      for (const [key, route] of Object.entries(routes)) {
-        if (keyword.includes(key) && (keyword.includes("gå til") || keyword.includes("åpne") || keyword.includes("vis"))) {
-          return res.json({
-            reply: `Åpner ${key} for deg. Er det noe spesielt du lurer på der?`,
-            tool: route
-          });
+      const role = (hints?.role || "SELGER").toUpperCase();
+      const companyId = hints?.activeCompanyId;
+
+      const SYSTEM_PROMPT = `
+Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen (norsk).
+- Svar alltid naturlig, som en ekte kollega.
+- Når bruker spør *hvor/hvordan*: gi eksakt sti (f.eks. "Biler → Rediger → Prisassistent").
+- Bruk korte punkter eller korte avsnitt (ikke lange essays).
+- Når mulig, foreslå å åpne siden og returner tool JSON.
+- Ikke finn på funksjoner. Hvis uklart: si "Jeg er ikke helt sikker".
+- Respekter roller: EIER/REGNSKAP ser kost/brutto. Andre ikke.
+- Bruk app-termer: Biler, Kunder, Kontrakter, Aktiviteter, Dashboard, Innstillinger → Team, Prisassistent, Innbytte, Brutto, Dager på lager, Lagret visning, Varsler.
+`;
+
+      function tool(page: string, params?: any) {
+        return { tool: { name: "open", page, params } };
+      }
+
+      function detectIntent(q: string) {
+        const t = q.toLowerCase();
+        const regMatch = t.match(/\b([a-z]{2}\d{5})\b/i)?.[1];
+
+        if (/(biler|lager)/.test(t)) return { intent: "OPEN_CARS" };
+        if (/(kunder)/.test(t)) return { intent: "OPEN_CUSTOMERS" };
+        if (/(kontrakt)/.test(t)) return { intent: "OPEN_CONTRACTS" };
+        if (/(innstillinger|team|inviter)/.test(t)) return { intent: "OPEN_SETTINGS_TEAM" };
+        if (/(varsler|aktiviteter)/.test(t)) return { intent: "OPEN_ACTIVITIES" };
+        if (/(pris|prisassistent)/.test(t)) return { intent: "PRICE_HELP" };
+        if (/(ny bil|legg til bil)/.test(t)) return { intent: "ADD_CAR" };
+        if (/(ny kunde|opprett kunde)/.test(t)) return { intent: "ADD_CUSTOMER" };
+        if (/(innbytte|trade)/.test(t)) return { intent: "TRADEIN_HELP" };
+        if (/(lagret visning|saved view)/.test(t)) return { intent: "SAVED_VIEWS_HELP" };
+        if (/(oppfølging|follow)/.test(t)) return { intent: "FOLLOWUP_HELP" };
+        if (/(er bil|er.*solgt)/.test(t) && regMatch) return { intent: "CAR_STATUS", reg: regMatch };
+
+        return { intent: "FREE" };
+      }
+
+      async function findCarByReg(reg?: string) {
+        if (!reg) return null;
+        try {
+          const storage = await storagePromise;
+          const cars = await storage.getCars('default-company');
+          return cars.find(car => 
+            car.registration?.toLowerCase().includes(reg.toLowerCase())
+          ) || null;
+        } catch {
+          return null;
         }
       }
 
-      // Static responses based on common questions
-      if (keyword.includes("pris") && (keyword.includes("endre") || keyword.includes("justere"))) {
-        return res.json({
-          reply: "For å endre pris: 1) Gå til Biler → klikk på bilen. 2) Trykk Rediger-knappen. 3) Gå til Pris-fanen. 4) Endre salgspris eller bruk Prisassistent. 5) Lagre endringene.",
-          tool: { name: "open", page: "/cars" }
-        });
-      }
-      
-      if (keyword.includes("inviter") && keyword.includes("bruker")) {
-        const response = userRole === "EIER" 
-          ? "For å invitere brukere: Gå til Innstillinger → Team → klikk «Inviter bruker». Velg rolle (Selger, Regnskap, Verksted) og send invitasjonslenken."
-          : "Bare eiere kan invitere nye brukere. Kontakt en eier for å få sendt invitasjon.";
-        return res.json({ 
-          reply: response,
-          tool: userRole === "EIER" ? { name: "open", page: "/settings" } : null
-        });
-      }
-      
-      if (keyword.includes("kunde") && keyword.includes("status")) {
-        return res.json({
-          reply: "Kundestatus (Hot/Warm/Cold) vises automatisk basert på siste kontakt: Hot = siste 7 dager (grønn), Warm = 8-30 dager (gul), Cold = over 30 dager (blå). Du ser statusen som farget merke ved hver kunde.",
-          tool: { name: "open", page: "/customers" }
-        });
-      }
-      
-      if (keyword.includes("oppfølging")) {
-        return res.json({
-          reply: "Oppfølginger finner du: 1) På Dashboard under «Oppgaver i dag». 2) I Aktiviteter-siden for full oversikt. 3) På hver kundeprofil under Oppfølginger-fanen.",
-          tool: { name: "open", page: "/activities" }
-        });
-      }
-      
-      if (keyword.includes("margin") || keyword.includes("brutto")) {
-        const response = ['EIER', 'REGNSKAP'].includes(userRole)
-          ? "Marginchippen viser bruttofortjeneste: (Salgspris - Kostpris) / Salgspris × 100. Grønn = god margin (>15%), gul = ok (5-15%), rød = lav (<5%)."
-          : "Margininformasjon er kun tilgjengelig for eiere og regnskapsansvarlige.";
-        return res.json({ reply: response });
-      }
+      const intent = detectIntent(lastMessage);
 
-      if (keyword.includes("firma") || keyword.includes("bytte")) {
+      // Quick navigation
+      if (intent.intent === "OPEN_CARS")
+        return res.json({ reply: "Åpner **Biler**.", ...tool("/cars") });
+      if (intent.intent === "OPEN_CUSTOMERS")
+        return res.json({ reply: "Åpner **Kunder**.", ...tool("/customers") });
+      if (intent.intent === "OPEN_CONTRACTS")
+        return res.json({ reply: "Åpner **Kontrakter**.", ...tool("/contracts") });
+      if (intent.intent === "OPEN_SETTINGS_TEAM")
+        return res.json({ reply: "Åpner **Innstillinger → Team**.", ...tool("/settings") });
+      if (intent.intent === "OPEN_ACTIVITIES")
+        return res.json({ reply: "Åpner **Aktiviteter**.", ...tool("/activities") });
+
+      // Car status lookup
+      if (intent.intent === "CAR_STATUS") {
+        const car = await findCarByReg(intent.reg);
+        if (!car) return res.json({ reply: `Fant ingen bil med regnr **${intent.reg}**.` });
+        const stat = /solgt/i.test(car.status || '') ? "Solgt" : "Tilgjengelig";
         return res.json({
-          reply: "Firmavelgeren finner du øverst til høyre i navigasjonen. Klikk på firmanavnet for å bytte mellom firmaer du har tilgang til, eller opprett nytt firma.",
-          tool: null
+          reply: `Bil **${car.registration}** er **${stat}**.`,
+          ...tool("/cars", { modal: "edit", id: car.id }),
         });
       }
 
-      // Default helpful response
+      // Deterministic how-tos
+      if (intent.intent === "PRICE_HELP")
+        return res.json({
+          reply: "Prisendring: Biler → Rediger → Prisassistent → Bruk anbefalt pris → Lagre.",
+          ...tool("/cars"),
+        });
+      if (intent.intent === "ADD_CAR")
+        return res.json({
+          reply: "Ny bil: Biler → Legg til bil → Skriv regnr → Fullfør detaljer → Lagre.",
+          ...tool("/cars"),
+        });
+      if (intent.intent === "ADD_CUSTOMER")
+        return res.json({
+          reply: "Ny kunde: Kunder → Legg til kunde → Navn, e-post, telefon → Lagre.",
+          ...tool("/customers"),
+        });
+      if (intent.intent === "TRADEIN_HELP")
+        return res.json({
+          reply: "Innbytte: Kontrakter → Velg kontrakt → Slå på Innbytte → Sett verdi → Lagre.",
+          ...tool("/contracts"),
+        });
+      if (intent.intent === "SAVED_VIEWS_HELP")
+        return res.json({
+          reply: "Lagret visning: Filtrer → Klikk Lagre nåværende → Gi navn → Hent via meny.",
+        });
+      if (intent.intent === "FOLLOWUP_HELP")
+        return res.json({
+          reply: "Oppfølging: Kunder → Velg kunde → Follow-ups → Ny oppfølging → Velg dato → Lagre.",
+          ...tool("/customers"),
+        });
+
+      // Try OpenAI if available
+      if (process.env.OPENAI_API_KEY) {
+        try {
+          const openai = new (await import('openai')).default({ 
+            apiKey: process.env.OPENAI_API_KEY 
+          });
+          
+          const llmMessages = [
+            { role: "system" as const, content: SYSTEM_PROMPT },
+            { role: "system" as const, content: `[Hints]\nrole=${role}\nactiveCompanyId=${companyId || ""}\n` },
+            ...messages
+          ];
+
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: llmMessages,
+            temperature: 0.3,
+            max_tokens: 300,
+          });
+
+          const reply = completion.choices?.[0]?.message?.content?.trim() || "Ok.";
+          return res.json({ reply });
+        } catch (error) {
+          console.error("OpenAI error:", error);
+          // Fall through to static responses
+        }
+      }
+
+      // Fallback responses
       return res.json({
-        reply: "Jeg kan hjelpe deg med: navigering i systemet, finne funksjoner, forstå hvordan ting fungerer. Spør meg gjerne om noe spesifikt, så skal jeg guide deg!",
-        tool: null
+        reply: "Jeg kan guide deg stegvis (f.eks. «Hvor finner jeg biler?»). For mer naturlige svar kan du sette OPENAI_API_KEY.",
       });
       
     } catch (error) {
