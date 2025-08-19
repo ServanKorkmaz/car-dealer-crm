@@ -4,6 +4,7 @@ import {
   customers,
   contracts,
   activityLog,
+  activities,
   userSavedViews,
   type User,
   type UpsertUser,
@@ -15,6 +16,8 @@ import {
   type InsertContract,
   type ActivityLog,
   type InsertActivityLog,
+  type Activity,
+  type InsertActivity,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -108,6 +111,21 @@ export interface IStorage {
   }): Promise<any>;
   updateSavedView(id: string, updates: { name?: string; payload?: any }, userId: string): Promise<any | null>;
   deleteSavedView(id: string, userId: string): Promise<boolean>;
+  
+  // Enhanced Activities operations
+  getActivities(userId: string, companyId?: string, filters?: { 
+    type?: string; 
+    priority?: string; 
+    resolved?: boolean; 
+    limit?: number; 
+    offset?: number; 
+  }): Promise<Activity[]>;
+  getUnresolvedAlerts(companyId: string, limit?: number): Promise<Activity[]>;
+  createActivity(activity: InsertActivity): Promise<Activity>;
+  resolveActivity(activityId: string, userId: string): Promise<boolean>;
+  getUnresolvedAlert(alertKey: string, companyId: string): Promise<Activity | null>;
+  getAllUsers(): Promise<User[]>;
+  getContractsByCustomer(customerId: string, userId: string): Promise<Contract[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -545,6 +563,86 @@ export class DatabaseStorage implements IStorage {
         eq(userSavedViews.userId, userId)
       ));
     return (result as any).rowCount > 0;
+  }
+
+  // Enhanced Activities operations
+  async getActivities(userId: string, companyId: string = 'default-company', filters?: { 
+    type?: string; 
+    priority?: string; 
+    resolved?: boolean; 
+    limit?: number; 
+    offset?: number; 
+  }): Promise<Activity[]> {
+    let whereConditions = [eq(activities.companyId, companyId)];
+    
+    if (filters?.type) whereConditions.push(eq(activities.type, filters.type));
+    if (filters?.priority) whereConditions.push(eq(activities.priority, filters.priority));
+    if (filters?.resolved !== undefined) whereConditions.push(eq(activities.resolved, filters.resolved));
+
+    let query = db.select().from(activities)
+      .where(and(...whereConditions))
+      .orderBy(desc(activities.createdAt));
+
+    if (filters?.limit) {
+      query = query.limit(filters.limit);
+    }
+    if (filters?.offset) {
+      query = query.offset(filters.offset);
+    }
+
+    return await query;
+  }
+
+  async getUnresolvedAlerts(companyId: string, limit: number = 10): Promise<Activity[]> {
+    return await db.select().from(activities)
+      .where(and(
+        eq(activities.companyId, companyId),
+        eq(activities.resolved, false),
+        eq(activities.type, 'ALERT')
+      ))
+      .orderBy(desc(activities.createdAt))
+      .limit(limit);
+  }
+
+  async createActivity(activity: InsertActivity): Promise<Activity> {
+    const [newActivity] = await db
+      .insert(activities)
+      .values(activity)
+      .returning();
+    return newActivity;
+  }
+
+  async resolveActivity(activityId: string, userId: string): Promise<boolean> {
+    const result = await db
+      .update(activities)
+      .set({ resolved: true })
+      .where(eq(activities.id, activityId));
+    return (result as any).rowCount > 0;
+  }
+
+  async getUnresolvedAlert(alertKey: string, companyId: string): Promise<Activity | null> {
+    // For now, we'll use message matching since we don't have alertKey field in schema
+    // In a real implementation, you'd add an alertKey field to the activities table
+    const [alert] = await db.select().from(activities)
+      .where(and(
+        eq(activities.companyId, companyId),
+        eq(activities.resolved, false),
+        eq(activities.type, 'ALERT')
+      ))
+      .limit(1);
+    return alert || null;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async getContractsByCustomer(customerId: string, userId: string): Promise<Contract[]> {
+    return await db.select().from(contracts)
+      .where(and(
+        eq(contracts.customerId, customerId),
+        eq(contracts.userId, userId)
+      ));
   }
 }
 

@@ -1,0 +1,72 @@
+Goal: Replace the “dummy” activity feed with real, rule-based alerts that highlight what matters.
+
+Instructions for Replit Agent:
+
+Normalize activity events
+
+Create an enum/type ActivityType: IMPORT, CAR_UPDATE, CONTRACT_CREATED, CONTRACT_SIGNED, SALE, PRICE_CHANGE, FOLLOW_UP, ALERT.
+
+Each event has: id, company_id, user_id, type, entity_id (car|customer|contract), message, priority (‘low’ | ‘normal’ | ‘high’), created_at.
+
+Store in Supabase activities table:
+
+create table activities (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null,
+  user_id uuid,
+  type text not null,
+  entity_id uuid,
+  message text not null,
+  priority text not null default 'normal' check (priority in ('low','normal','high')),
+  created_at timestamp with time zone default now()
+);
+create index on activities(company_id, created_at desc);
+
+
+RLS: only rows with same company_id visible.
+
+Smart alert rules (auto-generate activities)
+
+If a car > 60 days on lot and still status='Tilgjengelig' → create high priority ALERT: “Bil [regnr] har stått > 60 dager uten prisendring.”
+
+If a contract exists but signatur_status != 'Signert' after 24h → high priority ALERT: “Kontrakt #[id] mangler signatur.”
+
+If brutto % < 5% on a car → normal priority ALERT: “Lav margin på [regnr].”
+
+If new customer created with no follow-up set → low priority ALERT: “Ingen oppfølging avtalt for [kundenavn].”
+
+Cron job / scheduled worker runs every hour and inserts missing alerts.
+
+UI changes in Aktiviteter page
+
+Replace current hardcoded feed with real DB query (paginated, newest first).
+
+Add category chips at top: Alle | Salg | Import | Lagerstyring | Kontrakter | Varsler.
+
+Filter client-side by type.
+
+Priority indicators:
+
+High → red badge, Medium → amber, Low → gray.
+
+Allow “mark as resolved” (soft-delete or status flag).
+
+Search box queries message with full-text.
+
+Notification bell
+
+Add bell icon in top navbar. Badge count = # of unresolved high-priority alerts.
+
+Clicking opens dropdown with last 10 high/normal alerts. Link to full Aktiviteter page.
+
+Acceptance criteria
+
+If I leave a car unsold >60d, a high-priority alert shows automatically.
+
+If I edit a contract and leave it unsigned for 24h, alert appears.
+
+Alerts show in feed + bell dropdown; I can mark them resolved.
+
+Feed filters (chips) work instantly; pagination still smooth.
+
+No duplicate alerts for same condition (insert once until resolved).

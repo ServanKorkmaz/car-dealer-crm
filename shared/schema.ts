@@ -136,7 +136,7 @@ export const contracts = pgTable("contracts", {
   userId: varchar("user_id").notNull().references(() => users.id),
 });
 
-// Activity Log table for tracking system activities
+// Activity Log table for tracking system activities (legacy)
 export const activityLog = pgTable("activity_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   type: varchar("type").notNull(), // car_created, car_updated, car_sold, customer_created, customer_updated, contract_created, contract_signed, user_login
@@ -149,6 +149,23 @@ export const activityLog = pgTable("activity_log", {
 }, (table) => [
   index("idx_activity_log_user_id").on(table.userId),
   index("idx_activity_log_entity").on(table.entityId, table.entityType),
+]);
+
+// Enhanced Activities table for smart alerts and notifications
+export const activities = pgTable("activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().default("default-company"),
+  userId: varchar("user_id"),
+  type: varchar("type").notNull(), // IMPORT, CAR_UPDATE, CONTRACT_CREATED, CONTRACT_SIGNED, SALE, PRICE_CHANGE, FOLLOW_UP, ALERT
+  entityId: varchar("entity_id"), // ID of the related entity (car, customer, contract)
+  message: text("message").notNull(), // human-readable description
+  priority: varchar("priority").notNull().default("normal"), // 'low' | 'normal' | 'high'
+  resolved: boolean("resolved").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_activities_company_created").on(table.companyId, table.createdAt),
+  index("idx_activities_user_type").on(table.userId, table.type),
+  index("idx_activities_priority").on(table.priority, table.resolved),
 ]);
 
 // User Saved Views table for storing user filter preferences
@@ -266,8 +283,6 @@ export const insertContractSchema = createInsertSchema(contracts).omit({
   signerPhone: true,
   signingMethod: true,
   webhookStatus: true,
-  eSignSentAt: true,
-  tradeInCarId: true,
 }).extend({
   // Override field types to match frontend data
   salePrice: z.union([z.string(), z.number()]).transform(val => val.toString()),
@@ -312,5 +327,37 @@ export const insertSavedViewSchema = createInsertSchema(userSavedViews).omit({
   updatedAt: true,
 });
 
+export const insertActivitySchema = createInsertSchema(activities).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Activity types enum
+export const ActivityType = {
+  IMPORT: "IMPORT",
+  CAR_UPDATE: "CAR_UPDATE", 
+  CONTRACT_CREATED: "CONTRACT_CREATED",
+  CONTRACT_SIGNED: "CONTRACT_SIGNED",
+  SALE: "SALE",
+  PRICE_CHANGE: "PRICE_CHANGE",
+  FOLLOW_UP: "FOLLOW_UP",
+  ALERT: "ALERT",
+} as const;
+
+export type ActivityTypeValue = typeof ActivityType[keyof typeof ActivityType];
+
+// Activity priority enum
+export const ActivityPriority = {
+  LOW: "low",
+  NORMAL: "normal", 
+  HIGH: "high",
+} as const;
+
+export type ActivityPriorityValue = typeof ActivityPriority[keyof typeof ActivityPriority];
+
 export type UserSavedView = typeof userSavedViews.$inferSelect;
 export type InsertSavedView = z.infer<typeof insertSavedViewSchema>;
+
+// Activities types
+export type Activity = typeof activities.$inferSelect;
+export type InsertActivity = z.infer<typeof insertActivitySchema>;
