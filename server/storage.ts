@@ -887,12 +887,12 @@ export class DatabaseStorage implements IStorage {
     const [membership] = await db
       .select()
       .from(memberships)
-      .where(and(eq(memberships.userId, userId), eq(memberships.companyId, companyId)));
+      .where(and(eq(memberships.userId, userId), eq(memberships.departmentId, companyId)));
     
     return membership ? {
       id: membership.id,
       userId: membership.userId,
-      companyId: membership.companyId,
+      companyId: membership.departmentId, // Map departmentId back to companyId for API compatibility
       role: membership.role as "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED",
       createdAt: membership.createdAt || new Date()
     } : null;
@@ -911,7 +911,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // Ensure default department exists
+  // Ensure default department exists (using companies table for compatibility)
   async ensureDefaultDepartment(): Promise<void> {
     try {
       const [existing] = await db
@@ -928,9 +928,20 @@ export class DatabaseStorage implements IStorage {
             name: 'Hovedavdeling'
           })
           .onConflictDoNothing();
+        console.log('Created default department: Hovedavdeling');
       }
     } catch (error) {
       console.error('Error ensuring default department:', error);
+      // Fall back to creating with auto-generated ID if fixed ID fails
+      try {
+        await db
+          .insert(companies)
+          .values({ name: 'Hovedavdeling' })
+          .onConflictDoNothing();
+        console.log('Created default department with auto ID');
+      } catch (fallbackError) {
+        console.error('Fallback creation also failed:', fallbackError);
+      }
     }
   }
 
@@ -941,11 +952,12 @@ export class DatabaseStorage implements IStorage {
       .values({ id: userId, fullName: "User" })
       .onConflictDoNothing();
 
+    // Use departmentId field as per schema
     await db
       .insert(memberships)
-      .values({ userId, companyId, role })
+      .values({ userId, departmentId: companyId, role })
       .onConflictDoUpdate({
-        target: [memberships.userId, memberships.companyId],
+        target: [memberships.userId, memberships.departmentId],
         set: { role }
       });
   }
@@ -954,13 +966,13 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(memberships)
       .set({ role })
-      .where(and(eq(memberships.userId, userId), eq(memberships.companyId, companyId)));
+      .where(and(eq(memberships.userId, userId), eq(memberships.departmentId, companyId)));
   }
 
   async removeUserFromCompany(userId: string, companyId: string): Promise<void> {
     await db
       .delete(memberships)
-      .where(and(eq(memberships.userId, userId), eq(memberships.companyId, companyId)));
+      .where(and(eq(memberships.userId, userId), eq(memberships.departmentId, companyId)));
   }
 
   async getCompanyMembers(companyId: string): Promise<Array<{
@@ -975,14 +987,14 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: memberships.id,
         userId: memberships.userId,
-        companyId: memberships.companyId,
+        companyId: memberships.departmentId, // Map departmentId to companyId for compatibility
         role: memberships.role,
         fullName: profiles.fullName,
         createdAt: memberships.createdAt
       })
       .from(memberships)
       .leftJoin(profiles, eq(memberships.userId, profiles.id))
-      .where(eq(memberships.companyId, companyId));
+      .where(eq(memberships.departmentId, companyId));
 
     return result.map(member => ({
       id: member.id,
@@ -1305,20 +1317,20 @@ export class DatabaseStorage implements IStorage {
         role: memberships.role,
       })
       .from(memberships)
-      .innerJoin(companies, eq(memberships.companyId, companies.id))
+      .innerJoin(companies, eq(memberships.departmentId, companies.id))
       .where(eq(memberships.userId, userId));
 
     return results;
   }
 
   async switchActiveCompany(userId: string, companyId: string): Promise<boolean> {
-    // Verify user has access to this company
+    // Verify user has access to this company/department
     const membership = await db
       .select()
       .from(memberships)
       .where(and(
         eq(memberships.userId, userId),
-        eq(memberships.companyId, companyId)
+        eq(memberships.departmentId, companyId)
       ))
       .limit(1);
 
