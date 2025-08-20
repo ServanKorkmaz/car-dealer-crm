@@ -15,11 +15,11 @@ export interface Profile {
   updated_at: Date;
 }
 
-export interface Organization {
+export interface Department {
   id: string;
   name: string;
   orgnr?: string;
-  slug: string;
+  slug?: string;
   logo_url?: string;
   address?: string;
   phone?: string;
@@ -28,8 +28,11 @@ export interface Organization {
   updated_at: Date;
 }
 
-export interface OrgMember {
-  org_id: string;
+// Keep Organization as alias for backwards compatibility
+export interface Organization extends Department {}
+
+export interface DeptMember {
+  dept_id: string;
   user_id: string;
   role: OrgRole;
   invited_by?: string;
@@ -37,12 +40,18 @@ export interface OrgMember {
   joined_at: Date;
   // Joined data
   user?: Profile;
+  department?: Department;
+}
+
+// Keep OrgMember as alias for backwards compatibility
+export interface OrgMember extends Omit<DeptMember, 'dept_id' | 'department'> {
+  org_id: string;
   organization?: Organization;
 }
 
 export interface Invite {
   id: string;
-  org_id: string;
+  dept_id: string;
   email: string;
   role: OrgRole;
   token: string;
@@ -51,6 +60,8 @@ export interface Invite {
   created_at: Date;
   expires_at: Date;
   accepted_at?: Date;
+  // Keep org_id for compatibility
+  org_id?: string;
 }
 
 export interface Subscription {
@@ -133,9 +144,12 @@ export interface AuthUser {
   id: string;
   email: string;
   profile?: Profile;
+  departments?: Department[];
+  current_dept?: Department;
+  role?: OrgRole;
+  // Keep organizations for backwards compatibility
   organizations?: Organization[];
   current_org?: Organization;
-  role?: OrgRole;
 }
 
 // Plan pricing (for display)

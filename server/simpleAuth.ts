@@ -28,9 +28,9 @@ export function setupSimpleAuth(app: Express) {
         profileImageUrl: null,
       });
 
-      // Ensure user has profile and company membership
+      // Ensure user has profile and department membership
       await storage.createProfile("test-user-123", "Demo Bruker");
-      await storage.addUserToCompany("test-user-123", "default-company", "EIER");
+      await storage.addUserToDepartment("test-user-123", "default-department", "EIER");
 
       // Set up a simple session
       (req.session as any).user = {
@@ -71,9 +71,9 @@ export function setupSimpleAuth(app: Express) {
           profileImageUrl: null,
         });
 
-        // Ensure user has profile and company membership
+        // Ensure user has profile and department membership
         await storage.createProfile("test-user-123", "Demo Bruker");
-        await storage.addUserToCompany("test-user-123", "default-company", "EIER");
+        await storage.addUserToDepartment("test-user-123", "default-department", "EIER");
 
         // Set up session
         (req.session as any).user = {
