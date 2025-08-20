@@ -2,23 +2,20 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { User, Session } from '@supabase/supabase-js';
-import type { AuthUser, Department, Organization, OrgRole } from '@shared/auth-types';
+import type { AuthUser, Organization, OrgRole } from '@shared/auth-types';
 
 interface AuthContextValue {
   user: AuthUser | null;
   session: Session | null;
   isLoading: boolean;
-  currentDept: Department | null;
-  currentOrg: Organization | null; // Keep for compatibility
+  currentOrg: Organization | null;
   userRole: OrgRole | null;
-  departments: Department[];
-  organizations: Organization[]; // Keep for compatibility
+  organizations: Organization[];
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  switchDept: (deptId: string) => Promise<void>;
-  switchOrg: (orgId: string) => Promise<void>; // Keep for compatibility
+  switchOrg: (orgId: string) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -37,11 +34,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentDept, setCurrentDept] = useState<Department | null>(null);
-  const [currentOrg, setCurrentOrg] = useState<Organization | null>(null); // Keep for compatibility
+  const [currentOrg, setCurrentOrg] = useState<Organization | null>(null);
   const [userRole, setUserRole] = useState<OrgRole | null>(null);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]); // Keep for compatibility
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
 
   // Fetch user data and organizations
   const fetchUserData = async (userId: string, email: string) => {
@@ -140,11 +135,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (storedUser) {
             const mockUser = JSON.parse(storedUser);
             setUser(mockUser);
-            setCurrentDept(mockUser.current_dept || mockUser.current_org);
-            setCurrentOrg(mockUser.current_org || mockUser.current_dept);
+            setCurrentOrg(mockUser.current_org);
             setUserRole(mockUser.role);
-            setDepartments(mockUser.departments || mockUser.organizations || []);
-            setOrganizations(mockUser.organizations || mockUser.departments || []);
+            setOrganizations(mockUser.organizations);
           }
           setIsLoading(false);
           return;
@@ -174,12 +167,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await fetchUserData(session.user.id, session.user.email || '');
         } else {
           setUser(null);
-          setCurrentDept(null);
           setCurrentOrg(null);
           setUserRole(null);
-          setDepartments([]);
           setOrganizations([]);
-          localStorage.removeItem('currentDeptId');
           localStorage.removeItem('currentOrgId');
         }
 
@@ -198,29 +188,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isSupabaseConfigured) {
       // Development mode - simulate login
       console.log('Development mode: simulating login');
-      const mockDept: Department = { id: 'default-department', name: 'Hovedavdeling', created_at: new Date(), updated_at: new Date() };
       const mockUser: AuthUser = {
         id: 'test-user-123',
         email: 'test@forhandlerpro.no',
         profile: { user_id: 'test-user-123', full_name: 'Test User', created_at: new Date(), updated_at: new Date() },
-        departments: [mockDept],
-        current_dept: mockDept,
-        organizations: [mockDept], // Keep for compatibility
-        current_org: mockDept, // Keep for compatibility
+        organizations: [{ id: 'default-company', name: 'Test Company' }],
+        current_org: { id: 'default-company', name: 'Test Company' },
         role: 'owner' as OrgRole,
       };
       
       setUser(mockUser);
-      setCurrentDept(mockDept);
-      setCurrentOrg(mockDept);
+      setCurrentOrg({ id: 'default-company', name: 'Test Company' });
       setUserRole('owner' as OrgRole);
-      setDepartments([mockDept]);
-      setOrganizations([mockDept]);
+      setOrganizations([{ id: 'default-company', name: 'Test Company' }]);
       
       // Store in localStorage to persist across reloads
       localStorage.setItem('mockUser', JSON.stringify(mockUser));
-      localStorage.setItem('currentDeptId', 'default-department');
-      localStorage.setItem('currentOrgId', 'default-department'); // Keep for compatibility
+      localStorage.setItem('currentOrgId', 'default-company');
       return;
     }
 
@@ -254,13 +238,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isSupabaseConfigured) {
       // Development mode - clear mock data
       setUser(null);
-      setCurrentDept(null);
       setCurrentOrg(null);
       setUserRole(null);
-      setDepartments([]);
       setOrganizations([]);
       localStorage.removeItem('mockUser');
-      localStorage.removeItem('currentDeptId');
       localStorage.removeItem('currentOrgId');
       setLocation('/login');
       return;
@@ -282,40 +263,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const switchDept = async (deptId: string) => {
-    const dept = departments.find(d => d.id === deptId);
-    if (!dept) return;
+  const switchOrg = async (orgId: string) => {
+    const org = organizations.find(o => o.id === orgId);
+    if (!org) return;
 
-    if (!isSupabaseConfigured) {
-      // Development mode
-      setCurrentDept(dept);
-      setCurrentOrg(dept);
-      localStorage.setItem('currentDeptId', deptId);
-      localStorage.setItem('currentOrgId', deptId);
-      return;
-    }
-
-    // Get user role for this department
+    // Get user role for this org
     const { data: membership } = await supabase
       .from('org_members')
       .select('role')
-      .eq('org_id', deptId)
+      .eq('org_id', orgId)
       .eq('user_id', user?.id)
       .eq('status', 'active')
       .single();
 
     if (membership) {
-      setCurrentDept(dept);
-      setCurrentOrg(dept);
+      setCurrentOrg(org);
       setUserRole(membership.role as OrgRole);
-      localStorage.setItem('currentDeptId', deptId);
-      localStorage.setItem('currentOrgId', deptId);
-    }
-  };
+      localStorage.setItem('currentOrgId', orgId);
+      
+      // Update user object
+      if (user) {
+        setUser({
+          ...user,
+          current_org: org,
+          role: membership.role as OrgRole,
+        });
+      }
 
-  // Keep switchOrg for backwards compatibility
-  const switchOrg = async (orgId: string) => {
-    await switchDept(orgId);
+      // Refresh the page to reload data with new org context
+      window.location.reload();
+    }
   };
 
   const refreshUser = async () => {
@@ -330,16 +307,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         session,
         isLoading,
-        currentDept,
         currentOrg,
         userRole,
-        departments,
         organizations,
         signIn,
         signUp,
         signOut,
         resetPassword,
-        switchDept,
         switchOrg,
         refreshUser,
       }}

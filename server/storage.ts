@@ -169,7 +169,6 @@ export interface IStorage {
     createdAt: Date 
   } | null>;
   createCompany(name: string): Promise<{ id: string; name: string; createdAt: Date }>;
-  ensureDefaultDepartment(): Promise<void>;
   addUserToCompany(userId: string, companyId: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"): Promise<void>;
   updateUserRole(userId: string, companyId: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"): Promise<void>;
   removeUserFromCompany(userId: string, companyId: string): Promise<void>;
@@ -887,12 +886,12 @@ export class DatabaseStorage implements IStorage {
     const [membership] = await db
       .select()
       .from(memberships)
-      .where(and(eq(memberships.userId, userId), eq(memberships.departmentId, companyId)));
+      .where(and(eq(memberships.userId, userId), eq(memberships.companyId, companyId)));
     
     return membership ? {
       id: membership.id,
       userId: membership.userId,
-      companyId: membership.departmentId, // Map departmentId back to companyId for API compatibility
+      companyId: membership.companyId,
       role: membership.role as "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED",
       createdAt: membership.createdAt || new Date()
     } : null;
@@ -911,40 +910,6 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // Ensure default department exists (using companies table for compatibility)
-  async ensureDefaultDepartment(): Promise<void> {
-    try {
-      const [existing] = await db
-        .select()
-        .from(companies)
-        .where(eq(companies.id, 'default-department'))
-        .limit(1);
-
-      if (!existing) {
-        await db
-          .insert(companies)
-          .values({ 
-            id: 'default-department',
-            name: 'Hovedavdeling'
-          })
-          .onConflictDoNothing();
-        console.log('Created default department: Hovedavdeling');
-      }
-    } catch (error) {
-      console.error('Error ensuring default department:', error);
-      // Fall back to creating with auto-generated ID if fixed ID fails
-      try {
-        await db
-          .insert(companies)
-          .values({ name: 'Hovedavdeling' })
-          .onConflictDoNothing();
-        console.log('Created default department with auto ID');
-      } catch (fallbackError) {
-        console.error('Fallback creation also failed:', fallbackError);
-      }
-    }
-  }
-
   async addUserToCompany(userId: string, companyId: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"): Promise<void> {
     // Create profile if it doesn't exist
     await db
@@ -952,12 +917,11 @@ export class DatabaseStorage implements IStorage {
       .values({ id: userId, fullName: "User" })
       .onConflictDoNothing();
 
-    // Use departmentId field as per schema
     await db
       .insert(memberships)
-      .values({ userId, departmentId: companyId, role })
+      .values({ userId, companyId, role })
       .onConflictDoUpdate({
-        target: [memberships.userId, memberships.departmentId],
+        target: [memberships.userId, memberships.companyId],
         set: { role }
       });
   }
@@ -966,13 +930,13 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(memberships)
       .set({ role })
-      .where(and(eq(memberships.userId, userId), eq(memberships.departmentId, companyId)));
+      .where(and(eq(memberships.userId, userId), eq(memberships.companyId, companyId)));
   }
 
   async removeUserFromCompany(userId: string, companyId: string): Promise<void> {
     await db
       .delete(memberships)
-      .where(and(eq(memberships.userId, userId), eq(memberships.departmentId, companyId)));
+      .where(and(eq(memberships.userId, userId), eq(memberships.companyId, companyId)));
   }
 
   async getCompanyMembers(companyId: string): Promise<Array<{
@@ -987,14 +951,14 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: memberships.id,
         userId: memberships.userId,
-        companyId: memberships.departmentId, // Map departmentId to companyId for compatibility
+        companyId: memberships.companyId,
         role: memberships.role,
         fullName: profiles.fullName,
         createdAt: memberships.createdAt
       })
       .from(memberships)
       .leftJoin(profiles, eq(memberships.userId, profiles.id))
-      .where(eq(memberships.departmentId, companyId));
+      .where(eq(memberships.companyId, companyId));
 
     return result.map(member => ({
       id: member.id,
@@ -1317,20 +1281,20 @@ export class DatabaseStorage implements IStorage {
         role: memberships.role,
       })
       .from(memberships)
-      .innerJoin(companies, eq(memberships.departmentId, companies.id))
+      .innerJoin(companies, eq(memberships.companyId, companies.id))
       .where(eq(memberships.userId, userId));
 
     return results;
   }
 
   async switchActiveCompany(userId: string, companyId: string): Promise<boolean> {
-    // Verify user has access to this company/department
+    // Verify user has access to this company
     const membership = await db
       .select()
       .from(memberships)
       .where(and(
         eq(memberships.userId, userId),
-        eq(memberships.departmentId, companyId)
+        eq(memberships.companyId, companyId)
       ))
       .limit(1);
 
