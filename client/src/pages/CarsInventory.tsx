@@ -108,7 +108,7 @@ const CarCard = ({
   onSelect?: (car: Car) => void;
   isSelected?: boolean;
 }) => {
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const status = statusConfig[car.status as keyof typeof statusConfig] || statusConfig.available;
   
