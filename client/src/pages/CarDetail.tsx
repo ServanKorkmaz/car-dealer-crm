@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import EditCarModal from "@/components/cars/EditCarModal";
+import PriceAssistant from "@/components/PriceAssistant";
 import { 
   ArrowLeft, Edit, Trash2, CheckCircle, Clock, Calendar, 
   Gauge, Settings, MapPin, Fuel, Car as CarIcon, Eye,
@@ -465,6 +466,31 @@ export default function CarDetail() {
             </Card>
           </div>
         </div>
+
+        {/* AI Price Assistant */}
+        <PriceAssistant 
+          carId={car.id} 
+          currentPrice={Number(car.salePrice || 0)}
+          onPriceUpdate={async (newPrice) => {
+            // Update the car price
+            try {
+              await apiRequest("PUT", `/api/cars/${car.id}`, { 
+                salePrice: newPrice.toString() 
+              });
+              queryClient.invalidateQueries({ queryKey: ["/api/cars", car.id] });
+              toast({
+                title: "Pris oppdatert",
+                description: `Ny pris: ${formatPrice(newPrice.toString())}`,
+              });
+            } catch (error) {
+              toast({
+                title: "Feil",
+                description: "Kunne ikke oppdatere pris",
+                variant: "destructive",
+              });
+            }
+          }}
+        />
 
         {/* Description */}
         {car.description && (

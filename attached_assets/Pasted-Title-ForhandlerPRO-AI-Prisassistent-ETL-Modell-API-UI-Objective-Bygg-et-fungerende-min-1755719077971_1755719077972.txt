@@ -1,0 +1,644 @@
+Title: ForhandlerPRO – AI Prisassistent (ETL → Modell → API → UI)
+
+Objective: Bygg et fungerende minimum av en AI‑prisbistand som:
+
+henter og beriker bruktbil‑data (SVV + FINN‑placeholder),
+
+bygger features og trener en LightGBM‑modell med kvantil‑hoder (P10/P50/P90),
+
+eksponerer et REST‑endepunkt /api/price/suggest,
+
+viser UI‑komponent “Prisassistent” i React (P50, P10–P90, sannsynlighet for salg 14/30d, comps).
+
+Tech constraints:
+
+Frontend: React + TypeScript + Vite + Tailwind + shadcn/ui.
+
+Backend: Node/TypeScript (Express) + Drizzle ORM + Supabase.
+
+ML: Python 3.11, pandas, numpy, scikit‑learn, lightgbm.
+
+Kjør Python fra Node med child_process eller kall precomputed prediksjoner via tabell.
+
+Ingen ekte FINN‑API‑nøkler: lag en finn_mock_ingest.ts som leser fra seed/finn_sample.json (placeholder), men strukturer slik at ekte klient enkelt kan kobles på senere.
+
+Bruk .env for alle nøkler:
+
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+SVV_API_KEY=   # hvis tilgjengelig, ellers tom
+PRICE_MODEL_PATH=./ml/model_lgbm_quantiles.pkl
+
+
+Opprett requirements.txt for Python.
+
+1) Prosjektstruktur & avhengigheter
+
+Create/ensure directories:
+
+/server
+/server/etl
+/server/ml
+/server/api
+/server/utils
+/shared
+/web
+/seed
+/sql
+
+
+Install Node deps (add if missing):
+
+npm i express cors zod dotenv lightship
+npm i -D typescript ts-node nodemon @types/express @types/node
+npm i @supabase/supabase-js drizzle-orm pg
+
+
+Python env:
+Opprett server/ml/requirements.txt med:
+
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.5.1
+lightgbm==4.5.0
+joblib==1.4.2
+
+2) Supabase skjema (SQL) + RLS
+
+Opprett sql/price_assistant_schema.sql:
+
+-- Core raw listings (fra FINN/andre kanaler – snapshot-basert)
+create table if not exists public.listings_raw (
+  ad_id text not null,
+  captured_at timestamptz not null default now(),
+  source text not null default 'finn',
+  title text,
+  price int,
+  km int,
+  year int,
+  gear text,
+  driveline text,
+  fuel_type text,
+  location_code text,
+  equipment jsonb,
+  seller_type text,
+  status text,
+  regnr_hash text,
+  vin_hash text,
+  primary key (ad_id, captured_at)
+);
+
+-- Beriket kjøretøy
+create table if not exists public.vehicles_enriched (
+  ad_id text primary key,
+  last_enriched_at timestamptz not null default now(),
+  regnr_hash text,
+  vin_hash text,
+  power_hp int,
+  weight_kg int,
+  wltp_consumption numeric,
+  eu_due date,
+  doors int,
+  seats int,
+  ofv_trim_code text,
+  make text,
+  model text,
+  variant text
+);
+
+-- Markedsfeatures per dag/modell/region
+create table if not exists public.market_features_daily (
+  model_key text not null,
+  region text not null,
+  snapshot_date date not null,
+  active_supply int,
+  median_price int,
+  p10_price int,
+  p90_price int,
+  dom_p50 int,
+  dom_p90 int,
+  primary key (model_key, region, snapshot_date)
+);
+
+-- Dine salgshendelser (moat)
+create table if not exists public.sales_events (
+  internal_car_id uuid default gen_random_uuid() primary key,
+  ad_id text,
+  listed_at timestamptz,
+  listed_price int,
+  sold_at timestamptz,
+  sold_price int,
+  channel text,
+  days_on_market int
+);
+
+-- Feature store (modellinput) – 1 rad pr. aktiv annonse (seneste snapshot)
+create table if not exists public.price_features_current (
+  ad_id text primary key,
+  snapshot_at timestamptz not null default now(),
+  price int,
+  km int,
+  year int,
+  gear text,
+  driveline text,
+  fuel_type text,
+  location_code text,
+  make text,
+  model text,
+  variant text,
+  eu_due date,
+  power_hp int,
+  weight_kg int,
+  equipment_score numeric,
+  supply_density int,
+  season_month int,
+  region text
+);
+
+-- Prediksjoner lagres for audit/visning
+create table if not exists public.price_predictions (
+  ad_id text primary key,
+  predicted_at timestamptz not null default now(),
+  p10 int,
+  p50 int,
+  p90 int,
+  prob_sell_14d numeric,
+  prob_sell_30d numeric
+);
+
+-- Enkel policy: service-role skriver, resten leser; stram inn etter behov
+alter table public.listings_raw enable row level security;
+alter table public.vehicles_enriched enable row level security;
+alter table public.market_features_daily enable row level security;
+alter table public.sales_events enable row level security;
+alter table public.price_features_current enable row level security;
+alter table public.price_predictions enable row level security;
+
+create policy "read_all_pa" on public.price_predictions
+  for select using (true);
+create policy "read_all_pf" on public.price_features_current
+  for select using (true);
+
+-- Skriv kun via service role
+create policy "write_service_only_listings" on public.listings_raw
+  for insert with check (auth.role() = 'service_role');
+create policy "write_service_only_enriched" on public.vehicles_enriched
+  for insert with check (auth.role() = 'service_role');
+create policy "write_service_only_preds" on public.price_predictions
+  for insert with check (auth.role() = 'service_role');
+
+
+Kjør denne i Supabase SQL Editor.
+
+3) Seed & mock
+
+Opprett seed/finn_sample.json (liten håndlaget liste – 5–10 biler):
+
+[
+  {
+    "ad_id": "FINN123",
+    "title": "Volkswagen Golf 1.6 TDI",
+    "price": 129000,
+    "km": 120000,
+    "year": 2016,
+    "gear": "Manual",
+    "driveline": "FWD",
+    "fuel_type": "Diesel",
+    "location_code": "NO-0301",
+    "equipment": ["ACC", "PDC", "WinterWheels"],
+    "seller_type": "dealer",
+    "status": "active",
+    "make": "Volkswagen",
+    "model": "Golf",
+    "variant": "1.6 TDI"
+  },
+  {
+    "ad_id": "FINN124",
+    "title": "BMW 3-serie 320i xDrive",
+    "price": 249000,
+    "km": 98000,
+    "year": 2017,
+    "gear": "Auto",
+    "driveline": "AWD",
+    "fuel_type": "Petrol",
+    "location_code": "NO-1103",
+    "equipment": ["HUD","Navi","LED"],
+    "seller_type": "dealer",
+    "status": "active",
+    "make": "BMW",
+    "model": "3-serie",
+    "variant": "320i xDrive"
+  }
+]
+
+4) Node utils (Supabase klient)
+
+Opprett server/utils/supabase.ts:
+
+import 'dotenv/config';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { persistSession: false } }
+);
+
+export default supabase;
+
+5) ETL – mock FINN ingest + enrichment
+
+server/etl/finn_mock_ingest.ts:
+
+import fs from 'fs';
+import path from 'path';
+import supabase from '../utils/supabase';
+
+type RawAd = {
+  ad_id: string;
+  title?: string;
+  price?: number;
+  km?: number;
+  year?: number;
+  gear?: string;
+  driveline?: string;
+  fuel_type?: string;
+  location_code?: string;
+  equipment?: string[];
+  seller_type?: string;
+  status?: string;
+  make?: string;
+  model?: string;
+  variant?: string;
+};
+
+(async () => {
+  const p = path.resolve(process.cwd(), 'seed/finn_sample.json');
+  const raw = JSON.parse(fs.readFileSync(p, 'utf-8')) as RawAd[];
+
+  // insert snapshot into listings_raw
+  const { error } = await supabase.from('listings_raw').insert(
+    raw.map(r => ({
+      ad_id: r.ad_id,
+      title: r.title,
+      price: r.price,
+      km: r.km,
+      year: r.year,
+      gear: r.gear,
+      driveline: r.driveline,
+      fuel_type: r.fuel_type,
+      location_code: r.location_code,
+      equipment: r.equipment ?? [],
+      seller_type: r.seller_type,
+      status: r.status,
+      regnr_hash: null,
+      vin_hash: null
+    }))
+  );
+  if (error) throw error;
+
+  // naive enrichment → vehicles_enriched + price_features_current
+  for (const r of raw) {
+    await supabase.from('vehicles_enriched').upsert({
+      ad_id: r.ad_id,
+      power_hp: r.fuel_type === 'Diesel' ? 110 : 135,
+      weight_kg: 1400,
+      wltp_consumption: 5.2,
+      eu_due: '2026-06-01',
+      doors: 5,
+      seats: 5,
+      ofv_trim_code: null,
+      make: r.make,
+      model: r.model,
+      variant: r.variant
+    });
+
+    const equipmentScore = (r.equipment?.length ?? 0) * 0.5;
+    const date = new Date();
+    await supabase.from('price_features_current').upsert({
+      ad_id: r.ad_id,
+      snapshot_at: date.toISOString(),
+      price: r.price,
+      km: r.km,
+      year: r.year,
+      gear: r.gear,
+      driveline: r.driveline,
+      fuel_type: r.fuel_type,
+      location_code: r.location_code,
+      make: r.make,
+      model: r.model,
+      variant: r.variant,
+      eu_due: '2026-06-01',
+      power_hp: r.fuel_type === 'Diesel' ? 110 : 135,
+      weight_kg: 1400,
+      equipment_score: equipmentScore,
+      supply_density: 12,
+      season_month: date.getUTCMonth() + 1,
+      region: (r.location_code ?? 'NO-0000').slice(0,2)
+    });
+  }
+
+  console.log('Mock FINN ingest + enrichment done.');
+})();
+
+6) ML – treningsskript (LightGBM + kvantiler)
+
+server/ml/train_quantiles.py:
+
+import os, joblib
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+import lightgbm as lgb
+
+# Hent features fra CSV eller Supabase eksport senere.
+# For POC les vi direkte fra seed-snapshot via en syntetisk tabell.
+df = pd.read_json('./seed/finn_sample.json')
+
+# Minimal feature engineering
+df['equipment_len'] = df['equipment'].apply(lambda x: len(x) if isinstance(x, list) else 0)
+df['is_awd'] = (df['driveline'] == 'AWD').astype(int)
+df['is_auto'] = (df['gear'].str.lower() == 'auto').astype(int)
+df['season_month'] = 8
+df['supply_density'] = 12
+
+features = ['km','year','equipment_len','is_awd','is_auto','season_month','supply_density']
+X = df[features].fillna(0)
+y = df['price'].fillna(df['price'].median())
+
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.3, random_state=42)
+
+def fit_quantile(alpha):
+    params = dict(
+        objective='quantile',
+        alpha=alpha,
+        learning_rate=0.05,
+        num_leaves=31,
+        n_estimators=600
+    )
+    m = lgb.LGBMRegressor(**params)
+    m.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
+    return m
+
+m_p10 = fit_quantile(0.10)
+m_p50 = fit_quantile(0.50)
+m_p90 = fit_quantile(0.90)
+
+os.makedirs('./ml', exist_ok=True)
+joblib.dump({'p10': m_p10, 'p50': m_p50, 'p90': m_p90, 'features': features}, './ml/model_lgbm_quantiles.pkl')
+print('Saved model to ./ml/model_lgbm_quantiles.pkl')
+
+
+Prediksjons‑helper server/ml/predict_quantiles.py:
+
+import sys, json, joblib, pandas as pd
+
+model = joblib.load('./ml/model_lgbm_quantiles.pkl')
+features = model['features']
+
+payload = json.loads(sys.stdin.read())
+# payload: { "km": int, "year": int, "gear": "Auto|Manual", "driveline":"AWD|FWD|RWD",
+#            "equipment_len": int, "season_month": int, "supply_density": int }
+
+df = pd.DataFrame([payload])
+for f in features:
+  if f not in df: df[f] = 0
+df = df[features].fillna(0)
+
+p10 = model['p10'].predict(df)[0]
+p50 = model['p50'].predict(df)[0]
+p90 = model['p90'].predict(df)[0]
+
+# naive probability of sale proxy (narrower band & lower km -> higher)
+band = max(1, p90 - p10)
+prob14 = max(0.05, min(0.95, 0.85 - band/300000 + (max(0, 200000 - payload.get('km', 0)))/800000))
+prob30 = min(0.98, prob14 + 0.1)
+
+print(json.dumps({"p10": int(p10), "p50": int(p50), "p90": int(p90),
+                  "prob14": round(float(prob14),2), "prob30": round(float(prob30),2)}))
+
+7) HTTP‑API for pris
+
+server/api/index.ts:
+
+import 'dotenv/config';
+import express from 'express';
+import cors from 'cors';
+import { spawn } from 'child_process';
+import supabase from '../utils/supabase';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.get('/health', (_, res) => res.json({ ok: true }));
+
+// Returner prediksjon for en ad_id fra feature store
+app.get('/api/price/suggest/:ad_id', async (req, res) => {
+  const { ad_id } = req.params;
+  const { data, error } = await supabase
+    .from('price_features_current')
+    .select('*')
+    .eq('ad_id', ad_id)
+    .maybeSingle();
+
+  if (error || !data) return res.status(404).json({ error: 'features not found' });
+
+  const payload = {
+    km: data.km ?? 0,
+    year: data.year ?? 2016,
+    gear: data.gear ?? 'Manual',
+    driveline: data.driveline ?? 'FWD',
+    equipment_len: Number(data.equipment_score ?? 0),
+    season_month: data.season_month ?? 8,
+    supply_density: data.supply_density ?? 10
+  };
+
+  const py = spawn('python', ['./server/ml/predict_quantiles.py'], { stdio: ['pipe', 'pipe', 'inherit'] });
+  py.stdin.write(JSON.stringify(payload));
+  py.stdin.end();
+
+  let out = '';
+  py.stdout.on('data', chunk => out += chunk.toString());
+  py.on('close', async () => {
+    try {
+      const pred = JSON.parse(out);
+      await supabase.from('price_predictions').upsert({
+        ad_id,
+        p10: pred.p10,
+        p50: pred.p50,
+        p90: pred.p90,
+        prob_sell_14d: pred.prob14,
+        prob_sell_30d: pred.prob30
+      });
+      res.json({ ad_id, ...pred });
+    } catch (e:any) {
+      res.status(500).json({ error: e.message, raw: out });
+    }
+  });
+});
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`API listening on :${port}`));
+
+
+Nodestarter server/index.ts:
+
+import './api';
+
+
+Scripts i package.json (legg til/oppdater):
+
+{
+  "scripts": {
+    "dev": "nodemon --watch server --exec ts-node server/index.ts",
+    "etl:mock": "ts-node server/etl/finn_mock_ingest.ts",
+    "ml:train": "python server/ml/train_quantiles.py"
+  }
+}
+
+8) Frontend – “Prisassistent” komponent
+
+web/src/components/PriceAssistant.tsx:
+
+import React, { useEffect, useMemo, useState } from 'react';
+
+type Pred = { p10:number; p50:number; p90:number; prob14:number; prob30:number };
+
+export default function PriceAssistant({ adId }: { adId: string }) {
+  const [pred, setPred] = useState<Pred | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    const run = async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        const r = await fetch(`/api/price/suggest/${adId}`);
+        if (!r.ok) throw new Error(await r.text());
+        const j = await r.json();
+        if (!ignore) setPred(j);
+      } catch (e:any) {
+        if (!ignore) setErr(e.message);
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+    run();
+    return () => { ignore = true; };
+  }, [adId]);
+
+  const band = useMemo(() => pred ? pred.p90 - pred.p10 : 0, [pred]);
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-lg backdrop-blur">
+      <h3 className="text-xl font-semibold mb-3">Prisassistent</h3>
+      {loading && <div className="text-sm opacity-70">Beregner…</div>}
+      {err && <div className="text-sm text-red-500">Feil: {err}</div>}
+      {pred && (
+        <div className="grid gap-3">
+          <div className="flex items-baseline gap-3">
+            <div className="text-3xl font-bold">{pred.p50.toLocaleString('no-NO')} kr</div>
+            <div className="text-sm opacity-80">Anbefalt (P50)</div>
+          </div>
+          <div className="text-sm opacity-80">
+            Trygt prisbånd: <span className="font-medium">{pred.p10.toLocaleString('no-NO')}–{pred.p90.toLocaleString('no-NO')} kr</span> ({band.toLocaleString('no-NO')} kr)
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-white/10 p-3">
+              <div className="text-2xl font-semibold">{Math.round(pred.prob14 * 100)}%</div>
+              <div className="text-xs opacity-70">Sjanse for salg < 14 dager</div>
+            </div>
+            <div className="rounded-xl border border-white/10 p-3">
+              <div className="text-2xl font-semibold">{Math.round(pred.prob30 * 100)}%</div>
+              <div className="text-xs opacity-70">Sjanse for salg < 30 dager</div>
+            </div>
+          </div>
+          <div className="text-xs opacity-70">
+            *Prognose basert på lignende biler, km, år, utstyr og markedsaktivitet.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+Eksempelbruk i en bil‑side web/src/pages/CarDetail.tsx:
+
+import React from 'react';
+import PriceAssistant from '../components/PriceAssistant';
+
+export default function CarDetail() {
+  const adId = 'FINN123'; // bind mot faktisk ad_id
+  return (
+    <div className="container mx-auto p-6">
+      {/* ...din bilvisning... */}
+      <div className="mt-6">
+        <PriceAssistant adId={adId} />
+      </div>
+    </div>
+  );
+}
+
+9) Koble dev‑servere
+
+I Vite web/vite.config.ts, legg proxy:
+
+server: {
+  proxy: {
+    '/api': 'http://localhost:3000'
+  }
+}
+
+10) Kjørerekkefølge (kommandolinje)
+
+Installer Python‑pakker:
+
+pip install -r server/ml/requirements.txt
+
+
+Seed + enrich (mock):
+
+npm run etl:mock
+
+
+Train modell:
+
+npm run ml:train
+
+
+Start API:
+
+npm run dev
+
+
+Start Vite (om ikke allerede): start frontend dev‑server.
+
+11) Neste steg (enkelt å utvide)
+
+Bytt finn_mock_ingest.ts med ekte klient når partner‑API er klart. Hold samme feltstruktur.
+
+Lag en nattlig jobb som:
+
+henter nye snapshots,
+
+recompute price_features_current,
+
+kjører ml:train ukentlig,
+
+invalidere/refresh price_predictions.
+
+Legg til “comps”:
+
+En enkel KNN (km, år, samme modell/variant) og returner 3–8 comps med justeringsbeløp i NOK.
+
+RLS: stram til lesetilgang per forhandler om nødvendig.
+
+Logg faktisk solgt pris fra ForhandlerPRO inn i sales_events for kontinuerlig kalibrering.
+
+Deliverables: Alle filer nevnt over opprettes/oppdateres, alle scripts kjørbare, og UI‑komponenten vises med data fra /api/price/suggest/:ad_id.
+
+End of prompt.

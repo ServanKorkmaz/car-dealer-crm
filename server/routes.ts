@@ -1013,13 +1013,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Pricing API routes
+  // Pricing API routes with ML model
   app.get('/api/cars/:id/price-suggestion', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const storage = await storagePromise;
-      const suggestion = await storage.getSuggestedPrice(req.params.id, userId);
-      res.json(suggestion);
+      const { spawn } = await import('child_process');
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+      
+      // Get car details
+      const car = await storage.getCarById(req.params.id, userId);
+      if (!car) {
+        return res.status(404).json({ message: "Car not found" });
+      }
+      
+      // Check if we have price features for this car
+      const result = await db.execute(
+        sql`SELECT * FROM price_features_current WHERE car_id = ${req.params.id} 
+            OR ad_id = ${`CAR_${req.params.id}`} LIMIT 1`
+      );
+      
+      let features: any;
+      if (result.rows.length > 0) {
+        features = result.rows[0];
+      } else {
+        // Create features from car data
+        const equipmentScore = car.equipment ? (Array.isArray(car.equipment) ? car.equipment.length : 
+                               typeof car.equipment === 'string' ? car.equipment.split(',').length : 0) * 0.5 : 0;
+        const date = new Date();
+        
+        features = {
+          km: car.mileage || 100000,
+          year: car.year || 2018,
+          gear: car.gearbox === 'Automat' ? 'Auto' : 'Manual',
+          driveline: 'FWD',
+          fuel_type: car.fuelType || 'Petrol',
+          equipment_len: equipmentScore,
+          equipment_score: equipmentScore,
+          season_month: date.getMonth() + 1,
+          supply_density: 10
+        };
+        
+        // Store features for future use
+        await db.execute(
+          sql`INSERT INTO price_features_current (
+            ad_id, car_id, price, km, year, gear, fuel_type,
+            equipment_score, supply_density, season_month
+          ) VALUES (
+            ${`CAR_${req.params.id}`}, ${req.params.id}, ${Math.round(parseFloat(car.salePrice || '0'))}, 
+            ${car.mileage || 0}, ${car.year || 2018}, ${features.gear}, 
+            ${car.fuelType || 'Petrol'}, ${equipmentScore}, ${10}, ${date.getMonth() + 1}
+          ) ON CONFLICT (ad_id) DO UPDATE SET
+            price = EXCLUDED.price,
+            km = EXCLUDED.km,
+            snapshot_at = NOW()`
+        );
+      }
+      
+      // Call Python ML model for predictions
+      const py = spawn('python', ['./server/ml/predict_quantiles.py'], { stdio: ['pipe', 'pipe', 'inherit'] });
+      py.stdin.write(JSON.stringify(features));
+      py.stdin.end();
+      
+      let output = '';
+      py.stdout.on('data', chunk => output += chunk.toString());
+      
+      await new Promise((resolve, reject) => {
+        py.on('close', async (code) => {
+          if (code !== 0) {
+            reject(new Error(`Python process exited with code ${code}`));
+            return;
+          }
+          
+          try {
+            const predictions = JSON.parse(output);
+            
+            // Store predictions in database
+            await db.execute(
+              sql`INSERT INTO price_predictions (
+                ad_id, car_id, p10, p50, p90, prob_sell_14d, prob_sell_30d
+              ) VALUES (
+                ${`CAR_${req.params.id}`}, ${req.params.id}, ${predictions.p10}, 
+                ${predictions.p50}, ${predictions.p90}, 
+                ${predictions.prob14}, ${predictions.prob30}
+              ) ON CONFLICT (ad_id) DO UPDATE SET
+                p10 = EXCLUDED.p10,
+                p50 = EXCLUDED.p50,
+                p90 = EXCLUDED.p90,
+                prob_sell_14d = EXCLUDED.prob_sell_14d,
+                prob_sell_30d = EXCLUDED.prob_sell_30d,
+                predicted_at = NOW()`
+            );
+            
+            // Get comparison cars
+            const comps = await db.execute(
+              sql`SELECT * FROM price_features_current 
+                  WHERE make = ${car.make} 
+                  AND ABS(year - ${car.year}) <= 2
+                  AND ad_id != ${`CAR_${req.params.id}`}
+                  ORDER BY ABS(km - ${car.mileage || 0})
+                  LIMIT 5`
+            );
+            
+            // Format response
+            const response = {
+              carId: req.params.id,
+              currentPrice: car.salePrice || 0,
+              predictions: {
+                p10: predictions.p10,
+                p50: predictions.p50,
+                p90: predictions.p90,
+                recommended: predictions.p50
+              },
+              saleability: {
+                prob14Days: predictions.prob14,
+                prob30Days: predictions.prob30,
+                rating: predictions.prob30 > 0.7 ? 'Høy' : 
+                        predictions.prob30 > 0.4 ? 'Middels' : 'Lav'
+              },
+              comparisons: comps.rows.map((comp: any) => ({
+                make: comp.make,
+                model: comp.model,
+                year: comp.year,
+                km: comp.km,
+                price: comp.price
+              })),
+              factors: {
+                mileage: car.mileage || 0,
+                year: car.year || 2018,
+                equipment: features.equipment_len || 0,
+                marketDemand: features.supply_density || 10
+              }
+            };
+            
+            res.json(response);
+            resolve(true);
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+      
     } catch (error: any) {
       console.error("Error getting price suggestion:", error);
       res.status(500).json({ message: error.message || "Failed to get price suggestion" });
