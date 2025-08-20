@@ -169,6 +169,7 @@ export interface IStorage {
     createdAt: Date 
   } | null>;
   createCompany(name: string): Promise<{ id: string; name: string; createdAt: Date }>;
+  ensureDefaultDepartment(): Promise<void>;
   addUserToCompany(userId: string, companyId: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"): Promise<void>;
   updateUserRole(userId: string, companyId: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"): Promise<void>;
   removeUserFromCompany(userId: string, companyId: string): Promise<void>;
@@ -908,6 +909,29 @@ export class DatabaseStorage implements IStorage {
       name: company.name,
       createdAt: company.createdAt || new Date()
     };
+  }
+
+  // Ensure default department exists
+  async ensureDefaultDepartment(): Promise<void> {
+    try {
+      const [existing] = await db
+        .select()
+        .from(companies)
+        .where(eq(companies.id, 'default-department'))
+        .limit(1);
+
+      if (!existing) {
+        await db
+          .insert(companies)
+          .values({ 
+            id: 'default-department',
+            name: 'Hovedavdeling'
+          })
+          .onConflictDoNothing();
+      }
+    } catch (error) {
+      console.error('Error ensuring default department:', error);
+    }
   }
 
   async addUserToCompany(userId: string, companyId: string, role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED"): Promise<void> {
