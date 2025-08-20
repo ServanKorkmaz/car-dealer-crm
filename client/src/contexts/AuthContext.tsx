@@ -129,6 +129,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        if (!isSupabaseConfigured) {
+          // Development mode - check for stored mock user
+          const storedUser = localStorage.getItem('mockUser');
+          if (storedUser) {
+            const mockUser = JSON.parse(storedUser);
+            setUser(mockUser);
+            setCurrentOrg(mockUser.current_org);
+            setUserRole(mockUser.role);
+            setOrganizations(mockUser.organizations);
+          }
+          setIsLoading(false);
+          return;
+        }
+
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
@@ -144,31 +158,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session);
-      
-      if (session?.user) {
-        await fetchUserData(session.user.id, session.user.email || '');
-      } else {
-        setUser(null);
-        setCurrentOrg(null);
-        setUserRole(null);
-        setOrganizations([]);
-        localStorage.removeItem('currentOrgId');
-      }
+    // Listen for auth changes (only in Supabase mode)
+    if (isSupabaseConfigured) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        setSession(session);
+        
+        if (session?.user) {
+          await fetchUserData(session.user.id, session.user.email || '');
+        } else {
+          setUser(null);
+          setCurrentOrg(null);
+          setUserRole(null);
+          setOrganizations([]);
+          localStorage.removeItem('currentOrgId');
+        }
 
-      if (event === 'SIGNED_OUT') {
-        setLocation('/login');
-      }
-    });
+        if (event === 'SIGNED_OUT') {
+          setLocation('/login');
+        }
+      });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
   }, [setLocation]);
 
   const signIn = async (email: string, password: string) => {
+    if (!isSupabaseConfigured) {
+      // Development mode - simulate login
+      console.log('Development mode: simulating login');
+      const mockUser: AuthUser = {
+        id: 'test-user-123',
+        email: 'test@forhandlerpro.no',
+        profile: { user_id: 'test-user-123', full_name: 'Test User', created_at: new Date(), updated_at: new Date() },
+        organizations: [{ id: 'default-company', name: 'Test Company' }],
+        current_org: { id: 'default-company', name: 'Test Company' },
+        role: 'owner' as OrgRole,
+      };
+      
+      setUser(mockUser);
+      setCurrentOrg({ id: 'default-company', name: 'Test Company' });
+      setUserRole('owner' as OrgRole);
+      setOrganizations([{ id: 'default-company', name: 'Test Company' }]);
+      
+      // Store in localStorage to persist across reloads
+      localStorage.setItem('mockUser', JSON.stringify(mockUser));
+      localStorage.setItem('currentOrgId', 'default-company');
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -196,6 +235,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    if (!isSupabaseConfigured) {
+      // Development mode - clear mock data
+      setUser(null);
+      setCurrentOrg(null);
+      setUserRole(null);
+      setOrganizations([]);
+      localStorage.removeItem('mockUser');
+      localStorage.removeItem('currentOrgId');
+      setLocation('/login');
+      return;
+    }
+
     const { error } = await supabase.auth.signOut();
     if (error) {
       throw error;
