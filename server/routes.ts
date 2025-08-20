@@ -1072,7 +1072,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Call Python ML model for predictions
-      const py = spawn('python', ['./server/ml/predict_quantiles.py'], { stdio: ['pipe', 'pipe', 'inherit'] });
+      const py = spawn('python', ['./server/ml/predict_realistic.py'], { stdio: ['pipe', 'pipe', 'inherit'] });
       py.stdin.write(JSON.stringify(features));
       py.stdin.end();
       
