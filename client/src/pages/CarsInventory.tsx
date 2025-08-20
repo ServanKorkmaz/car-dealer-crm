@@ -33,7 +33,11 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  X
+  X,
+  ArrowLeft,
+  ExternalLink,
+  Share2,
+  Globe
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -240,6 +244,15 @@ const CarCard = ({
                         <DropdownMenuItem onClick={(e) => handleQuickAction("Dupliser", e)}>
                           <Copy className="w-4 h-4 mr-2" />
                           Dupliser
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={(e) => handleQuickAction("Publiser til Finn.no", e)}>
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Publiser til Finn.no
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => handleQuickAction("Del på andre plattformer", e)}>
+                          <Share2 className="w-4 h-4 mr-2" />
+                          Del på andre plattformer
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
@@ -563,13 +576,23 @@ export default function CarsInventory() {
       <div className="container mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
-              Bilbeholdning
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Administrer din bilpark profesjonelt
-            </p>
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/')}
+              className="shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
+                Bilbeholdning
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Administrer din bilpark profesjonelt
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -585,6 +608,35 @@ export default function CarsInventory() {
               </TooltipContent>
             </Tooltip>
 
+            {/* Publish to platforms */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Globe className="w-4 h-4 mr-2" />
+                  Publiser
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => toast({ title: "Finn.no", description: "Publiserer valgte biler til Finn.no..." })}>
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Publiser til Finn.no
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toast({ title: "Bilbasen", description: "Publiserer til Bilbasen..." })}>
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Publiser til Bilbasen
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toast({ title: "AutoUncle", description: "Publiserer til AutoUncle..." })}>
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Publiser til AutoUncle
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => toast({ title: "Alle plattformer", description: "Publiserer til alle tilgjengelige plattformer..." })}>
+                  <Globe className="w-4 h-4 mr-2" />
+                  Publiser til alle
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {/* Export */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -594,11 +646,11 @@ export default function CarsInventory() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toast({ title: "PDF Eksport", description: "Eksporterer beholdning som PDF..." })}>
                   <FileText className="w-4 h-4 mr-2" />
                   Eksporter som PDF
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toast({ title: "Excel Eksport", description: "Eksporterer beholdning som Excel..." })}>
                   <TableProperties className="w-4 h-4 mr-2" />
                   Eksporter som Excel
                 </DropdownMenuItem>
@@ -958,6 +1010,22 @@ export default function CarsInventory() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBulkAction("Publiser til Finn.no")}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Publiser til Finn.no
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleBulkAction("Del på andre plattformer")}
+                      >
+                        <Share2 className="w-4 h-4 mr-2" />
+                        Andre plattformer
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
