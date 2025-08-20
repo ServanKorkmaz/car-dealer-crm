@@ -30,6 +30,7 @@ The application employs a modern full-stack architecture with clear separation o
 - **Smart Rule-Based Activity System**: For real-time event logging and intelligent notifications.
 - **Natural Language Contract Creation System**: Parses commands to pre-fill contract forms and automatically creates new customers if needed.
 - **Enhanced AI Assistant**: Features an "Answer-First" intent system for distinguishing between questions and commands, providing immediate data answers for questions and requiring confirmation for navigation from commands.
+- **AI Price Assistant with Realistic Norwegian Market Pricing**: Machine learning-powered pricing suggestions using quantile regression model calibrated for Norwegian automotive market, providing P10/P50/P90 price predictions and sale probability estimates based on vehicle age, mileage, transmission, fuel type, and equipment level.
 
 ### Database Design
 The PostgreSQL database includes:
