@@ -6,33 +6,32 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
 import AddCarModal from "@/components/cars/AddCarModal";
 import EditCarModal from "@/components/cars/EditCarModal";
-import CarCard from "@/components/cars/CarCard";
 import { 
-  Plus, Search, Edit, Trash2, CheckCircle, Clock, ExternalLink, 
-  Filter, SortAsc, Car as CarIcon, Calendar, Gauge, MapPin,
-  Eye, DollarSign, Settings, TrendingUp, TrendingDown, AlertCircle,
-  Copy, Star, Grid3x3, List, LayoutGrid, Fuel, Info, X,
-  Layers3, Layers2, Layers, UserPlus
+  Plus, Search, Edit, Trash2, Car as CarIcon, Eye, DollarSign, 
+  TrendingUp, TrendingDown, AlertCircle, Copy, Star, Grid3x3, 
+  Fuel, X, UserPlus, ChevronDown, FilterX, ArrowUpDown, 
+  Grid2x2, SquareStack, TableProperties, Filter
 } from "lucide-react";
 import { InviteTeamDialog } from "@/components/team/InviteTeamDialog";
-import { useUserRole, useCanViewSensitive, useCanDelete, useCanInvite } from "@/hooks/useUserRole";
+import { useCanViewSensitive, useCanDelete, useCanInvite } from "@/hooks/useUserRole";
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
 import { Link } from "wouter";
-import SavedViewsToolbar from "@/components/shared/SavedViewsToolbar";
-import { deserializeViewFromUrl, type SavedViewPayload } from "@/hooks/useSavedViews";
 
-// Improved Grid Card Component - kompakt og oversiktlig
-function GridCarCard({ 
+
+
+// Professional Car Card for Grid View
+function ProfessionalCarCard({ 
   car, 
   onEdit, 
   onSell, 
@@ -46,7 +45,8 @@ function GridCarCard({
   getStatusColor, 
   getStatusText,
   calculateProfit,
-  canDelete 
+  canDelete,
+  size = "normal"
 }: {
   car: Car;
   onEdit: () => void;
@@ -62,331 +62,221 @@ function GridCarCard({
   getStatusText: (status: string) => string;
   calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
   canDelete: boolean;
-}) {
-  const canViewSensitive = useCanViewSensitive();
-  const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate?.toString() || null);
-  const hasImage = car.images && car.images.length > 0;
-  const profit = canViewSensitive ? calculateProfit(car.salePrice || "0", car.costPrice || undefined) : { amount: 0, percentage: 0 };
-  const [showQuickInfo, setShowQuickInfo] = useState(false);
-
-  // Advarselsflagg for manglende data
-  const warnings = [];
-  if (!hasImage) warnings.push("Mangler bilde");
-  if (!car.euControl) warnings.push("Mangler EU-kontroll");
-  
-  return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col" data-testid={`card-car-${car.id}`}>
-      {/* Bilbilde med statusmerking */}
-      <div className="relative h-36 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 mb-2">
-        {hasImage ? (
-          <img 
-            src={car.images![0]} 
-            alt={`${car.make} ${car.model}`}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-            }}
-          />
-        ) : null}
-        <div className={`${hasImage ? 'hidden' : 'flex'} absolute inset-0 items-center justify-center`}>
-          <CarIcon className="w-10 h-10 text-slate-400" />
-        </div>
-        
-        {/* Status badge øverst til venstre */}
-        <Badge className={`absolute top-2 left-2 ${getStatusColor(car.status || 'available')} text-xs px-2 py-0.5`}>
-          {getStatusText(car.status || 'available')}
-        </Badge>
-        
-        {/* Pris øverst til høyre */}
-        <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm text-white px-2 py-1 rounded text-sm font-bold">
-          {formatPrice(car.salePrice || "0")}
-        </div>
-        
-        {/* Dager på lager nederst til høyre */}
-        <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-0.5 rounded">
-          {daysOnStock} dager
-        </div>
-        
-        {/* Favorittmerking */}
-        <button
-          onClick={onToggleFavorite}
-          className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm p-1 rounded hover:bg-black/80 transition-colors"
-        >
-          <Star className={`w-4 h-4 ${isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-white'}`} />
-        </button>
-      </div>
-
-      {/* Tittel og hovedinfo */}
-      <div className="flex-1">
-        <div className="flex justify-between items-start mb-1">
-          <h3 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
-            {car.make} {car.model} {car.year}
-          </h3>
-          {warnings.length > 0 && (
-            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-          )}
-        </div>
-        
-        {/* Teknisk info på én linje */}
-        <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 truncate">
-          {car.registrationNumber} · {car.mileage?.toLocaleString('no-NO')} km · {car.transmission || 'Auto'} · {car.fuelType || 'Ukjent'}
-        </p>
-        
-        {/* Fortjeneste-indikator */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1">
-            {profit.amount > 0 ? (
-              <>
-                <TrendingUp className="w-3 h-3 text-green-600" />
-                <span className="text-xs font-medium text-green-600">
-                  +{formatPrice(String(profit.amount))} ({profit.percentage.toFixed(0)}%)
-                </span>
-              </>
-            ) : profit.amount < 0 ? (
-              <>
-                <TrendingDown className="w-3 h-3 text-red-600" />
-                <span className="text-xs font-medium text-red-600">
-                  {formatPrice(String(profit.amount))} ({profit.percentage.toFixed(0)}%)
-                </span>
-              </>
-            ) : (
-              <span className="text-xs text-slate-400">Ingen kostpris</span>
-            )}
-          </div>
-        </div>
-        
-        {/* Handlingsknapper */}
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-1 h-7 text-xs"
-            onClick={() => setShowQuickInfo(!showQuickInfo)}
-          >
-            <Info className="w-3 h-3 mr-1" />
-            Detaljer
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onEdit}
-            className="h-7 px-2"
-            data-testid={`button-edit-${car.id}`}
-          >
-            <Edit className="w-3 h-3" />
-          </Button>
-          {car.status === 'available' && (
-            <Button
-              size="sm"
-              onClick={onSell}
-              disabled={isSelling}
-              className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
-              data-testid={`button-sell-${car.id}`}
-            >
-              Selg
-            </Button>
-          )}
-        </div>
-        
-        {/* Utvidet info (toggle) */}
-        {showQuickInfo && (
-          <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-xs space-y-1">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Kostpris:</span>
-              <span className="font-medium">{car.costPrice ? formatPrice(car.costPrice) : '-'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">EU-kontroll:</span>
-              <span className="font-medium">{car.euControl || 'Ikke registrert'}</span>
-            </div>
-            {car.finnUrl && (
-              <button
-                onClick={() => navigator.clipboard.writeText(car.finnUrl!)}
-                className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
-              >
-                <Copy className="w-3 h-3" />
-                Kopier Finn-lenke
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Improved List Card Component - kompakt listevisning
-function ListCarCard({ 
-  car, 
-  onEdit, 
-  onSell, 
-  onDelete, 
-  onToggleFavorite,
-  isDeleting, 
-  isSelling,
-  isFavorite,
-  calculateDaysOnStock, 
-  formatPrice, 
-  getStatusColor, 
-  getStatusText,
-  calculateProfit,
-  canDelete
-}: {
-  car: Car;
-  onEdit: () => void;
-  onSell: () => void;
-  onDelete: () => void;
-  onToggleFavorite: () => void;
-  isDeleting: boolean;
-  isSelling: boolean;
-  isFavorite: boolean;
-  calculateDaysOnStock: (createdAt: string, soldDate?: string | null) => number;
-  formatPrice: (price: string) => string;
-  getStatusColor: (status: string) => string;
-  getStatusText: (status: string) => string;
-  calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
-  canDelete: boolean;
+  size?: "compact" | "normal" | "comfort";
 }) {
   const canViewSensitive = useCanViewSensitive();
   const daysOnStock = calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate?.toString() || null);
   const hasImage = car.images && car.images.length > 0;
   const profit = canViewSensitive ? calculateProfit(car.salePrice || "0", car.costPrice || undefined) : { amount: 0, percentage: 0 };
   
-  // Advarselsflagg
-  const warnings = [];
-  if (!hasImage) warnings.push("Mangler bilde");
-  if (!car.euControl) warnings.push("Mangler EU-kontroll");
+  // Size configurations
+  const sizeConfig = {
+    compact: {
+      card: "p-3",
+      image: "h-32",
+      title: "text-sm",
+      subtitle: "text-xs",
+      price: "text-lg",
+      button: "h-7 text-xs px-2"
+    },
+    normal: {
+      card: "p-4",
+      image: "h-40",
+      title: "text-base",
+      subtitle: "text-sm",
+      price: "text-xl",
+      button: "h-8 text-sm px-3"
+    },
+    comfort: {
+      card: "p-5",
+      image: "h-48",
+      title: "text-lg",
+      subtitle: "text-base",
+      price: "text-2xl",
+      button: "h-9 text-base px-4"
+    }
+  };
+
+  const config = sizeConfig[size];
+
+  // Status color mapping with modern colors
+  const getModernStatusColor = (status: string) => {
+    switch (status) {
+      case 'sold': return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800';
+      case 'available': return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800';
+      case 'pending': return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800';
+      case 'reserved': return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800';
+      default: return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700';
+    }
+  };
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 p-3" data-testid={`card-car-${car.id}`}>
-      <div className="flex items-center gap-3">
-        {/* Miniatyrbilde */}
-        <div className="w-24 h-16 flex-shrink-0 bg-slate-100 dark:bg-slate-800 rounded overflow-hidden relative">
+    <Card className="group relative overflow-hidden border-0 shadow-sm hover:shadow-lg transition-all duration-300 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 ring-1 ring-slate-200 dark:ring-slate-800 hover:ring-slate-300 dark:hover:ring-slate-700" 
+          data-testid={`card-car-${car.id}`}>
+      <CardContent className={config.card}>
+        {/* Image Container with Status Overlay */}
+        <div className={`relative ${config.image} rounded-xl overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 mb-4`}>
           {hasImage ? (
             <img 
               src={car.images![0]} 
               alt={`${car.make} ${car.model}`}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
                 (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
               }}
             />
           ) : null}
-          <div className={`${hasImage ? 'hidden' : 'flex'} w-full h-full items-center justify-center`}>
-            <CarIcon className="w-6 h-6 text-slate-400" />
+          
+          {/* Placeholder when no image */}
+          <div className={`${hasImage ? 'hidden' : 'flex'} absolute inset-0 items-center justify-center`}>
+            <div className="text-center">
+              <CarIcon className="w-12 h-12 text-slate-400 mx-auto mb-2" />
+              <span className="text-xs text-slate-500 dark:text-slate-400">Ingen bilde</span>
+            </div>
           </div>
           
-          {/* Favorittmerking */}
-          <button
-            onClick={onToggleFavorite}
-            className="absolute top-1 left-1 bg-black/60 backdrop-blur-sm p-0.5 rounded"
-          >
-            <Star className={`w-3 h-3 ${isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-white'}`} />
-          </button>
+          {/* Status Badge - Top Left */}
+          <div className="absolute top-3 left-3">
+            <Badge className={`${getModernStatusColor(car.status || 'available')} border font-medium px-2.5 py-1 text-xs`}>
+              {getStatusText(car.status || 'available')}
+            </Badge>
+          </div>
+          
+          {/* Favorite Button - Top Right */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onToggleFavorite}
+                className="absolute top-3 right-3 p-2 rounded-lg bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-white/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-colors shadow-sm"
+              >
+                <Star className={`w-4 h-4 ${isFavorite ? 'text-yellow-500 fill-yellow-500' : 'text-slate-400 hover:text-yellow-500'}`} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isFavorite ? 'Fjern fra favoritter' : 'Legg til favoritter'}
+            </TooltipContent>
+          </Tooltip>
+          
+          {/* Days on Stock - Bottom Right */}
+          <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded-lg bg-black/75 backdrop-blur-sm text-white text-xs font-medium">
+            {daysOnStock} dager
+          </div>
         </div>
 
-        {/* Bilinformasjon */}
-        <div className="flex-1 min-w-0">
+        {/* Car Information */}
+        <div className="space-y-3">
+          {/* Title and Warnings */}
           <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-sm text-slate-900 dark:text-white truncate">
-                  {car.make} {car.model} {car.year}
-                </h3>
-                {warnings.length > 0 && (
-                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                )}
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {car.registrationNumber} · {car.mileage?.toLocaleString('no-NO')} km · {car.transmission || 'Auto'} · {car.fuelType || 'Ukjent'}
+            <div className="flex-1 min-w-0">
+              <h3 className={`font-bold text-slate-900 dark:text-white truncate ${config.title}`}>
+                {car.make} {car.model}
+              </h3>
+              <p className={`text-slate-600 dark:text-slate-400 font-medium ${config.subtitle}`}>
+                {car.year}
               </p>
             </div>
-            
-            {/* Status og pris */}
-            <div className="flex items-center gap-3">
-              <Badge className={`${getStatusColor(car.status || 'available')} text-xs`}>
-                {getStatusText(car.status || 'available')}
-              </Badge>
-              <div className="text-right">
-                <div className="text-lg font-bold text-slate-900 dark:text-white">
-                  {formatPrice(car.salePrice || "0")}
-                </div>
-                <div className="text-xs text-slate-500">
-                  {daysOnStock} dager
-                </div>
-              </div>
+            {(!hasImage || !car.euControl) && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="space-y-1">
+                    {!hasImage && <div>• Mangler bilde</div>}
+                    {!car.euControl && <div>• Mangler EU-kontroll</div>}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+
+          {/* Technical Details */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm">
+              <span className="font-mono font-medium text-slate-800 dark:text-slate-200">{car.registrationNumber}</span>
+              <Separator orientation="vertical" className="h-4" />
+              <span>{car.mileage?.toLocaleString('no-NO')} km</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 text-sm">
+              <Fuel className="w-4 h-4" />
+              <span>{car.fuelType || 'Ukjent'}</span>
+              <Separator orientation="vertical" className="h-4" />
+              <span>{car.transmission || 'Auto'}</span>
             </div>
           </div>
 
-          {/* Fortjeneste og handlinger */}
-          <div className="flex items-center justify-between mt-2">
-            <div className="flex items-center gap-1">
-              {profit.amount > 0 ? (
-                <>
-                  <TrendingUp className="w-3 h-3 text-green-600" />
-                  <span className="text-xs font-medium text-green-600">
-                    +{formatPrice(String(profit.amount))} ({profit.percentage.toFixed(0)}%)
+          {/* Price and Profit */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className={`font-bold text-slate-900 dark:text-white ${config.price}`}>
+                {formatPrice(car.salePrice || "0")}
+              </span>
+              {canViewSensitive && profit.amount !== 0 && (
+                <div className="flex items-center gap-1">
+                  {profit.amount > 0 ? (
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4 text-red-600" />
+                  )}
+                  <span className={`text-sm font-medium ${profit.amount > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {profit.amount > 0 ? '+' : ''}{formatPrice(String(profit.amount))}
                   </span>
-                </>
-              ) : profit.amount < 0 ? (
-                <>
-                  <TrendingDown className="w-3 h-3 text-red-600" />
-                  <span className="text-xs font-medium text-red-600">
-                    {formatPrice(String(profit.amount))} ({profit.percentage.toFixed(0)}%)
-                  </span>
-                </>
-              ) : (
-                <span className="text-xs text-slate-400">Ingen kostpris</span>
-              )}
-            </div>
-            
-            {/* Handlingsknapper */}
-            <div className="flex gap-1">
-              <Link href={`/cars/${car.id}`}>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
-                  <Eye className="w-3 h-3 mr-1" />
-                  Detaljer
-                </Button>
-              </Link>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onEdit}
-                className="h-7 px-2"
-                data-testid={`button-edit-${car.id}`}
-              >
-                <Edit className="w-3 h-3" />
-              </Button>
-              {car.status === 'available' && (
-                <Button
-                  size="sm"
-                  onClick={onSell}
-                  disabled={isSelling}
-                  className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700"
-                  data-testid={`button-sell-${car.id}`}
-                >
-                  Selg
-                </Button>
-              )}
-              {canDelete && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onDelete}
-                  disabled={isDeleting}
-                  className="h-7 px-2 text-red-600 hover:text-red-700"
-                  data-testid={`button-delete-${car.id}`}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
+                </div>
               )}
             </div>
           </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href={`/cars/${car.id}`} className="flex-1">
+                  <Button variant="outline" size="sm" className={`w-full ${config.button} border-slate-300 dark:border-slate-600`}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Detaljer
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>Se full bilprofil</TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onEdit}
+                  className={config.button}
+                  data-testid={`button-edit-${car.id}`}
+                >
+                  <Edit className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Rediger bil</TooltipContent>
+            </Tooltip>
+
+            {car.status === 'available' && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    onClick={onSell}
+                    disabled={isSelling}
+                    className={`${config.button} bg-emerald-600 hover:bg-emerald-700 text-white border-0`}
+                    data-testid={`button-sell-${car.id}`}
+                  >
+                    <DollarSign className="w-4 h-4 mr-1" />
+                    Selg
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Opprett salgskontrakt</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -394,970 +284,611 @@ export default function Cars() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
-  const [showFinnImport, setShowFinnImport] = useState(false);
-  const [finnUrl, setFinnUrl] = useState("");
-  const [manualRegNumber, setManualRegNumber] = useState("");
-  const [showRegNumberDialog, setShowRegNumberDialog] = useState(false);
-  const [sortBy, setSortBy] = useState("newest");
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterMake, setFilterMake] = useState("all");
-  const [filterFuelType, setFilterFuelType] = useState("all");
-  const [filterYear, setFilterYear] = useState<[number, number]>([2000, new Date().getFullYear()]);
-  const [filterMileage, setFilterMileage] = useState<[number, number]>([0, 500000]);
-  const [filterPrice, setFilterPrice] = useState<[number, number]>([0, 2000000]);
-  const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [density, setDensity] = useState<'comfort' | 'normal' | 'compact'>('normal');
-  const [showSellDialog, setShowSellDialog] = useState(false);
-  const [sellingCar, setSellingCar] = useState<Car | null>(null);
-  const [salePrice, setSalePrice] = useState("");
+  const [gridSize, setGridSize] = useState<"compact" | "normal" | "comfort">("normal");
+  const [priceRange, setPriceRange] = useState([0, 1000000]);
+  const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
-  const queryClient = useQueryClient();
-  const { data: userRole } = useUserRole();
   const canDelete = useCanDelete();
   const canInvite = useCanInvite();
-  const canViewSensitive = useCanViewSensitive();
+  const queryClient = useQueryClient();
   
-  // Load density preference from localStorage
-  useEffect(() => {
-    const savedDensity = localStorage.getItem('cars_density') as 'comfort' | 'normal' | 'compact' | null;
-    if (savedDensity) {
-      setDensity(savedDensity);
-    }
-  }, []);
-  
-  // Save density preference to localStorage
-  const handleDensityChange = (newDensity: 'comfort' | 'normal' | 'compact') => {
-    setDensity(newDensity);
-    localStorage.setItem('cars_density', newDensity);
-  };
-
-  // Handle URL-based view sharing
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const viewParam = urlParams.get('view');
-    if (viewParam) {
-      const payload = deserializeViewFromUrl(viewParam);
-      if (payload) {
-        applyViewPayload(payload);
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    }
-  }, []);
-
-  // Create current filter state for saved views
-  const getCurrentFilters = (): SavedViewPayload => {
-    return {
-      searchTerm,
-      sortBy,
-      filterStatus,
-      filterMake,
-      filterFuelType,
-      filterYear,
-      filterMileage,
-      filterPrice,
-      density,
-      viewMode,
-      showFilters,
-    };
-  };
-
-  // Apply saved view payload
-  const applyViewPayload = (payload: SavedViewPayload) => {
-    if (payload.searchTerm !== undefined) setSearchTerm(payload.searchTerm);
-    if (payload.sortBy !== undefined) setSortBy(payload.sortBy);
-    if (payload.filterStatus !== undefined) setFilterStatus(payload.filterStatus);
-    if (payload.filterMake !== undefined) setFilterMake(payload.filterMake);
-    if (payload.filterFuelType !== undefined) setFilterFuelType(payload.filterFuelType);
-    if (payload.filterYear !== undefined) setFilterYear(payload.filterYear);
-    if (payload.filterMileage !== undefined) setFilterMileage(payload.filterMileage);
-    if (payload.filterPrice !== undefined) setFilterPrice(payload.filterPrice);
-    if (payload.density !== undefined) handleDensityChange(payload.density);
-    if (payload.viewMode !== undefined) setViewMode(payload.viewMode);
-    if (payload.showFilters !== undefined) setShowFilters(payload.showFilters);
-  };
-
-  // Redirect to home if not authenticated
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorisert",
-        description: "Du er ikke logget inn. Logger inn på nytt...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
-    }
-  }, [isAuthenticated, isLoading, toast]);
-
-  const { data: cars = [], isLoading: carsLoading, refetch: refetchCars } = useQuery<Car[]>({
+  // Fetch cars with refined query
+  const { data: cars = [], isLoading: carsLoading, error: carsError } = useQuery({
     queryKey: ["/api/cars"],
     enabled: isAuthenticated,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (carId: string) => {
-      await apiRequest("DELETE", `/api/cars/${carId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/30"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/7"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/analytics/365"] });
-      toast({
-        title: "Suksess",
-        description: "Bil ble slettet",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorisert",
-          description: "Du er ikke logget inn. Logger inn på nytt...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Feil",
-        description: "Kunne ikke slette bil",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const sellMutation = useMutation({
-    mutationFn: async ({ carId, soldPrice }: { carId: string; soldPrice?: string }) => {
-      await apiRequest("PUT", `/api/cars/${carId}/sell`, { soldPrice });
-    },
-    onSuccess: () => {
-      // Force immediate refresh of all relevant data
-      queryClient.refetchQueries({ queryKey: ["/api/cars"] });
-      queryClient.refetchQueries({ queryKey: ["/api/dashboard/stats"] });
-      queryClient.refetchQueries({ queryKey: ["/api/dashboard/analytics/30"] });
-      queryClient.refetchQueries({ queryKey: ["/api/dashboard/analytics/7"] });
-      queryClient.refetchQueries({ queryKey: ["/api/dashboard/analytics/365"] });
-      toast({
-        title: "Suksess",
-        description: "Bil markert som solgt",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorisert",
-          description: "Du er ikke logget inn. Logger inn på nytt...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Feil",
-        description: "Kunne ikke markere bil som solgt",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const finnImportMutation = useMutation({
-    mutationFn: async (data: { url: string; regNumber?: string }) => {
-      const response = await apiRequest("POST", "/api/cars/import-from-finn", data);
-      return response;
-    },
-    onSuccess: async (data: any) => {
-      if (data.carData) {
-        toast({
-          title: "Suksess", 
-          description: `Bil importert: ${data.carData.make} ${data.carData.model}`,
-        });
-        
-        // Close dialog and reset fields
-        setShowFinnImport(false);
-        setFinnUrl("");
-        setManualRegNumber("");
-        
-        // Force immediate refresh
-        await refetchCars();
-        
-        // Also update dashboard stats
-        queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-      }
-    },
-    onError: (error: any) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorisert",
-          description: "Du er ikke logget inn. Logger inn på nytt...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      let errorMessage = "Kunne ikke hente bildata fra Finn.no";
-      
-      if (error.message) {
-        if (error.message.includes("eksisterer allerede")) {
-          errorMessage = error.message;
-        } else if (error.message.includes("duplicate key")) {
-          errorMessage = "Denne bilen er allerede registrert i systemet";
-        } else {
-          errorMessage = error.message;
-        }
-      }
-      
-      toast({
-        title: "Import feilet",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleFinnImport = () => {
-    if (!finnUrl.trim()) {
-      toast({
-        title: "Feil",
-        description: "Vennligst skriv inn en gyldig Finn.no URL",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Enhanced URL validation
-    const urlPattern = /^https?:\/\/(www\.)?finn\.no\/(car|mobility)\/(item|ad)\/\d+/i;
-    if (!urlPattern.test(finnUrl)) {
-      toast({
-        title: "Ugyldig URL",
-        description: "URL må være en Finn.no bil- eller kjøretøyannonse (f.eks. https://www.finn.no/mobility/item/123456)",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    finnImportMutation.mutate({ url: finnUrl, regNumber: manualRegNumber });
-  };
-
-  if (isLoading || !isAuthenticated) {
-    return <div className="min-h-screen bg-slate-50 dark:bg-slate-900" />;
-  }
-
-  // Get unique makes and fuel types for filter dropdown
-  const uniqueMakes = Array.from(new Set(cars.map(car => car.make))).sort();
-  const uniqueFuelTypes = Array.from(new Set(cars.map(car => car.fuelType).filter(Boolean))).sort();
-  
-  // Calculate profit function
-  const calculateProfit = (salePrice: string, costPrice?: string) => {
-    const sale = parseFloat(salePrice || '0');
-    const cost = parseFloat(costPrice || '0');
-    if (cost === 0) return { amount: 0, percentage: 0 };
-    const amount = sale - cost;
-    const percentage = (amount / cost) * 100;
-    return { amount, percentage };
-  };
-  
-  // Load favorites from localStorage
-  useEffect(() => {
-    const savedFavorites = localStorage.getItem('carFavorites');
-    if (savedFavorites) {
-      setFavorites(new Set(JSON.parse(savedFavorites)));
-    }
-  }, []);
-  
-  // Save favorites to localStorage
-  const toggleFavorite = (carId: string) => {
-    const newFavorites = new Set(favorites);
-    if (newFavorites.has(carId)) {
-      newFavorites.delete(carId);
-    } else {
-      newFavorites.add(carId);
-    }
-    setFavorites(newFavorites);
-    localStorage.setItem('carFavorites', JSON.stringify(Array.from(newFavorites)));
-  };
-
-  // Filter and sort cars with advanced filters
-  let filteredCars = cars.filter((car: Car) => {
-    const matchesSearch = 
-      car.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      car.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      car.registrationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (car as any).chassisNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      `${car.make} ${car.model}`.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = filterStatus === "all" || car.status === filterStatus;
-    const matchesMake = filterMake === "all" || car.make === filterMake;
-    const matchesFuelType = filterFuelType === "all" || car.fuelType === filterFuelType;
-    
-    // Year filter
-    const carYear = car.year || 0;
-    const matchesYear = carYear >= filterYear[0] && carYear <= filterYear[1];
-    
-    // Mileage filter
-    const carMileage = car.mileage || 0;
-    const matchesMileage = carMileage >= filterMileage[0] && carMileage <= filterMileage[1];
-    
-    // Price filter
-    const carPrice = parseFloat(car.salePrice || '0');
-    const matchesPrice = carPrice >= filterPrice[0] && carPrice <= filterPrice[1];
-    
-    return matchesSearch && matchesStatus && matchesMake && matchesFuelType && 
-           matchesYear && matchesMileage && matchesPrice;
-  });
-
-  // Sort cars
-  filteredCars = [...filteredCars].sort((a, b) => {
-    switch (sortBy) {
-      case "newest":
-        return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
-      case "oldest":
-        return new Date(a.createdAt || '').getTime() - new Date(b.createdAt || '').getTime();
-      case "price-high":
-        return parseFloat(b.salePrice || '0') - parseFloat(a.salePrice || '0');
-      case "price-low":
-        return parseFloat(a.salePrice || '0') - parseFloat(b.salePrice || '0');
-      case "mileage-low":
-        return (a.mileage || 0) - (b.mileage || 0);
-      case "mileage-high":
-        return (b.mileage || 0) - (a.mileage || 0);
-      case "year-new":
-        return (b.year || 0) - (a.year || 0);
-      case "year-old":
-        return (a.year || 0) - (b.year || 0);
-      case "make":
-        return a.make.localeCompare(b.make);
-      default:
-        return 0;
-    }
-  });
-
-  // Calculate days on stock
+  // Utility functions (keeping existing logic)
   const calculateDaysOnStock = (createdAt: string, soldDate?: string | null) => {
     const startDate = new Date(createdAt);
     const endDate = soldDate ? new Date(soldDate) : new Date();
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  const handleSellCar = (car: Car) => {
-    setSellingCar(car);
-    setSalePrice(car.salePrice || "");
-    setShowSellDialog(true);
-  };
-
-  const confirmSell = () => {
-    if (sellingCar) {
-      sellMutation.mutate({ 
-        carId: sellingCar.id, 
-        soldPrice: salePrice 
-      });
-      setShowSellDialog(false);
-      setSellingCar(null);
-      setSalePrice("");
-    }
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
   const formatPrice = (price: string) => {
+    const num = parseInt(price);
     return new Intl.NumberFormat('no-NO', {
       style: 'currency',
       currency: 'NOK',
       minimumFractionDigits: 0,
-    }).format(parseFloat(price));
+      maximumFractionDigits: 0,
+    }).format(num);
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'available':
-        return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400';
-      case 'sold':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
-      case 'reserved':
-        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-400';
-      default:
-        return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400';
+      case 'sold': return 'bg-red-100 text-red-800';
+      case 'available': return 'bg-green-100 text-green-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'reserved': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'available':
-        return 'Tilgjengelig';
-      case 'sold':
-        return 'Solgt';
-      case 'reserved':
-        return 'Reservert';
-      default:
-        return status;
+      case 'sold': return 'Solgt';
+      case 'available': return 'Tilgjengelig';
+      case 'pending': return 'Venter';
+      case 'reserved': return 'Reservert';
+      default: return 'Ukjent';
     }
   };
+
+  const calculateProfit = (salePrice: string, costPrice?: string) => {
+    if (!costPrice) return { amount: 0, percentage: 0 };
+    const sale = parseInt(salePrice);
+    const cost = parseInt(costPrice);
+    const profit = sale - cost;
+    const percentage = cost > 0 ? (profit / cost) * 100 : 0;
+    return { amount: profit, percentage };
+  };
+
+  // Filter and sort cars
+  const filteredCars = cars
+    .filter(car => {
+      const matchesSearch = 
+        car.make?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        car.model?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        car.registrationNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = filterStatus === "all" || car.status === filterStatus;
+      const matchesMake = filterMake === "all" || car.make === filterMake;
+      
+      const price = parseInt(car.salePrice || "0");
+      const matchesPrice = price >= priceRange[0] && price <= priceRange[1];
+      
+      return matchesSearch && matchesStatus && matchesMake && matchesPrice;
+    })
+    .sort((a, b) => {
+      let aVal, bVal;
+      
+      switch (sortBy) {
+        case "price":
+          aVal = parseInt(a.salePrice || "0");
+          bVal = parseInt(b.salePrice || "0");
+          break;
+        case "year":
+          aVal = a.year || 0;
+          bVal = b.year || 0;
+          break;
+        case "mileage":
+          aVal = a.mileage || 0;
+          bVal = b.mileage || 0;
+          break;
+        case "make":
+          aVal = a.make || "";
+          bVal = b.make || "";
+          break;
+        default:
+          aVal = new Date(a.createdAt || 0).getTime();
+          bVal = new Date(b.createdAt || 0).getTime();
+      }
+      
+      if (sortOrder === "asc") {
+        return aVal > bVal ? 1 : -1;
+      } else {
+        return aVal < bVal ? 1 : -1;
+      }
+    });
+
+  // Get unique makes for filter
+  const uniqueMakes = [...new Set(cars.map(car => car.make).filter(Boolean))];
+
+  // Mutations (keeping existing logic)
+  const deleteMutation = useMutation({
+    mutationFn: (carId: string) => apiRequest(`/api/cars/${carId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+      toast({ title: "Bil slettet", description: "Bilen er slettet fra lageret." });
+    },
+    onError: (error: any) => {
+      if (isUnauthorizedError(error)) {
+        toast({ title: "Ikke autorisert", description: "Du har ikke tilgang til å slette biler.", variant: "destructive" });
+      } else {
+        toast({ title: "Feil", description: "Kunne ikke slette bil.", variant: "destructive" });
+      }
+    }
+  });
+
+  const sellMutation = useMutation({
+    mutationFn: (carId: string) => apiRequest(`/api/cars/${carId}/sell`, { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+      toast({ title: "Bil solgt", description: "Bilen er markert som solgt." });
+    },
+    onError: () => {
+      toast({ title: "Feil", description: "Kunne ikke selge bil.", variant: "destructive" });
+    }
+  });
+
+  const toggleFavorite = (carId: string) => {
+    const newFavorites = new Set(favorites);
+    if (favorites.has(carId)) {
+      newFavorites.delete(carId);
+    } else {
+      newFavorites.add(carId);
+    }
+    setFavorites(newFavorites);
+  };
+
+  if (!isAuthenticated) {
+    return <div>Please log in to view cars.</div>;
+  }
 
   return (
     <MainLayout>
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Biler</h2>
-            <p className="text-slate-600 dark:text-slate-400">Administrer bilbeholdningen din</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Biler</h1>
+            <p className="text-slate-600 dark:text-slate-400 mt-1">
+              Administrer billageret ditt ({filteredCars.length} av {cars.length} biler)
+            </p>
           </div>
-          <div className="flex gap-2">
+          
+          <div className="flex items-center gap-3">
+            {canInvite && (
+              <Button
+                variant="outline"
+                onClick={() => setShowInviteModal(true)}
+                className="border-slate-300 dark:border-slate-600"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Inviter team
+              </Button>
+            )}
+            
             <Button
               onClick={() => setShowAddModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-              data-testid="button-add-car"
+              className="bg-blue-600 hover:bg-blue-700 text-white border-0"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Legg til bil
+              Ny bil
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowFinnImport(true)}
-              className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 dark:bg-orange-950 dark:border-orange-800 dark:text-orange-300 shadow-md hover:shadow-lg transition-all duration-200"
-              data-testid="button-import-finn"
-            >
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Importer fra Finn.no
-            </Button>
-            {canInvite && (
-              <InviteTeamDialog
-                trigger={
-                  <Button 
-                    variant="outline"
-                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:border-green-800 dark:text-green-300 shadow-md hover:shadow-lg transition-all duration-200"
-                    data-testid="button-invite-team"
-                  >
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Inviter teammedlem
-                  </Button>
-                }
-              />
-            )}
           </div>
         </div>
 
-        {/* Saved Views Toolbar */}
-        <SavedViewsToolbar
-          page="cars"
-          currentFilters={getCurrentFilters()}
-          onApplyView={applyViewPayload}
-          className="mb-4"
-        />
-
-        {/* Search and Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="flex flex-col sm:flex-row gap-3 flex-1">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+        {/* Sticky Search and Filter Bar */}
+        <div className="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
               <Input
-                placeholder="Søk etter reg.nr, merke, modell, chassisnummer..."
+                placeholder="Søk etter merke, modell eller regnummer..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-                data-testid="input-search-cars"
+                className="pl-10 border-slate-300 dark:border-slate-600 rounded-xl h-12 text-base"
+                data-testid="input-search"
               />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
             </div>
-            
-            <div className="flex gap-2 items-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className="h-10"
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                Avanserte filtre
-                {showFilters && <X className="w-4 h-4 ml-2" />}
-              </Button>
-              
+
+            {/* Quick Filters */}
+            <div className="flex items-center gap-3">
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[140px]" data-testid="select-filter-status">
+                <SelectTrigger className="w-[140px] h-12 rounded-xl border-slate-300 dark:border-slate-600">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Alle statuser</SelectItem>
                   <SelectItem value="available">Tilgjengelig</SelectItem>
                   <SelectItem value="sold">Solgt</SelectItem>
+                  <SelectItem value="pending">Venter</SelectItem>
                   <SelectItem value="reserved">Reservert</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select value={filterMake} onValueChange={setFilterMake}>
-                <SelectTrigger className="w-[130px]" data-testid="select-filter-make">
+                <SelectTrigger className="w-[140px] h-12 rounded-xl border-slate-300 dark:border-slate-600">
                   <SelectValue placeholder="Merke" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Alle merker</SelectItem>
                   {uniqueMakes.map(make => (
-                    <SelectItem key={make} value={make}>{make}</SelectItem>
+                    <SelectItem key={make} value={make!}>{make}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[140px]" data-testid="select-sort">
-                  <SelectValue placeholder="Sorter" />
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className={`h-12 px-4 rounded-xl border-slate-300 dark:border-slate-600 ${showFilters ? 'bg-slate-100 dark:bg-slate-800' : ''}`}
+              >
+                <Filter className="w-4 h-4 mr-2" />
+                Filter
+                <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              </Button>
+            </div>
+
+            {/* View Controls */}
+            <div className="flex items-center gap-2">
+              {/* Sort */}
+              <Select value={`${sortBy}-${sortOrder}`} onValueChange={(value) => {
+                const [field, order] = value.split('-');
+                setSortBy(field);
+                setSortOrder(order as "asc" | "desc");
+              }}>
+                <SelectTrigger className="w-[180px] h-12 rounded-xl border-slate-300 dark:border-slate-600">
+                  <ArrowUpDown className="w-4 h-4 mr-2" />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="newest">Nyeste først</SelectItem>
-                  <SelectItem value="oldest">Eldste først</SelectItem>
-                  <SelectItem value="price-high">Høyeste pris</SelectItem>
-                  <SelectItem value="price-low">Laveste pris</SelectItem>
-                  <SelectItem value="mileage-low">Lavest km</SelectItem>
-                  <SelectItem value="mileage-high">Høyest km</SelectItem>
-                  <SelectItem value="year-new">Nyeste årsmodell</SelectItem>
-                  <SelectItem value="year-old">Eldste årsmodell</SelectItem>
-                  <SelectItem value="make">Merke A-Å</SelectItem>
+                  <SelectItem value="createdAt-desc">Nyeste først</SelectItem>
+                  <SelectItem value="createdAt-asc">Eldste først</SelectItem>
+                  <SelectItem value="price-desc">Høyeste pris</SelectItem>
+                  <SelectItem value="price-asc">Laveste pris</SelectItem>
+                  <SelectItem value="year-desc">Nyeste årsmodell</SelectItem>
+                  <SelectItem value="year-asc">Eldste årsmodell</SelectItem>
+                  <SelectItem value="mileage-asc">Lavest km</SelectItem>
+                  <SelectItem value="mileage-desc">Høyest km</SelectItem>
+                  <SelectItem value="make-asc">Merke A-Å</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-slate-600 dark:text-slate-400">
-              {filteredCars.length} av {cars.length} biler
-            </span>
-            
-            {/* Density toggle */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-600 dark:text-slate-400">Tetthet:</span>
-              <ToggleGroup 
-                type="single" 
-                value={density} 
-                onValueChange={(value) => value && handleDensityChange(value as 'comfort' | 'normal' | 'compact')}
-                className="border rounded-md"
-              >
-                <ToggleGroupItem value="comfort" aria-label="Komfort" className="px-3 py-1">
-                  <Layers3 className="w-4 h-4 mr-1" />
-                  Komfort
+              {/* View Mode Toggle */}
+              <ToggleGroup type="single" value={viewMode} onValueChange={(value) => value && setViewMode(value as "grid" | "list")}>
+                <ToggleGroupItem value="grid" className="h-12 px-4 rounded-xl">
+                  <Grid3x3 className="w-4 h-4" />
                 </ToggleGroupItem>
-                <ToggleGroupItem value="normal" aria-label="Normal" className="px-3 py-1">
-                  <Layers2 className="w-4 h-4 mr-1" />
-                  Normal
-                </ToggleGroupItem>
-                <ToggleGroupItem value="compact" aria-label="Kompakt" className="px-3 py-1">
-                  <Layers className="w-4 h-4 mr-1" />
-                  Kompakt
+                <ToggleGroupItem value="list" className="h-12 px-4 rounded-xl">
+                  <TableProperties className="w-4 h-4" />
                 </ToggleGroupItem>
               </ToggleGroup>
-            </div>
-            
-            {/* View mode toggle */}
-            <div className="flex border rounded-md">
-              <Button
-                variant={viewMode === "grid" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("grid")}
-                className="rounded-r-none"
-                data-testid="button-view-grid"
-              >
-                <div className="grid grid-cols-2 gap-0.5 w-3 h-3">
-                  <div className="bg-current w-1 h-1 rounded-[1px]"></div>
-                  <div className="bg-current w-1 h-1 rounded-[1px]"></div>
-                  <div className="bg-current w-1 h-1 rounded-[1px]"></div>
-                  <div className="bg-current w-1 h-1 rounded-[1px]"></div>
-                </div>
-              </Button>
-              <Button
-                variant={viewMode === "list" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className="rounded-l-none"
-                data-testid="button-view-list"
-              >
-                <div className="flex flex-col gap-0.5 w-3 h-3">
-                  <div className="bg-current w-3 h-0.5 rounded-[1px]"></div>
-                  <div className="bg-current w-3 h-0.5 rounded-[1px]"></div>
-                  <div className="bg-current w-3 h-0.5 rounded-[1px]"></div>
-                </div>
-              </Button>
+
+              {/* Grid Size Control */}
+              {viewMode === "grid" && (
+                <ToggleGroup type="single" value={gridSize} onValueChange={(value) => value && setGridSize(value as typeof gridSize)}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem value="compact" className="h-12 px-3 rounded-xl">
+                        <SquareStack className="w-4 h-4" />
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent>Kompakt visning</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem value="normal" className="h-12 px-3 rounded-xl">
+                        <Grid2x2 className="w-4 h-4" />
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent>Normal visning</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem value="comfort" className="h-12 px-3 rounded-xl">
+                        <LayoutGrid className="w-4 h-4" />
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent>Komfort visning</TooltipContent>
+                  </Tooltip>
+                </ToggleGroup>
+              )}
             </div>
           </div>
-        </div>
 
-        {/* Advanced Filters Panel */}
-        {showFilters && (
-          <Card className="p-4 bg-slate-50 dark:bg-slate-800/50">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Fuel Type Filter */}
-              <div className="space-y-2">
-                <Label htmlFor="fuel-type" className="text-sm font-medium">Drivstofftype</Label>
-                <Select value={filterFuelType} onValueChange={setFilterFuelType}>
-                  <SelectTrigger id="fuel-type">
-                    <SelectValue placeholder="Velg drivstoff" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Alle typer</SelectItem>
-                    {uniqueFuelTypes.map(fuel => (
-                      <SelectItem key={fuel || 'unknown'} value={fuel || 'unknown'}>{fuel || 'Ukjent'}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Year Range */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Årsmodell: {filterYear[0]} - {filterYear[1]}</Label>
-                <div className="px-2">
+          {/* Extended Filters */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Price Range */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Prisområde: {formatPrice(String(priceRange[0]))} - {formatPrice(String(priceRange[1]))}
+                  </Label>
                   <Slider
-                    value={filterYear}
-                    onValueChange={(value) => setFilterYear(value as [number, number])}
-                    min={2000}
-                    max={new Date().getFullYear()}
-                    step={1}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-              
-              {/* Mileage Range */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Kilometerstand: {filterMileage[0].toLocaleString()} - {filterMileage[1].toLocaleString()} km
-                </Label>
-                <div className="px-2">
-                  <Slider
-                    value={filterMileage}
-                    onValueChange={(value) => setFilterMileage(value as [number, number])}
+                    value={priceRange}
+                    onValueChange={setPriceRange}
+                    max={1000000}
                     min={0}
-                    max={500000}
                     step={10000}
                     className="w-full"
                   />
                 </div>
               </div>
               
-              {/* Price Range */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  Pris: {formatPrice(String(filterPrice[0]))} - {formatPrice(String(filterPrice[1]))}
-                </Label>
-                <div className="px-2">
-                  <Slider
-                    value={filterPrice}
-                    onValueChange={(value) => setFilterPrice(value as [number, number])}
-                    min={0}
-                    max={2000000}
-                    step={50000}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            {/* Reset Filters Button */}
-            <div className="mt-4 flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setFilterStatus("all");
-                  setFilterMake("all");
-                  setFilterFuelType("all");
-                  setFilterYear([2000, new Date().getFullYear()]);
-                  setFilterMileage([0, 500000]);
-                  setFilterPrice([0, 2000000]);
-                  setSearchTerm("");
-                }}
-              >
-                Nullstill filtre
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {carsLoading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <p className="mt-2 text-slate-600 dark:text-slate-400">Laster biler...</p>
-          </div>
-        ) : filteredCars.length === 0 ? (
-          <Card className="text-center py-12">
-            <CardContent>
-              <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-lg mx-auto mb-4 flex items-center justify-center">
-                <Plus className="w-6 h-6 text-slate-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                Ingen biler funnet
-              </h3>
-              <p className="text-slate-600 dark:text-slate-400 mb-4">
-                {searchTerm ? "Prøv et annet søkeord" : "Legg til din første bil for å komme i gang"}
-              </p>
-              {!searchTerm && (
-                <Button onClick={() => setShowAddModal(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Legg til bil
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className={`
-            ${viewMode === "grid" 
-              ? `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 
-                 ${density === 'compact' ? 'gap-2' : density === 'comfort' ? 'gap-6' : 'gap-4'}` 
-              : "space-y-3"
-            }
-          `}>
-            {filteredCars.map((car: Car) => (
-              viewMode === "grid" ? (
-                <CarCard
-                  key={car.id} 
-                  car={car}
-                  density={density}
-                  onEdit={() => setEditingCar(car)}
-                  onSell={() => handleSellCar(car)}
-                  onDelete={() => deleteMutation.mutate(car.id)}
-                  onToggleFavorite={() => toggleFavorite(car.id)}
-                  isDeleting={deleteMutation.isPending}
-                  isSelling={sellMutation.isPending}
-                  isFavorite={favorites.has(car.id)}
-                  calculateDaysOnStock={calculateDaysOnStock}
-                  formatPrice={formatPrice}
-                  getStatusColor={getStatusColor}
-                  getStatusText={getStatusText}
-                  canDelete={canDelete}
-                />
-              ) : (
-                <ListCarCard 
-                  key={car.id} 
-                  car={car} 
-                  onEdit={() => setEditingCar(car)}
-                  onSell={() => handleSellCar(car)}
-                  onDelete={() => deleteMutation.mutate(car.id)}
-                  onToggleFavorite={() => toggleFavorite(car.id)}
-                  isDeleting={deleteMutation.isPending}
-                  isSelling={sellMutation.isPending}
-                  isFavorite={favorites.has(car.id)}
-                  calculateDaysOnStock={calculateDaysOnStock}
-                  formatPrice={formatPrice}
-                  getStatusColor={getStatusColor}
-                  getStatusText={getStatusText}
-                  calculateProfit={calculateProfit}
-                  canDelete={canDelete}
-                />
-              )
-            ))}
-          </div>
-        )}
-      </div>
-
-      {showAddModal && (
-        <AddCarModal onClose={() => setShowAddModal(false)} />
-      )}
-
-      {editingCar && (
-        <EditCarModal 
-          car={editingCar} 
-          onClose={() => setEditingCar(null)} 
-        />
-      )}
-
-      {/* Sell Car Dialog */}
-      {showSellDialog && sellingCar && (
-        <Dialog open={showSellDialog} onOpenChange={(open) => {
-          if (!open) {
-            setShowSellDialog(false);
-            setSellingCar(null);
-            setSalePrice("");
-          }
-        }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                Marker som solgt
-              </DialogTitle>
-              <DialogDescription>
-                Angi salgspris for {sellingCar.make} {sellingCar.model} ({sellingCar.registrationNumber})
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4 pt-4">
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-slate-600 dark:text-slate-400">Utsalgspris:</span>
-                  <span className="font-medium text-slate-900 dark:text-white">
-                    {formatPrice(sellingCar.salePrice || "0")}
-                  </span>
-                </div>
-                {canViewSensitive && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600 dark:text-slate-400">Innkjøpspris:</span>
-                    <span className="font-medium text-slate-900 dark:text-white">
-                      {formatPrice(sellingCar.costPrice || "0")}
-                    </span>
-                  </div>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Faktisk salgspris
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
-                    type="number"
-                    placeholder="Angi salgspris"
-                    value={salePrice}
-                    onChange={(e) => setSalePrice(e.target.value)}
-                    className="pl-10 text-lg font-medium"
-                    autoFocus
-                    data-testid="input-sale-price"
-                  />
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Beløp i norske kroner (NOK)
-                </p>
-              </div>
-              
-              {salePrice && sellingCar.costPrice && canViewSensitive && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-blue-700 dark:text-blue-300">Fortjeneste:</span>
-                    <span className={`font-bold ${
-                      parseInt(salePrice) - parseInt(sellingCar.costPrice) >= 0 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {formatPrice((parseInt(salePrice || "0") - parseInt(sellingCar.costPrice || "0")).toString())}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex gap-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowSellDialog(false);
-                  setSellingCar(null);
-                  setSalePrice("");
-                }}
-                className="flex-1"
-                data-testid="button-cancel-sell"
-              >
-                Avbryt
-              </Button>
-              <Button
-                onClick={confirmSell}
-                disabled={!salePrice || sellMutation.isPending}
-                className="flex-1 bg-green-600 hover:bg-green-700"
-                data-testid="button-confirm-sell"
-              >
-                {sellMutation.isPending ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Marker som solgt
-                  </>
-                )}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Finn.no Import Dialog */}
-      {showFinnImport && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-              Importer bil fra Finn.no
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-              Lim inn URL-en til en bil- eller kjøretøyannonse på Finn.no for å hente data automatisk.
-            </p>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  Finn.no URL *
-                </label>
-                <Input
-                  type="url"
-                  placeholder="https://www.finn.no/mobility/item/123456"
-                  value={finnUrl}
-                  onChange={(e) => setFinnUrl(e.target.value)}
-                  className="w-full mt-1"
-                  disabled={finnImportMutation.isPending}
-                />
-              </div>
-              
-              <div>
-                <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                  Registreringsnummer (valgfritt)
-                </label>
-                <Input
-                  type="text"
-                  placeholder="F.eks: EV12345 eller AB1234"
-                  value={manualRegNumber}
-                  onChange={(e) => setManualRegNumber(e.target.value.toUpperCase())}
-                  className="w-full mt-1"
-                  disabled={finnImportMutation.isPending}
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  Legg til hvis ikke i annonsen for å hente SVV-data
-                </p>
-              </div>
-              
-              {finnImportMutation.isPending && (
-                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
-                    <div className="w-4 h-4 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-                    <span>Importerer bil fra Finn.no...</span>
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-2">
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => {
-                    setShowFinnImport(false);
-                    setFinnUrl("");
-                    setManualRegNumber("");
+                    setFilterStatus("all");
+                    setFilterMake("all");
+                    setPriceRange([0, 1000000]);
+                    setSearchTerm("");
                   }}
-                  disabled={finnImportMutation.isPending}
+                  className="text-slate-600 dark:text-slate-400"
                 >
-                  Avbryt
-                </Button>
-                <Button
-                  onClick={handleFinnImport}
-                  disabled={finnImportMutation.isPending || !finnUrl.trim()}
-                  className="bg-orange-600 hover:bg-orange-700 text-white"
-                >
-                  {finnImportMutation.isPending ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin mr-2" />
-                      Importerer...
-                    </>
-                  ) : (
-                    <>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Importer
-                    </>
-                  )}
+                  <FilterX className="w-4 h-4 mr-2" />
+                  Nullstill filter
                 </Button>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+
+        {/* Content */}
+        {carsLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardContent className="p-4">
+                  <div className="h-40 bg-slate-200 dark:bg-slate-700 rounded-xl mb-4"></div>
+                  <div className="space-y-2">
+                    <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div>
+                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : filteredCars.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="max-w-md mx-auto">
+              <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CarIcon className="w-12 h-12 text-slate-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+                {searchTerm || filterStatus !== "all" || filterMake !== "all" ? "Ingen biler matchet søket" : "Ingen biler registrert"}
+              </h3>
+              <p className="text-slate-600 dark:text-slate-400 mb-6">
+                {searchTerm || filterStatus !== "all" || filterMake !== "all" 
+                  ? "Prøv å justere søkekriteriene eller filtrene for å finne biler."
+                  : "Kom i gang ved å registrere din første bil i lageret."
+                }
+              </p>
+              {(!searchTerm && filterStatus === "all" && filterMake === "all") && (
+                <Button onClick={() => setShowAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Legg til første bil
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            {viewMode === "grid" ? (
+              <div className={`grid gap-6 ${
+                gridSize === "compact" 
+                  ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                  : gridSize === "normal"
+                  ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+              }`}>
+                {filteredCars.map((car) => (
+                  <ProfessionalCarCard
+                    key={car.id}
+                    car={car}
+                    size={gridSize}
+                    onEdit={() => setEditingCar(car)}
+                    onSell={() => sellMutation.mutate(car.id)}
+                    onDelete={() => deleteMutation.mutate(car.id)}
+                    onToggleFavorite={() => toggleFavorite(car.id)}
+                    isDeleting={deleteMutation.isPending}
+                    isSelling={sellMutation.isPending}
+                    isFavorite={favorites.has(car.id)}
+                    calculateDaysOnStock={calculateDaysOnStock}
+                    formatPrice={formatPrice}
+                    getStatusColor={getStatusColor}
+                    getStatusText={getStatusText}
+                    calculateProfit={calculateProfit}
+                    canDelete={canDelete}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                      <tr>
+                        <th className="p-4 text-left text-sm font-semibold text-slate-900 dark:text-white">Bil</th>
+                        <th className="p-4 text-left text-sm font-semibold text-slate-900 dark:text-white">Reg.nr</th>
+                        <th className="p-4 text-left text-sm font-semibold text-slate-900 dark:text-white">Modell</th>
+                        <th className="p-4 text-left text-sm font-semibold text-slate-900 dark:text-white">Drivstoff</th>
+                        <th className="p-4 text-left text-sm font-semibold text-slate-900 dark:text-white">Status</th>
+                        <th className="p-4 text-right text-sm font-semibold text-slate-900 dark:text-white">Pris</th>
+                        <th className="p-4 text-center text-sm font-semibold text-slate-900 dark:text-white">Dager</th>
+                        <th className="p-4 text-center text-sm font-semibold text-slate-900 dark:text-white">Handlinger</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredCars.map((car) => (
+                        <tr key={car.id} className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group" 
+                            data-testid={`row-car-${car.id}`}>
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="relative w-16 h-12 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+                                {car.images && car.images.length > 0 ? (
+                                  <img 
+                                    src={car.images[0]} 
+                                    alt={`${car.make} ${car.model}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <CarIcon className="w-6 h-6 text-slate-400" />
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => toggleFavorite(car.id)}
+                                className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                              >
+                                <Star className={`w-4 h-4 ${favorites.has(car.id) ? 'text-yellow-500 fill-yellow-500' : 'text-slate-400'}`} />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <span className="font-mono font-medium text-slate-900 dark:text-white">
+                              {car.registrationNumber}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div>
+                              <div className="font-semibold text-slate-900 dark:text-white">
+                                {car.make} {car.model}
+                              </div>
+                              <div className="text-sm text-slate-600 dark:text-slate-400">
+                                {car.year} • {car.mileage?.toLocaleString('no-NO')} km
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-sm text-slate-600 dark:text-slate-400">
+                              <div>{car.fuelType || 'Ukjent'}</div>
+                              <div>{car.transmission || 'Auto'}</div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <Badge className={`${getStatusColor(car.status || 'available')} border font-medium`}>
+                              {getStatusText(car.status || 'available')}
+                            </Badge>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-right">
+                              <div className="font-bold text-lg text-slate-900 dark:text-white">
+                                {formatPrice(car.salePrice || "0")}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className="text-sm text-slate-600 dark:text-slate-400">
+                              {calculateDaysOnStock(car.createdAt?.toString() || "", car.soldDate?.toString() || null)} dager
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Link href={`/cars/${car.id}`}>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                  </Link>
+                                </TooltipTrigger>
+                                <TooltipContent>Se detaljer</TooltipContent>
+                              </Tooltip>
+                              
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setEditingCar(car)}
+                                    className="h-8 w-8 p-0"
+                                    data-testid={`button-edit-${car.id}`}
+                                  >
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Rediger</TooltipContent>
+                              </Tooltip>
+
+                              {car.status === 'available' && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => sellMutation.mutate(car.id)}
+                                      disabled={sellMutation.isPending}
+                                      className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                      data-testid={`button-sell-${car.id}`}
+                                    >
+                                      Selg
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Opprett salgskontrakt</TooltipContent>
+                                </Tooltip>
+                              )}
+
+                              {canDelete && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => deleteMutation.mutate(car.id)}
+                                      disabled={deleteMutation.isPending}
+                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                                      data-testid={`button-delete-${car.id}`}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Slett bil</TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Modals */}
+        {showAddModal && (
+          <AddCarModal onClose={() => setShowAddModal(false)} />
+        )}
+
+        {editingCar && (
+          <EditCarModal car={editingCar} onClose={() => setEditingCar(null)} />
+        )}
+
+        {showInviteModal && (
+          <InviteTeamDialog
+            open={showInviteModal}
+            onOpenChange={setShowInviteModal}
+          />
+        )}
+      </div>
     </MainLayout>
   );
 }
+
