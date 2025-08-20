@@ -20,7 +20,7 @@ import {
   Plus, Search, Edit, Trash2, Car as CarIcon, Eye, DollarSign, 
   TrendingUp, TrendingDown, AlertCircle, Copy, Star, Grid3x3, 
   Fuel, X, UserPlus, ChevronDown, FilterX, ArrowUpDown, 
-  Grid2x2, SquareStack, TableProperties, Filter
+  Grid2x2, SquareStack, TableProperties, Filter, LayoutGrid
 } from "lucide-react";
 import { InviteTeamDialog } from "@/components/team/InviteTeamDialog";
 import { useCanViewSensitive, useCanDelete, useCanInvite } from "@/hooks/useUserRole";
