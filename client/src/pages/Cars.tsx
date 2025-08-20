@@ -69,27 +69,27 @@ function ProfessionalCarCard({
   const hasImage = car.images && car.images.length > 0;
   const profit = canViewSensitive ? calculateProfit(car.salePrice || "0", car.costPrice || undefined) : { amount: 0, percentage: 0 };
   
-  // Size configurations
+  // Size configurations with better aspect ratios for large screens
   const sizeConfig = {
     compact: {
-      card: "p-3",
-      image: "h-32",
+      card: "p-3 max-w-sm mx-auto",
+      image: "h-32 aspect-[4/3]",
       title: "text-sm",
       subtitle: "text-xs",
       price: "text-lg",
       button: "h-7 text-xs px-2"
     },
     normal: {
-      card: "p-4",
-      image: "h-40",
+      card: "p-4 max-w-md mx-auto",
+      image: "h-40 aspect-[4/3]",
       title: "text-base",
       subtitle: "text-sm",
       price: "text-xl",
       button: "h-8 text-sm px-3"
     },
     comfort: {
-      card: "p-5",
-      image: "h-48",
+      card: "p-5 max-w-lg mx-auto",
+      image: "h-48 aspect-[4/3]",
       title: "text-lg",
       subtitle: "text-base",
       price: "text-2xl",
@@ -120,7 +120,7 @@ function ProfessionalCarCard({
             <img 
               src={car.images![0]} 
               alt={`${car.make} ${car.model}`}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              className="car-image w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
                 (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
@@ -689,12 +689,12 @@ export default function Cars() {
         ) : (
           <>
             {viewMode === "grid" ? (
-              <div className={`grid gap-6 ${
+              <div className={`ultra-wide-grid grid gap-6 ${
                 gridSize === "compact" 
-                  ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                  ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 3xl:grid-cols-7"
                   : gridSize === "normal"
-                  ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                  : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+                  ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                  : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
               }`}>
                 {filteredCars.map((car) => (
                   <ProfessionalCarCard

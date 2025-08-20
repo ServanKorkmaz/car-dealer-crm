@@ -2,6 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom responsive breakpoints for ultra-wide screens */
+@media (min-width: 1920px) {
+  .ultra-wide-grid {
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+}
+
+/* Image optimization for high-DPI displays */
+img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* Prevent image stretching on ultra-wide displays */
+.car-image {
+  max-width: 100%;
+  height: auto;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Custom grid for ultra-wide displays */
+@media (min-width: 1920px) {
+  .grid-cols-7 {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
 /* Smooth scrolling and better performance */
 * {
   scroll-behavior: smooth;
