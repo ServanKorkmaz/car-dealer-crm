@@ -1,0 +1,56 @@
+You are building the **Cars & Inventory Management** module for ForhandlerPRO, a next-generation Dealer Management System (DMS). 
+Forget what’s coded before, you can redesign and improve everything to be the best in class. 
+
+🎯 Objective:
+Create a **world-class, professional, and beautiful Cars & Inventory Management module** with the following features:  
+
+### 🔑 Core Features
+1. **Car listing page (inventory overview)**  
+   - Grid/table layout with professional UI (Tailwind + shadcn/ui).  
+   - Each car card should show: image, make/model, year, mileage, price, VAT-status, EU-control, status (available/sold/reserved).  
+   - Filters at the top (make, year, price range, fuel type, gearbox, status).  
+   - Powerful **search bar** with instant filtering (fuzzy search on reg.nr, VIN, make/model).  
+   - Sortable columns (price, year, mileage, added date).  
+   - Responsive design: works perfectly on mobile (important for salespeople).  
+
+2. **Add new car flow**  
+   - Big, clean “+ Add Car” button.  
+   - When entering reg.nr, automatically fetch: brand, model, year, EU-control dates, technical data (from Statens Vegvesen API or mocked service).  
+   - Pre-fill the fields but allow manual editing.  
+   - Upload multiple images (drag & drop). Show preview gallery.  
+   - Option to mark car as **VAT-included, VAT-exempt, or margin scheme** (important for dealers).  
+
+3. **Car detail page**  
+   - Clean page with all info about the car (images carousel, full technical data, history).  
+   - Buttons for: Edit, Duplicate, Mark as Sold, Publish to Finn.no (future integration), Delete.  
+   - Show “Activity log” (when was it added, edited, sold).  
+
+4. **Status management**  
+   - Cars should have clear statuses: *Available, Reserved, Sold*.  
+   - Changing status should update across system instantly.  
+   - Sold cars should remain in history but not in active stock.  
+
+5. **Smart UX details**  
+   - Keyboard shortcuts (e.g., press “A” = add new car).  
+   - Bulk actions (select multiple cars → mark as sold, delete, export).  
+   - Subtle animations with Framer Motion (smooth transitions, hover effects).  
+   - Toast notifications for every action (e.g., “Car successfully added”).  
+
+### 🌟 Advanced Enhancements (to outcompete competitors)
+- **AI-powered price suggestion** (basic mock now, real later) → suggest fair market price when adding car.  
+- **Export inventory as PDF/Excel** (for advertising or accounting).  
+- **Dark/light mode toggle** (modern UI touch).  
+- **Activity feed** showing “Latest changes” across cars (who added, edited, sold).  
+
+### 🎨 UI/UX Guidelines
+- Professional look & feel → clean, minimal, modern.  
+- Rounded cards, soft shadows, plenty of white space.  
+- Tailwind + shadcn/ui components everywhere.  
+- Image-heavy design (cars sell visually).  
+- Mobile-first responsive layout.  
+
+---
+
+📌 Deliver clean, production-ready React + TypeScript code with Tailwind, shadcn/ui, and Framer Motion.  
+📌 Make design decisions yourself — aim for **world-class dealer software** feel.  
+📌 Overwrite/replace any previous code if needed.  

@@ -14,6 +14,7 @@ import Dashboard from "@/pages/Dashboard";
 import ProfessionalDashboard from "@/pages/ProfessionalDashboard";
 import Activities from "@/pages/Activities";
 import Cars from "@/pages/Cars";
+import CarsInventory from "@/pages/CarsInventory";
 import CarDetail from "@/pages/CarDetail";
 import Customers from "@/pages/Customers";
 import CustomerProfile from "@/pages/CustomerProfile";
@@ -62,7 +63,7 @@ function Router() {
       </Route>
       <Route path="/cars">
         <ProtectedRoute>
-          <Cars />
+          <CarsInventory />
         </ProtectedRoute>
       </Route>
       <Route path="/cars/:id">
