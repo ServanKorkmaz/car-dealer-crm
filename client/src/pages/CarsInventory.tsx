@@ -725,7 +725,7 @@ export default function CarsInventory() {
 
             {/* Add new car */}
             <Button 
-              className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+              className="gap-2 bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
               onClick={() => setShowAddCarModal(true)}
             >
               <Plus className="w-4 h-4" />
