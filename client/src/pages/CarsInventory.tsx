@@ -77,6 +77,8 @@ import { nb } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import type { Car } from "@shared/schema";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 // Professional status configuration
 const statusConfig = {
@@ -421,6 +423,7 @@ export default function CarsInventory() {
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState("newest");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [isExporting, setIsExporting] = useState(false);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -553,6 +556,73 @@ export default function CarsInventory() {
     setSelectedCars(new Set());
   };
 
+  // PDF Export function
+  const exportToPDF = async () => {
+    setIsExporting(true);
+    try {
+      const element = document.getElementById('cars-inventory-content');
+      if (!element) {
+        toast({
+          title: "Eksport feilet",
+          description: "Kunne ikke finne innhold å eksportere",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create canvas from the content
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        allowTaint: true,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('l', 'mm', 'a4'); // Landscape orientation for better table view
+      
+      const imgWidth = 297; // A4 landscape width in mm
+      const pageHeight = 210; // A4 landscape height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+
+      let position = 0;
+
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // Add additional pages if needed
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // Generate filename with current date
+      const today = new Date().toLocaleDateString('no-NO');
+      const filename = `ForhandlerPRO-Bilbeholdning-${today}.pdf`;
+      
+      pdf.save(filename);
+      
+      toast({
+        title: "PDF Eksport fullført",
+        description: `Bilbeholdning eksportert som ${filename}`,
+      });
+    } catch (error) {
+      console.error('PDF Export error:', error);
+      toast({
+        title: "Eksport feilet",
+        description: "Kunne ikke eksportere bilbeholdning til PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Keyboard shortcuts
   useCallback((e: KeyboardEvent) => {
     if (e.key === 'a' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT') {
@@ -640,17 +710,17 @@ export default function CarsInventory() {
             {/* Export */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" disabled={isExporting}>
                   <Download className="w-4 h-4 mr-2" />
-                  Eksporter
+                  {isExporting ? "Eksporterer..." : "Eksporter"}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => toast({ title: "PDF Eksport", description: "Eksporterer beholdning som PDF..." })}>
+                <DropdownMenuItem onClick={exportToPDF} disabled={isExporting}>
                   <FileText className="w-4 h-4 mr-2" />
-                  Eksporter som PDF
+                  {isExporting ? "Eksporterer PDF..." : "Eksporter som PDF"}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => toast({ title: "Excel Eksport", description: "Eksporterer beholdning som Excel..." })}>
+                <DropdownMenuItem onClick={() => toast({ title: "Excel Eksport", description: "Excel-eksport kommer snart..." })}>
                   <TableProperties className="w-4 h-4 mr-2" />
                   Eksporter som Excel
                 </DropdownMenuItem>
@@ -669,6 +739,7 @@ export default function CarsInventory() {
         </div>
 
         {/* Stats cards */}
+        <div id="cars-inventory-content">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card>
             <CardContent className="p-4">
@@ -1132,6 +1203,7 @@ export default function CarsInventory() {
               <p>Hurtigtast</p>
             </TooltipContent>
           </Tooltip>
+        </div>
         </div>
       </div>
     </div>
