@@ -442,6 +442,11 @@ export default function CarsInventory() {
   const { data: cars = [], isLoading, error } = useQuery<Car[]>({
     queryKey: ['/api/cars'],
   });
+  
+  // Fetch dashboard stats
+  const { data: dashboardStats } = useQuery({
+    queryKey: ['/api/dashboard/stats'],
+  });
 
   // Filter and sort cars
   const filteredCars = useMemo(() => {
@@ -559,8 +564,11 @@ export default function CarsInventory() {
       return carIds; // Return the sold IDs for use in onSuccess
     },
     onSuccess: (soldCarIds) => {
+      // Force refresh of both cars and stats
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.refetchQueries({ queryKey: ['/api/cars'] });
+      queryClient.refetchQueries({ queryKey: ['/api/dashboard/stats'] });
       
       const count = soldCarIds.length;
       toast({
@@ -589,8 +597,11 @@ export default function CarsInventory() {
       return carIds; // Return the deleted IDs for use in onSuccess
     },
     onSuccess: (deletedCarIds) => {
+      // Force refresh of both cars and stats
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.refetchQueries({ queryKey: ['/api/cars'] });
+      queryClient.refetchQueries({ queryKey: ['/api/dashboard/stats'] });
       
       const count = deletedCarIds.length;
       toast({
@@ -726,16 +737,29 @@ export default function CarsInventory() {
 
 
 
-  // Stats
-  const stats = useMemo(() => ({
-    total: cars.length,
-    available: cars.filter(c => c.status === 'available').length,
-    reserved: cars.filter(c => c.status === 'reserved').length,
-    sold: cars.filter(c => c.status === 'sold').length,
-    totalValue: cars
-      .filter(c => c.status === 'available')
-      .reduce((sum, car) => sum + parseInt(car.salePrice || "0"), 0)
-  }), [cars]);
+  // Stats - use API data when available, fallback to calculated stats
+  const stats = useMemo(() => {
+    if (dashboardStats) {
+      return {
+        total: dashboardStats.totalCars || 0,
+        available: dashboardStats.totalCars - (dashboardStats.totalSold || 0),
+        reserved: 0, // Not tracked in dashboard stats
+        sold: dashboardStats.totalSold || 0,
+        totalValue: dashboardStats.totalValue || 0
+      };
+    }
+    
+    // Fallback to calculated stats from cars data
+    return {
+      total: cars.length,
+      available: cars.filter(c => c.status === 'available').length,
+      reserved: cars.filter(c => c.status === 'reserved').length,
+      sold: cars.filter(c => c.status === 'sold').length,
+      totalValue: cars
+        .filter(c => c.status === 'available')
+        .reduce((sum, car) => sum + parseInt(car.salePrice || "0"), 0)
+    };
+  }, [cars, dashboardStats]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
