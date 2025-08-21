@@ -732,7 +732,8 @@ export default function CarsInventory() {
 
   // Stats - always calculate from current cars data for accuracy
   const stats = useMemo(() => {
-    return {
+    console.log('Calculating stats from cars:', cars.length, cars.map(c => c.status));
+    const result = {
       total: cars.length,
       available: cars.filter(c => c.status === 'available').length,
       reserved: cars.filter(c => c.status === 'reserved').length,
@@ -741,6 +742,8 @@ export default function CarsInventory() {
         .filter(c => c.status === 'available')
         .reduce((sum, car) => sum + parseInt(car.salePrice || "0"), 0)
     };
+    console.log('Stats calculated:', result);
+    return result;
   }, [cars]);
 
   return (
