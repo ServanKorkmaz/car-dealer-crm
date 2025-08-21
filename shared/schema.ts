@@ -64,6 +64,13 @@ export const memberships = pgTable("memberships", {
   index("idx_memberships_user_company").on(table.userId, table.companyId),
 ]);
 
+// SVV Cache table
+export const svvCache = pgTable("svv_cache", {
+  regnr: varchar("regnr").primaryKey(),
+  payload: jsonb("payload").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Cars table
 export const cars = pgTable("cars", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -71,8 +78,17 @@ export const cars = pgTable("cars", {
   registrationNumber: varchar("registration_number").notNull().unique(),
   make: varchar("make").notNull(),
   model: varchar("model").notNull(),
+  variant: varchar("variant"),
   year: integer("year").notNull(),
   mileage: integer("mileage").notNull(),
+  vin: varchar("vin"),
+  powerKw: integer("power_kw"),
+  gearbox: varchar("gearbox"),
+  bodyType: varchar("body_type"),
+  seats: integer("seats"),
+  weight: integer("weight"),
+  nextEu: varchar("next_eu"),
+  lastEu: varchar("last_eu"),
   color: varchar("color").default(""),
   fuelType: varchar("fuel_type").default(""),
   transmission: varchar("transmission").default(""),

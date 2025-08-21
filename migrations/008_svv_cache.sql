@@ -1,0 +1,20 @@
+-- Create SVV cache table for vehicle lookup data
+CREATE TABLE IF NOT EXISTS svv_cache (
+  regnr VARCHAR(10) PRIMARY KEY,
+  payload JSONB NOT NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add new columns to cars table if they don't exist
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS variant VARCHAR(255);
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS vin VARCHAR(50);
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS power_kw INTEGER;
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS gearbox VARCHAR(50);
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS body_type VARCHAR(100);
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS seats INTEGER;
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS weight INTEGER;
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS next_eu VARCHAR(20);
+ALTER TABLE cars ADD COLUMN IF NOT EXISTS last_eu VARCHAR(20);
+
+-- Create index for faster cache lookups
+CREATE INDEX IF NOT EXISTS idx_svv_cache_updated ON svv_cache(updated_at);

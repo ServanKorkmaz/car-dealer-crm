@@ -12,6 +12,7 @@ import { AlertSystem } from "./alerts";
 import OpenAI from "openai";
 import * as tools from "./assistantTools";
 import type { UserHints } from "./assistantTools";
+import { svvLookup } from "./routes/svv";
 
 // Initialize OpenAI if API key is available
 const openai = process.env.OPENAI_API_KEY
@@ -480,6 +481,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to mark car as sold" });
     }
   });
+
+  // SVV Lookup route with caching
+  app.post('/api/svv/lookup', authMiddleware, svvLookup);
 
   // Vehicle lookup API endpoint
   app.get('/api/vehicle-lookup/:regNumber', authMiddleware, async (req: any, res) => {

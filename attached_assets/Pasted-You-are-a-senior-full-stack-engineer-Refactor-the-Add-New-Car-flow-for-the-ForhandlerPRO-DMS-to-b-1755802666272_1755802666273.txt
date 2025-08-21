@@ -1,0 +1,209 @@
+You are a senior full‑stack engineer. Refactor the “Add New Car” flow for the ForhandlerPRO DMS to be production‑ready with: a robust SVV regnr lookup, a clean dealer‑grade UI, strong validation, and great DX. Stack assumptions: React + TypeScript + Vite, TailwindCSS + shadcn/ui, react‑hook‑form + zod, Supabase (auth+DB) with Drizzle ORM. We already have an SVV API key.
+
+Goals
+
+Rock‑solid registration number lookup (SVV)
+
+Modern, compact dealer UI with clear sections
+
+Autofill + manual override (lock/unlock)
+
+Image uploader with reorder, compression, progress
+
+Profit summary (live) incl. fees/taxes
+
+Validation + error states and graceful fallbacks
+
+Caching layer to reduce SVV calls
+
+Clean code structure + tests
+
+1) API & server
+
+Create server route POST /api/svv/lookup:
+
+Reads { regnr: string }
+
+Calls SVV backend with process.env.SVV_API_KEY (put key in env). Add 8s timeout and retry(2).
+
+Normalize output to one typed object:
+
+export interface SvvVehicle {
+  regnr: string; vin?: string;
+  brand?: string; model?: string; variant?: string;
+  firstRegDate?: string; modelYear?: number;
+  fuel?: "Bensin"|"Diesel"|"Elektrisk"|"Hybrid"|"Annet";
+  powerKW?: number; gearbox?: "Manuell"|"Automat"|"Annet";
+  color?: string; kmAtLastCheck?: number;
+  nextEU?: string; lastEU?: string;
+  bodyType?: string; seats?: number; weight?: number;
+}
+
+
+Map SVV fields safely; never throw raw SVV errors. Return { ok: true, data } or { ok: false, code, message }.
+
+Caching:
+
+Create table svv_cache (Supabase/Drizzle): columns regnr (pk), payload (jsonb), updated_at.
+
+API flow: check cache (<= 7 days old) → return; else fetch SVV → upsert cache.
+
+Rate‑limit endpoint to 10 req/min/IP (simple in‑memory limiter).
+
+2) Database touchpoints
+
+Ensure cars table supports these columns: regnr (unique), brand, model, variant, model_year, vin, fuel, power_kw, gearbox, color, km, next_eu, last_eu, body_type, seats, weight, purchase_price, sale_price, notes, images (string[]).
+
+Add Drizzle types + zod schema parity.
+
+3) UI/UX (shadcn/ui + Tailwind)
+
+Replace the current modal with a Dialog + Stepper (still one screen on desktop, stacked on mobile):
+
+Header: Title “Legg til ny bil” + small helper “Fyll ut regnr for auto‑utfylling”.
+
+Section A – Oppslag (sticky top bar)
+
+Input for Regnr (uppercase mask “AA 12345”, allow without space).
+
+Debounced (600ms) “Søk SVV” button with loading state. Enter key triggers too.
+
+Status badge: “Treff fra SVV • dd.mm.yyyy” or error chip with retry.
+
+Lock/Unlock toggle: When locked, autofilled fields are readOnly; unlock to edit.
+
+Section B – Grunnleggende (2‑4 columns responsive): Brand, Model, Variant, Årsmodell, Førstegangsreg., VIN, Km.
+
+Section C – Teknisk: Drivstoff (Select), Gir (Select), Effekt (kW), Farge, Karosseri, Seter, Vekt, EU (Last/Next Date pickers).
+
+Section D – Bilder:
+
+Drag&drop zone + “Velg filer”. Show thumbnails grid with reorder (dnd‑kit), remove, and primary photo star.
+
+Client‑side compression to ≤ 1920px long edge, ≤ 1MB each (browser image compression). Show per‑image progress.
+
+Section E – Økonomi:
+
+Inputs: Kostpris, Salgspris, optional fees (klargjøring, annonsering, garanti).
+
+Profit widget (sticky right on desktop): “Fortjeneste: X kr (Y%)” live, computed as Salgspris − (Kostpris + sum fees). If negative → warning variant.
+
+Section F – Notater (Autosize Textarea).
+
+Footer: Secondary “Avbryt”, primary “Lagre bil”, and “Lagre & ny”.
+
+Design language:
+
+Compact density, 12–16px controls, clear section headings, subtle dividers.
+
+Consistent number formatting (NO locale) and date format dd.mm.yyyy.
+
+Keyboard friendly (Tab order, Enter submits, Esc closes).
+
+4) Form & Validation
+
+Use react‑hook‑form with zod:
+
+const CarFormSchema = z.object({
+  regnr: z.string().regex(/^[A-ZÆØÅ]{2}\s?\d{5}$/i, "Ugyldig regnr"),
+  brand: z.string().min(1), model: z.string().min(1),
+  modelYear: z.coerce.number().int().min(1970).max(new Date().getFullYear()+1),
+  vin: z.string().min(10).optional(),
+  km: z.coerce.number().int().min(0),
+  fuel: z.enum(["Bensin","Diesel","Elektrisk","Hybrid","Annet"]),
+  powerKW: z.coerce.number().min(0).max(2000).optional(),
+  gearbox: z.enum(["Manuell","Automat","Annet"]),
+  color: z.string().optional(),
+  lastEU: z.string().optional(), nextEU: z.string().optional(),
+  purchasePrice: z.coerce.number().min(0),
+  salePrice: z.coerce.number().min(0),
+  fees: z.object({
+    prep: z.coerce.number().min(0).default(0),
+    ads: z.coerce.number().min(0).default(0),
+    warranty: z.coerce.number().min(0).default(0),
+  }).default({ prep:0, ads:0, warranty:0 }),
+  images: z.array(z.string().url()).max(30).default([]),
+  notes: z.string().max(5000).optional(),
+});
+
+
+On SVV response, setValue on unlocked fields. Keep a small toast showing which fields were updated.
+
+5) Behavior details
+
+Normalize regnr to uppercase without space for API calls; display with space in UI.
+
+Show skeleton loaders in fields while fetching.
+
+If SVV returns partial data, fill what we have; show an info callout: “Noe manglet fra SVV, vennligst fyll inn manuelt.”
+
+Manual override: unlocking a field marks it edited=true so subsequent lookups don’t overwrite user edits unless user clicks “Oppdater fra SVV”.
+
+EU‑dato varsler: If nextEU < today → red badge “EU utløpt”.
+
+Duplicate guard: On submit, if regnr already exists in cars, show dialog: “Denne bilen finnes allerede. Åpne eksisterende eller fortsett og lag kopi?”
+
+6) Images storage
+
+Upload to Supabase Storage bucket car-images/{userId}/{carId}/… after initial insert returns carId.
+
+Implement optimistic UI: add temporary URLs, then replace with public URL after upload.
+
+Generate a cover URL (first image) and store in cars.cover_url.
+
+7) Code structure
+/src/components/cars/AddCarDialog.tsx
+/src/components/cars/RegnrInput.tsx
+/src/components/cars/ImageUploader.tsx
+/src/lib/svv.ts (client fetcher)
+/src/server/routes/svv.ts (API)
+/src/lib/format.ts (NO number/date helpers)
+/db/schema.ts (drizzle) + migrations
+
+8) Tests
+
+Unit: formatters, profit calc, regnr parser, svv normalizer.
+
+Integration: mock SVV API, ensure lookup → form fill, cache hit path.
+
+E2E (Playwright): happy path (lookup → fill → upload images → save), error path (SVV down → manual entry), duplicate regnr dialog.
+
+9) Acceptance criteria
+
+Typing a valid regnr + click “Søk SVV” fills at least brand, model, modelYear, fuel, powerKW, gearbox, color (when available) within 2s on cache hit, 5s on live call.
+
+Debounce prevents more than one call per keystroke; pressing the search icon or Enter forces a call.
+
+UI remains compact and consistent with shadcn/ui tokens; no layout jumps.
+
+Profit widget always accurate and updates on any relevant input.
+
+Image uploader supports drag reorder and shows upload progress; compressed images are ≤1MB.
+
+All validation errors are inline, in Norwegian, with ARIA attributes set.
+
+No unhandled promise rejections; all API errors surface as toasts and field messages.
+
+Lighthouse a11y score ≥ 95 for the dialog.
+
+10) Nice‑to‑have (implement if quick)
+
+VIN decode fallback if SVV returns VIN only (behind toggle; do not block submit).
+
+Save draft locally (localStorage) so accidental close doesn’t lose data.
+
+Keep last 10 successful lookups as quick suggestions below regnr input.
+
+Please implement all of the above. Produce:
+
+Updated React components and styles
+
+New API route with cache
+
+Drizzle migration for svv_cache (and cars additions if missing)
+
+Tests (unit + basic e2e)
+
+Short README section explaining env vars: SVV_API_KEY, VITE_PUBLIC_SUPABASE_URL, VITE_PUBLIC_SUPABASE_ANON_KEY.
+
+Finally, run a quick manual QA and fix any regressions. Output code diffs and any instructions needed to set the env vars.

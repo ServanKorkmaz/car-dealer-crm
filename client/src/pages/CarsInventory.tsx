@@ -79,7 +79,7 @@ import { useLocation } from "wouter";
 import type { Car } from "@shared/schema";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
-import AddCarModal from "@/components/cars/AddCarModal";
+import AddCarDialog from "@/components/cars/AddCarDialog";
 
 // Professional status configuration
 const statusConfig = {
@@ -1187,9 +1187,9 @@ export default function CarsInventory() {
         </div>
       </div>
       
-      {/* Add Car Modal */}
+      {/* Add Car Dialog */}
       {showAddCarModal && (
-        <AddCarModal onClose={() => setShowAddCarModal(false)} />
+        <AddCarDialog onClose={() => setShowAddCarModal(false)} />
       )}
     </div>
   );
