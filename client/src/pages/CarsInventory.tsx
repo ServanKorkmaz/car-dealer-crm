@@ -586,7 +586,7 @@ export default function CarsInventory() {
         
         return oldCars.map(car => 
           carIds.includes(car.id) 
-            ? { ...car, status: 'sold' as const, soldDate: new Date().toISOString() }
+            ? { ...car, status: 'sold' as const, soldDate: new Date() }
             : car
         );
       });

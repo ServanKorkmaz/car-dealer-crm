@@ -422,7 +422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const car = await storage.updateCar(req.params.id, {
         status: 'sold',
-        soldDate: new Date().toISOString(),
+        soldDate: new Date(),
         soldPrice: req.body.soldPrice || null,
         soldToCustomerId: req.body.customerId || null
       }, userId);
