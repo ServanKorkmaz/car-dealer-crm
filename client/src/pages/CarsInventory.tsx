@@ -593,6 +593,8 @@ export default function CarsInventory() {
       });
     },
     onError: (error: any) => {
+      // Revert optimistic update on error
+      queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
       toast({
         title: "Feil",
         description: error.message || "Kunne ikke slette biler",

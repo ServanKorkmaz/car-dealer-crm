@@ -366,11 +366,18 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Attempting to delete car ${id} for user ${userId}`);
       
-      // First delete related price predictions to avoid foreign key constraint
+      // Delete all related records to avoid foreign key constraints
       const predictionResult = await db.execute(sql`DELETE FROM price_predictions WHERE car_id = ${id}`);
       console.log(`Deleted ${predictionResult.rowCount || 0} price predictions`);
       
-      // Then delete the car
+      const featuresResult = await db.execute(sql`DELETE FROM price_features_current WHERE car_id = ${id}`);
+      console.log(`Deleted ${featuresResult.rowCount || 0} price features`);
+      
+      // Delete any other related records that might exist
+      await db.execute(sql`DELETE FROM contracts WHERE car_id = ${id}`);
+      await db.execute(sql`DELETE FROM market_comps WHERE car_id = ${id}`);
+      
+      // Finally delete the car
       const result = await db.delete(cars)
         .where(and(eq(cars.id, id), eq(cars.companyId, membership.companyId), eq(cars.userId, userId)));
       
