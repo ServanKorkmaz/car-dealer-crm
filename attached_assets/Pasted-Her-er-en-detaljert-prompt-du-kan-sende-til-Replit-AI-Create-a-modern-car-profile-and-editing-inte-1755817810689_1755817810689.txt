@@ -1,0 +1,99 @@
+Her er en detaljert prompt du kan sende til Replit AI:
+
+Create a modern car profile and editing interface for ForhandlerPRO
+Build a comprehensive car profile view with inline editing capabilities for a Norwegian car dealership management system. The interface should be modern, professional, and user-friendly.
+Requirements:
+Visual Design:
+
+Dark theme (slate-800/900 backgrounds, white text)
+Modern card-based layout with subtle borders (border-slate-700)
+Professional typography and spacing
+Responsive design (mobile-first)
+
+Core Features:
+
+Header Section:
+
+Car title (brand, model, year)
+Status badge (til salgs/reservert/solgt) with color coding
+Price display with large, prominent typography
+Quick action buttons (edit mode toggle, delete, duplicate)
+
+
+Tabbed Interface:
+
+Overview tab (images, description, quick stats)
+Technical details tab (specifications in organized grid)
+Pricing tab (purchase price, selling price, profit calculations)
+Marketing tab (Finn.no integration, publication status)
+
+
+Image Management:
+
+Large main image display with thumbnail navigation
+Drag-and-drop image upload in edit mode
+Image deletion and reordering capabilities
+Image counter (1/15 format)
+
+
+Inline Editing:
+
+Toggle between view and edit modes
+Form fields that match the design system
+Auto-save indicators
+Validation feedback
+Cancel/save buttons with loading states
+
+
+Quick Stats Cards:
+
+Year, mileage, fuel type, registration number
+Icons from Lucide React
+Hover effects and transitions
+
+
+
+Technical Specifications:
+
+React + TypeScript
+TailwindCSS for styling
+Lucide React for icons
+Form state management with useState
+Responsive grid layouts
+Smooth transitions and hover effects
+
+Data Structure:
+typescriptinterface Car {
+  id: string;
+  brand: string;
+  model: string;
+  year: number;
+  price: number;
+  originalPrice: number;
+  status: 'til-salgs' | 'reservert' | 'solgt';
+  km: number;
+  fuel: string;
+  transmission: string;
+  power: number;
+  co2: number;
+  color: string;
+  description: string;
+  images: string[];
+  // Add more fields as needed
+}
+UX Guidelines:
+
+Minimize cognitive load with clear visual hierarchy
+Use progressive disclosure (tabs organize complex information)
+Provide immediate feedback for all interactions
+Make common actions easily accessible
+Use familiar patterns from modern web applications
+
+Norwegian Labels:
+
+Use Norwegian text for all labels and buttons
+"Rediger" (Edit), "Lagre" (Save), "Avbryt" (Cancel)
+"Oversikt", "Detaljer", "Prising", "Markedsføring" for tabs
+"Kilometerstand", "Drivstoff", "Årsmodell", etc.
+
+Create a polished, production-ready component that feels like a premium SaaS application. Focus on smooth interactions, professional aesthetics, and intuitive user experience.

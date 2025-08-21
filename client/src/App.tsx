@@ -16,6 +16,7 @@ import Activities from "@/pages/Activities";
 import Cars from "@/pages/Cars";
 import CarsInventory from "@/pages/CarsInventory";
 import CarDetail from "@/pages/CarDetail";
+import CarProfile from "@/pages/CarProfile";
 import Customers from "@/pages/Customers";
 import CustomerProfile from "@/pages/CustomerProfile";
 import { CustomerProfilePage } from "@/pages/CustomerProfilePage";
@@ -69,6 +70,11 @@ function Router() {
       <Route path="/cars/:id">
         <ProtectedRoute>
           <CarDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/cars/:id/profile">
+        <ProtectedRoute>
+          <CarProfile />
         </ProtectedRoute>
       </Route>
       <Route path="/customers">

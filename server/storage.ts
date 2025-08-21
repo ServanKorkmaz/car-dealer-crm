@@ -304,7 +304,6 @@ export class DatabaseStorage implements IStorage {
       recondCost: row.recond_cost,
       notes: row.notes,
       images: row.images,
-      svvData: row.svv_data || null,
       finnUrl: row.finn_url,
       status: row.status,
       soldDate: row.sold_date,

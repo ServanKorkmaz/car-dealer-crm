@@ -156,7 +156,7 @@ const CarCard = ({
             status.dotColor.replace('bg-', 'border-l-'),
             isSelected && "ring-2 ring-primary"
           )}
-          onClick={() => navigate(`/cars/${car.id}`)}
+          onClick={() => navigate(`/cars/${car.id}/profile`)}
         >
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
@@ -235,7 +235,10 @@ const CarCard = ({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={(e) => handleQuickAction("Se detaljer", e)}>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/cars/${car.id}/profile`);
+                        }}>
                           <Eye className="w-4 h-4 mr-2" />
                           Se detaljer
                         </DropdownMenuItem>
@@ -292,7 +295,7 @@ const CarCard = ({
           "border-0 ring-1 ring-slate-200 dark:ring-slate-800",
           isSelected && "ring-2 ring-primary"
         )}
-        onClick={() => navigate(`/cars/${car.id}`)}
+        onClick={() => navigate(`/cars/${car.id}/profile`)}
       >
         {/* Image section */}
         <div className="relative aspect-[16/10] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
