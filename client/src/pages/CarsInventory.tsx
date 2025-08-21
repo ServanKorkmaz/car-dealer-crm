@@ -443,10 +443,7 @@ export default function CarsInventory() {
     queryKey: ['/api/cars'],
   });
   
-  // Fetch dashboard stats
-  const { data: dashboardStats } = useQuery({
-    queryKey: ['/api/dashboard/stats'],
-  });
+  // Remove dashboard stats query to avoid conflicting data
 
   // Filter and sort cars
   const filteredCars = useMemo(() => {
@@ -564,11 +561,9 @@ export default function CarsInventory() {
       return carIds; // Return the sold IDs for use in onSuccess
     },
     onSuccess: (soldCarIds) => {
-      // Force refresh of both cars and stats
+      // Force refresh of cars data only
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       queryClient.refetchQueries({ queryKey: ['/api/cars'] });
-      queryClient.refetchQueries({ queryKey: ['/api/dashboard/stats'] });
       
       const count = soldCarIds.length;
       toast({
@@ -579,7 +574,6 @@ export default function CarsInventory() {
     onError: (error: any) => {
       // Revert optimistic update on error
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       toast({
         title: "Feil",
         description: error.message || "Kunne ikke markere biler som solgt",
@@ -598,11 +592,9 @@ export default function CarsInventory() {
       return carIds; // Return the deleted IDs for use in onSuccess
     },
     onSuccess: (deletedCarIds) => {
-      // Force refresh of both cars and stats
+      // Force refresh of cars data only  
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       queryClient.refetchQueries({ queryKey: ['/api/cars'] });
-      queryClient.refetchQueries({ queryKey: ['/api/dashboard/stats'] });
       
       const count = deletedCarIds.length;
       toast({
@@ -613,7 +605,6 @@ export default function CarsInventory() {
     onError: (error: any) => {
       // Revert optimistic update on error
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       toast({
         title: "Feil",
         description: error.message || "Kunne ikke slette biler",
