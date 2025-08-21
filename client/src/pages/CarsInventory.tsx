@@ -450,6 +450,8 @@ export default function CarsInventory() {
   const { data: cars = [], isLoading, error } = useQuery<Car[]>({
     queryKey: ['/api/cars'],
     enabled: !!user, // Only fetch cars when user is authenticated
+    refetchInterval: false, // Don't auto-refetch
+    staleTime: 0, // Always consider data stale to ensure fresh data
   });
   
   // Remove dashboard stats query to avoid conflicting data

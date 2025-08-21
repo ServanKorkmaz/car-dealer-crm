@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Car as CarType } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -280,8 +281,15 @@ export default function AddCarDialog({ onClose }: AddCarDialogProps) {
       }
       return response.json();
     },
-    onSuccess: () => {
-      // Optimistic update - don't await these
+    onSuccess: (newCar) => {
+      // Optimistically add the new car to the cache
+      queryClient.setQueryData(["/api/cars"], (oldCars: CarType[] | undefined) => {
+        if (!oldCars) return [newCar];
+        // Add new car at the beginning of the list
+        return [newCar, ...oldCars];
+      });
+      
+      // Then invalidate to ensure we have fresh data from server
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       
