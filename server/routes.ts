@@ -414,6 +414,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mark car as sold route
+  app.put('/api/cars/:id/sold', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const storage = await storagePromise;
+      
+      const car = await storage.updateCar(req.params.id, {
+        status: 'sold',
+        soldDate: new Date().toISOString(),
+        soldPrice: req.body.soldPrice || null,
+        soldToCustomerId: req.body.customerId || null
+      }, userId);
+      
+      // Log car sold activity asynchronously
+      ActivityLogger.logCarSold(userId, car.id, {
+        make: car.make,
+        model: car.model,
+        soldPrice: car.soldPrice || car.salePrice || "0"
+      }).catch(error => {
+        console.error("Failed to log car sold activity:", error);
+      });
+      
+      res.json(car);
+    } catch (error) {
+      console.error("Error marking car as sold:", error);
+      res.status(500).json({ message: "Failed to mark car as sold" });
+    }
+  });
+
   app.put('/api/cars/:id', authMiddleware, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

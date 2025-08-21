@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient } from "@/lib/queryClient";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { 
   Search, 
@@ -416,6 +415,7 @@ const CarCard = ({
 export default function CarsInventory() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // State management
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -549,7 +549,58 @@ export default function CarsInventory() {
   };
 
   // Bulk actions
+  // Mark cars as sold mutation
+  const markAsSoldMutation = useMutation({
+    mutationFn: async (carIds: string[]) => {
+      const promises = carIds.map(carId => 
+        apiRequest('PUT', `/api/cars/${carId}/sold`, {})
+      );
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      toast({
+        title: "Biler markert som solgt",
+        description: "Bilene er nå registrert som solgte i systemet",
+      });
+    },
+    onError: (error: any) => {
+      // Revert optimistic update on error
+      queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+      toast({
+        title: "Feil",
+        description: error.message || "Kunne ikke markere biler som solgt",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleBulkAction = (action: string) => {
+    if (action === "Marker som solgt") {
+      const carIds = Array.from(selectedCars);
+      
+      // Optimistic update - immediately update UI
+      queryClient.setQueryData(['/api/cars'], (oldCars: Car[] | undefined) => {
+        if (!oldCars) return oldCars;
+        
+        return oldCars.map(car => 
+          carIds.includes(car.id) 
+            ? { ...car, status: 'sold' as const, soldDate: new Date().toISOString() }
+            : car
+        );
+      });
+      
+      // Make API call
+      markAsSoldMutation.mutate(carIds);
+      
+      // Clear selection
+      setSelectedCars(new Set());
+      
+      return;
+    }
+    
+    // Handle other bulk actions
     toast({
       title: `${action} for ${selectedCars.size} biler`,
       description: "Handlingen ble utført.",
