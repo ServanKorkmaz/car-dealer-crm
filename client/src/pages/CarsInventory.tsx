@@ -416,6 +416,11 @@ export default function CarsInventory() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Check authentication status
+  const { data: user, isLoading: isUserLoading } = useQuery({
+    queryKey: ['/api/auth/user'],
+  });
   
   // State management
   const [view, setView] = useState<"grid" | "list">("grid");
@@ -438,9 +443,10 @@ export default function CarsInventory() {
     mileageRange: [0, 300000]
   });
 
-  // Fetch cars
+  // Fetch cars - wait for user to be authenticated
   const { data: cars = [], isLoading, error } = useQuery<Car[]>({
     queryKey: ['/api/cars'],
+    enabled: !!user, // Only fetch cars when user is authenticated
   });
   
   // Remove dashboard stats query to avoid conflicting data
@@ -732,8 +738,7 @@ export default function CarsInventory() {
 
   // Stats - always calculate from current cars data for accuracy
   const stats = useMemo(() => {
-    console.log('Calculating stats from cars:', cars.length, cars.map(c => c.status));
-    const result = {
+    return {
       total: cars.length,
       available: cars.filter(c => c.status === 'available').length,
       reserved: cars.filter(c => c.status === 'reserved').length,
@@ -742,8 +747,6 @@ export default function CarsInventory() {
         .filter(c => c.status === 'available')
         .reduce((sum, car) => sum + parseInt(car.salePrice || "0"), 0)
     };
-    console.log('Stats calculated:', result);
-    return result;
   }, [cars]);
 
   return (
