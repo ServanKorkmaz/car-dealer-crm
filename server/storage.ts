@@ -320,16 +320,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCar(car: InsertCar, userId: string): Promise<Car> {
-    // Get user's company
-    const membership = await this.getUserMembership(userId, 'default-company');
-    if (!membership) throw new Error('User not in company');
+    // For development, use default company directly to avoid extra query
+    const companyId = 'default-company';
     
     const [newCar] = await db
       .insert(cars)
       .values({
         ...car,
         userId,
-        companyId: membership.companyId,
+        companyId,
       })
       .returning();
     return newCar;

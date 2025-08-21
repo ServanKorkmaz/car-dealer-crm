@@ -379,20 +379,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const carData = insertCarSchema.parse(req.body);
       const storage = await storagePromise;
+      
+      // Create car first - this should be fast
       const car = await storage.createCar(carData, userId);
       
-      // Log car creation activity
-      try {
-        await ActivityLogger.logCarCreated(userId, car.id, {
+      // Respond immediately
+      res.status(201).json(car);
+      
+      // Log activity asynchronously after response (fire and forget)
+      setImmediate(() => {
+        ActivityLogger.logCarCreated(userId, car.id, {
           make: car.make,
           model: car.model,
           year: car.year
+        }).catch(error => {
+          console.error("Failed to log car creation activity:", error);
         });
-      } catch (error) {
-        console.error("Failed to log car creation activity:", error);
-      }
-      
-      res.status(201).json(car);
+      });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
@@ -418,16 +421,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const storage = await storagePromise;
       const car = await storage.updateCar(req.params.id, carData, userId);
       
-      // Log car update activity
-      try {
-        await ActivityLogger.logCarUpdated(userId, car.id, {
-          make: car.make,
-          model: car.model,
-          registrationNumber: car.registrationNumber
-        });
-      } catch (error) {
+      // Log car update activity asynchronously (don't await)
+      ActivityLogger.logCarUpdated(userId, car.id, {
+        make: car.make,
+        model: car.model,
+        registrationNumber: car.registrationNumber
+      }).catch(error => {
         console.error("Failed to log car update activity:", error);
-      }
+      });
       
       res.json(car);
     } catch (error) {

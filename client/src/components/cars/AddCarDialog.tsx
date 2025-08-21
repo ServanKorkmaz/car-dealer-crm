@@ -281,8 +281,10 @@ export default function AddCarDialog({ onClose }: AddCarDialogProps) {
       return response.json();
     },
     onSuccess: () => {
+      // Optimistic update - don't await these
       queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      
       toast({
         title: "Bil lagt til",
         description: "Bilen er nå registrert i systemet",
