@@ -556,13 +556,16 @@ export default function CarsInventory() {
         apiRequest('PUT', `/api/cars/${carId}/sold`, {})
       );
       await Promise.all(promises);
+      return carIds; // Return the sold IDs for use in onSuccess
     },
-    onSuccess: () => {
+    onSuccess: (soldCarIds) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      
+      const count = soldCarIds.length;
       toast({
-        title: "Biler markert som solgt",
-        description: "Bilene er nå registrert som solgte i systemet",
+        title: count === 1 ? "Bil markert som solgt" : "Biler markert som solgt",
+        description: count === 1 ? "Bilen er nå registrert som solgt i systemet" : `${count} biler er nå registrert som solgte i systemet`,
       });
     },
     onError: (error: any) => {
@@ -583,13 +586,16 @@ export default function CarsInventory() {
         apiRequest('DELETE', `/api/cars/${carId}`, {})
       );
       await Promise.all(promises);
+      return carIds; // Return the deleted IDs for use in onSuccess
     },
-    onSuccess: () => {
+    onSuccess: (deletedCarIds) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      
+      const count = deletedCarIds.length;
       toast({
-        title: "Biler slettet",
-        description: "Bilene er slettet fra systemet",
+        title: count === 1 ? "Bil slettet" : "Biler slettet",
+        description: count === 1 ? "Bilen er slettet fra systemet" : `${count} biler er slettet fra systemet`,
       });
     },
     onError: (error: any) => {
