@@ -420,10 +420,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const storage = await storagePromise;
       
+      const currentDate = new Date();
+      
       const car = await storage.updateCar(req.params.id, {
         status: 'sold',
-        soldDate: new Date(),
-        soldPrice: req.body.soldPrice || null,
+        soldDate: currentDate,
+        soldPrice: req.body.soldPrice?.toString() || null,
         soldToCustomerId: req.body.customerId || null
       }, userId);
       

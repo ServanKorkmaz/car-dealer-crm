@@ -339,12 +339,20 @@ export class DatabaseStorage implements IStorage {
     const membership = await this.getUserMembership(userId, 'default-company');
     if (!membership) throw new Error('User not in company');
     
+    // Ensure Date objects are used for timestamp fields
+    const updateData: any = { 
+      ...car, 
+      updatedAt: new Date()
+    };
+    
+    // Handle soldDate field specifically
+    if (car.soldDate) {
+      updateData.soldDate = car.soldDate instanceof Date ? car.soldDate : new Date(car.soldDate);
+    }
+    
     const [updatedCar] = await db
       .update(cars)
-      .set({ 
-        ...car, 
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(and(eq(cars.id, id), eq(cars.companyId, membership.companyId), eq(cars.userId, userId)))
       .returning();
     return updatedCar;
