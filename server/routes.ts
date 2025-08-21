@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storagePromise } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -13,11 +13,6 @@ import OpenAI from "openai";
 import * as tools from "./assistantTools";
 import type { UserHints } from "./assistantTools";
 import { svvLookup } from "./routes/svv";
-
-// Feedback imports
-import { feedbackRateLimit } from "./lib/rateLimit";
-import { supabaseServer, ensureFeedbackBucket, uploadScreenshot } from "./lib/supabaseServer";
-import { mailerService } from "./lib/mailer";
 
 // Initialize OpenAI if API key is available
 const openai = process.env.OPENAI_API_KEY
@@ -41,11 +36,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const storage = await storagePromise;
       const membership = await storage.getUserMembership(userId, 'default-company');
-
+      
       if (!membership) {
         return res.status(404).json({ message: "User not found in company" });
       }
-
+      
       res.json({
         role: membership.role,
         companyId: membership.companyId,
@@ -64,18 +59,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { email, role } = req.body;
-
+      
       if (!email || !role) {
         return res.status(400).json({ message: "Email and role are required" });
       }
-
+      
       if (!['EIER', 'SELGER', 'REGNSKAP', 'VERKSTED'].includes(role)) {
         return res.status(400).json({ message: "Invalid role" });
       }
-
+      
       const storage = await storagePromise;
       const invite = await storage.createInvite('default-company', email, role, userId);
-
+      
       res.json({
         message: "Invitation sent successfully",
         inviteId: invite.id,
@@ -92,7 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const storage = await storagePromise;
       const invites = await storage.getCompanyInvites('default-company', userId);
-
+      
       res.json(invites);
     } catch (error) {
       console.error("Error fetching invites:", error);
@@ -103,18 +98,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/accept-invite', async (req, res) => {
     try {
       const { token, userId } = req.body;
-
+      
       if (!token) {
         return res.status(400).json({ message: "Invite token is required" });
       }
-
+      
       const storage = await storagePromise;
       const result = await storage.acceptInvite(token, userId || 'new-user-' + Date.now());
-
+      
       if (!result) {
         return res.status(400).json({ message: "Invalid or expired invite" });
       }
-
+      
       res.json({
         message: "Invite accepted successfully",
         companyId: result.companyId,
@@ -144,13 +139,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { page } = req.query;
-
+      
       if (!page || !['cars', 'customers'].includes(page)) {
         return res.status(400).json({ message: "Valid page parameter required" });
       }
-
+      
       const storage = await storagePromise;
-      const savedViews = await storage.getSavedViews(userId, page as string);
+      const savedViews = await storage.getSavedViews(userId, page);
       res.json(savedViews);
     } catch (error) {
       console.error("Error fetching saved views:", error);
@@ -162,15 +157,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { page, name, payload } = req.body;
-
+      
       if (!page || !name || !payload) {
         return res.status(400).json({ message: "Page, name, and payload are required" });
       }
-
+      
       if (!['cars', 'customers'].includes(page)) {
         return res.status(400).json({ message: "Invalid page parameter" });
       }
-
+      
       const storage = await storagePromise;
       const savedView = await storage.createSavedView({
         userId,
@@ -179,7 +174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name,
         payload
       });
-
+      
       res.status(201).json(savedView);
     } catch (error) {
       console.error("Error creating saved view:", error);
@@ -192,18 +187,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { id } = req.params;
       const { name, payload } = req.body;
-
+      
       if (!name && !payload) {
         return res.status(400).json({ message: "Name or payload is required" });
       }
-
+      
       const storage = await storagePromise;
       const updatedView = await storage.updateSavedView(id, { name, payload }, userId);
-
+      
       if (!updatedView) {
         return res.status(404).json({ message: "Saved view not found" });
       }
-
+      
       res.json(updatedView);
     } catch (error) {
       console.error("Error updating saved view:", error);
@@ -215,14 +210,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { id } = req.params;
-
+      
       const storage = await storagePromise;
       const success = await storage.deleteSavedView(id, userId);
-
+      
       if (!success) {
         return res.status(404).json({ message: "Saved view not found" });
       }
-
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting saved view:", error);
@@ -252,13 +247,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const limit = parseInt(req.query.limit as string) || 20;
       const storage = await storagePromise;
-
+      
       // Get the new enhanced activities instead of legacy activityLog
       const activities = await storage.getActivities(userId, 'default-company', { 
         limit,
         resolved: false // Show unresolved first
       });
-
+      
       res.json(activities);
     } catch (error) {
       console.error("Error fetching dashboard activities:", error);
@@ -271,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { type, priority, resolved, limit = '50', offset = '0' } = req.query;
-
+      
       const storage = await storagePromise;
       const activities = await storage.getActivities(userId, 'default-company', {
         type: type as string,
@@ -280,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limit: parseInt(limit as string),
         offset: parseInt(offset as string)
       });
-
+      
       res.json(activities);
     } catch (error) {
       console.error("Error fetching activities:", error);
@@ -292,9 +287,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const storage = await storagePromise;
-
+      
       const success = await storage.resolveActivity(req.params.id, userId);
-
+      
       if (success) {
         res.json({ success: true, message: "Activity resolved" });
       } else {
@@ -310,7 +305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const storage = await storagePromise;
       const alerts = await storage.getUnresolvedAlerts('default-company', 10);
-
+      
       res.json(alerts);
     } catch (error) {
       console.error("Error fetching unresolved alerts:", error);
@@ -323,7 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       await AlertSystem.runAlerts(userId, 'default-company');
-
+      
       res.json({ success: true, message: "Alert check completed" });
     } catch (error) {
       console.error("Error running alert check:", error);
@@ -384,13 +379,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const carData = insertCarSchema.parse(req.body);
       const storage = await storagePromise;
-
+      
       // Create car first - this should be fast
       const car = await storage.createCar(carData, userId);
-
+      
       // Respond immediately
       res.status(201).json(car);
-
+      
       // Log activity asynchronously after response (fire and forget)
       setImmediate(() => {
         ActivityLogger.logCarCreated(userId, car.id, {
@@ -405,7 +400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
-
+      
       // Handle duplicate registration number
       if (error.code === '23505' && error.constraint === 'cars_registration_number_unique') {
         return res.status(409).json({ 
@@ -413,7 +408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           code: "DUPLICATE_REGISTRATION"
         });
       }
-
+      
       console.error("Error creating car:", error);
       res.status(500).json({ message: "Failed to create car" });
     }
@@ -424,16 +419,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const storage = await storagePromise;
-
+      
       const currentDate = new Date();
-
+      
       const car = await storage.updateCar(req.params.id, {
         status: 'sold',
         soldDate: currentDate,
         soldPrice: req.body.soldPrice?.toString() || null,
         soldToCustomerId: req.body.customerId || null
       }, userId);
-
+      
       // Log car sold activity asynchronously
       ActivityLogger.logCarSold(userId, car.id, {
         make: car.make,
@@ -442,7 +437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).catch(error => {
         console.error("Failed to log car sold activity:", error);
       });
-
+      
       res.json(car);
     } catch (error) {
       console.error("Error marking car as sold:", error);
@@ -456,7 +451,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const carData = insertCarSchema.partial().parse(req.body);
       const storage = await storagePromise;
       const car = await storage.updateCar(req.params.id, carData, userId);
-
+      
       // Log car update activity asynchronously (don't await)
       ActivityLogger.logCarUpdated(userId, car.id, {
         make: car.make,
@@ -465,7 +460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }).catch(error => {
         console.error("Failed to log car update activity:", error);
       });
-
+      
       res.json(car);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -497,7 +492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { soldPrice, customerId } = req.body;
-
+      
       const storage = await storagePromise;
       const updatedCar = await storage.updateCar(req.params.id, {
         status: "sold",
@@ -516,11 +511,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error("Failed to log car sold activity:", error);
       }
-
+      
       if (!updatedCar) {
         return res.status(404).json({ message: "Car not found" });
       }
-
+      
       res.json(updatedCar);
     } catch (error) {
       console.error("Error marking car as sold:", error);
@@ -535,7 +530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/vehicle-lookup/:regNumber', authMiddleware, async (req: any, res) => {
     try {
       const { regNumber } = req.params;
-
+      
       // Validate registration number format (Norwegian)
       const regNumberClean = regNumber.replace(/\s+/g, '').toUpperCase();
       if (!/^[A-Z]{2}\d{4,5}$|^[A-Z]\d{4,5}$|^[A-Z]{1,3}\s?\d{2,5}$/.test(regNumberClean)) {
@@ -584,9 +579,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const vehicleData = await svvResponse.json();
-
+      
       console.log('Raw SVV API response:', JSON.stringify(vehicleData, null, 2));
-
+      
       // Extract vehicle information from the complex response structure
       const vehicleInfo = vehicleData.kjoretoydataListe?.[0];
       if (!vehicleInfo) {
@@ -599,70 +594,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Extract technical data from the correct structure
       const tekniskData = vehicleInfo.godkjenning?.tekniskGodkjenning?.tekniskeData;
       const genereltData = tekniskData?.generelt;
-
+      
       // Extract make and model from the correct paths
       const make = genereltData?.merke?.[0]?.merke || "";
       const model = genereltData?.handelsbetegnelse?.[0] || "";
-
+      
       // Extract year from first registration
       const firstRegDate = vehicleInfo.forstegangsregistrering?.registrertForstegangNorgeDato;
       const year = firstRegDate ? new Date(firstRegDate).getFullYear() : new Date().getFullYear();
-
+      
       // Extract motor and drivetrain data
       const motorData = tekniskData?.motorOgDrivverk;
       let fuelType = "";
       let power = "";
       let transmission = "";
-
+      
       if (motorData) {
         // Get fuel type from first motor with drivstoff
         const motorWithFuel = motorData.motor?.find((m: any) => m.drivstoff?.length > 0);
         if (motorWithFuel?.drivstoff?.[0]?.drivstoffKode?.kodeBeskrivelse) {
           fuelType = motorWithFuel.drivstoff[0].drivstoffKode.kodeBeskrivelse;
         }
-
+        
         // Get power from first motor with maksNettoEffekt
         const motorWithPower = motorData.motor?.find((m: any) => m.drivstoff?.[0]?.maksNettoEffekt);
         if (motorWithPower?.drivstoff?.[0]?.maksNettoEffekt) {
           power = `${motorWithPower.drivstoff[0].maksNettoEffekt} kW`;
         }
-
+        
         // Get transmission type
         if (motorData.girkasse?.girkasseType?.kodeBeskrivelse) {
           transmission = motorData.girkasse.girkasseType.kodeBeskrivelse;
         }
       }
-
+      
       // Extract color from karosseri data
       const karosseriData = tekniskData?.karosseriOgLasteplan;
       let color = "";
       if (karosseriData?.karosseri?.[0]?.farge?.kodeBeskrivelse) {
         color = karosseriData.karosseri[0].farge.kodeBeskrivelse;
       }
-
+      
       // Extract girkasse (transmission) type properly
       if (motorData?.girkassetype?.kodeBeskrivelse) {
         transmission = motorData.girkassetype.kodeBeskrivelse;
       }
-
+      
       // Extract additional technical details
       const vekter = tekniskData?.vekter;
       const dimensjoner = tekniskData?.dimensjoner;
       const persontall = tekniskData?.persontall;
-
+      
       // Extract emissions from miljodata
       const miljoData = tekniskData?.miljodata?.[0];
       const co2Emissions = miljoData?.co2Utslipp || null;
-
+      
       // Extract control dates
       const lastEuControl = vehicleInfo.periodiskKjoretoyKontroll?.sistGodkjent || null;
       const nextEuControl = vehicleInfo.periodiskKjoretoyKontroll?.kontrollfrist || null;
-
+      
       // Extract vehicle class and type
       const kjoretoyklassifisering = vehicleInfo.godkjenning?.tekniskGodkjenning?.kjoretoyklassifisering;
       const vehicleClass = kjoretoyklassifisering?.beskrivelse || "";
       const vehicleType = kjoretoyklassifisering?.tekniskKode?.kodeBeskrivelse || "";
-
+      
       // Extract VIN and karosseri type
       const vin = vehicleInfo.kjoretoyId?.understellsnummer || "";
       const karosseriType = karosseriData?.karosseritype?.kodeBeskrivelse || "";
@@ -671,7 +666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mileage = vehicleInfo.registrering?.kilometerstand || 0;
 
       console.log('Parsed vehicle data:', { make, model, year, color, fuelType, transmission, power });
-
+      
       // Map SVV data to our car form structure
       const mappedData = {
         make,
@@ -830,7 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contractData = insertContractSchema.parse(req.body);
       const storage = await storagePromise;
       const contract = await storage.createContract(contractData, userId);
-
+      
       // Mark car as sold
       await storage.updateCar(contractData.carId, { 
         status: "sold",
@@ -863,20 +858,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           images: [],
           euControl: false,
         };
-
+        
         const tradeInCarRecord = await storage.createCar(tradeInCar, userId);
-
+        
         // Update contract with trade-in car reference (this will be skipped for now due to schema issues)
         // await storage.updateContract(contract.id, {
         //   tradeInCarId: tradeInCarRecord.id,
         // }, userId);
       }
-
+      
       // Log contract creation activity
       try {
         const customer = await storage.getCustomerById(contract.customerId, userId);
         const car = await storage.getCarById(contract.carId, userId);
-
+        
         await ActivityLogger.logContractCreated(userId, contract.id, {
           contractNumber: contract.contractNumber,
           customerName: customer?.name || "Ukjent kunde",
@@ -885,7 +880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error("Failed to log contract creation activity:", error);
       }
-
+      
       res.status(201).json(contract);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -933,7 +928,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const storage = await storagePromise;
-
+      
       // Get contract with related data
       const contract = await storage.getContractById(req.params.id, userId);
       if (!contract) {
@@ -966,14 +961,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const storage = await storagePromise;
       const contract = await storage.getContractById(req.params.id, userId);
-
+      
       if (!contract) {
         return res.status(404).json({ message: "Contract not found" });
       }
 
       // Mock e-sign sending (2 second delay)
       await new Promise(resolve => setTimeout(resolve, 2000));
-
+      
       // Update contract with sent status (skip eSignSentAt for now due to schema issues)
       await storage.updateContract(req.params.id, {
         eSignStatus: 'sendt',
@@ -990,13 +985,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/cars/import-from-finn', authMiddleware, async (req: any, res) => {
     try {
       const { url, regNumber } = req.body;
-
+      
       if (!url || typeof url !== 'string') {
         return res.status(400).json({ message: "URL is required" });
       }
 
       const carData = await scrapeFinnAd(url, regNumber);
-
+      
       if (!carData) {
         return res.status(400).json({ message: "Could not extract car data from URL" });
       }
@@ -1004,14 +999,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import the car into the database
       const userId = req.user.claims.sub;
       const storage = await storagePromise;
-
+      
       // Check if car with same registration number already exists
       if (carData.registrationNumber) {
         const existingCars = await storage.getCars(userId);
         const existingCar = existingCars.find(car => 
           car.registrationNumber === carData.registrationNumber
         );
-
+        
         if (existingCar) {
           return res.status(409).json({
             success: false,
@@ -1020,7 +1015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
-
+      
       // Ensure required fields are present for car creation
       const carDataWithDefaults = {
         ...carData,
@@ -1034,7 +1029,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastEuControl: carData.lastEuControl ?? null,
         nextEuControl: carData.nextEuControl ?? null,
       };
-
+      
       const importedCar = await storage.createCar(carDataWithDefaults, userId);
 
       // Log car import activity
@@ -1142,7 +1137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { name } = req.body;
-
+      
       if (!name || typeof name !== 'string' || !name.trim()) {
         return res.status(400).json({ message: 'Company name is required' });
       }
@@ -1160,14 +1155,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const { companyId } = req.body;
-
+      
       if (!companyId) {
         return res.status(400).json({ message: 'Company ID is required' });
       }
 
       const storage = await storagePromise;
       const hasAccess = await storage.switchActiveCompany(userId, companyId);
-
+      
       if (!hasAccess) {
         return res.status(403).json({ message: 'Access denied to this company' });
       }
@@ -1284,7 +1279,7 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
           else if (intent.page?.includes("activities")) pageName = "**Aktiviteter**";
           else if (intent.page?.includes("settings")) pageName = "**Innstillinger**";
           else if (intent.page?.includes("dashboard")) pageName = "**Dashboard**";
-
+          
           return res.json({ 
             reply: `Åpner ${pageName}.`, 
             tool: { name: "open", page: intent.page || "#/dashboard", auto: true } 
@@ -1329,7 +1324,7 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
 
         case "CREATE_CONTRACT": {
           const result = await tools.parseContractCreationCommand(intent.command || "", userHints);
-
+          
           if ((result as any).needsPhone) {
             // Store context for follow-up
             return res.json({ 
@@ -1341,18 +1336,18 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
               }
             });
           }
-
+          
           if (result.error) {
             return res.json({ reply: result.error });
           }
-
+          
           if (result.success) {
             const params = new URLSearchParams({
               customerId: result.customer.id,
               carId: result.car.id,
               prefill: 'true'
             });
-
+            
             return res.json({
               reply: `Kontrakt forhåndsutfylt for **${result.customer.name}** – **${result.car.registrationNumber}**. Åpner kontraktskjema...`,
               tool: { 
@@ -1362,7 +1357,7 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
               }
             });
           }
-
+          
           return res.json({ reply: "Noe gikk galt ved tolkning av kommandoen." });
         }
 
@@ -1411,7 +1406,7 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
       return res.json({
         reply: "Jeg kan guide deg stegvis (f.eks. «Hvor finner jeg biler?»). For mer naturlige svar kan du sette OPENAI_API_KEY.",
       });
-
+      
     } catch (error) {
       console.error("Assistant error:", error);
       res.status(500).json({ 
@@ -1423,138 +1418,6 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
   // Register accounting routes
   const { registerAccountingRoutes } = await import('./accounting/routes');
   registerAccountingRoutes(app, authMiddleware);
-
-  // Feedback validation schema
-  const feedbackSchema = z.object({
-    type: z.enum(['Bug', 'Feature', 'Question']),
-    severity: z.enum(['Critical', 'High', 'Medium', 'Low']),
-    message: z.string().min(10).max(2000),
-    email: z.string().email().optional().nullable(),
-    screenshotBase64: z.string().optional().nullable(),
-    context: z.object({
-      userAgent: z.string().optional(),
-      currentPage: z.string().optional(),
-      appVersion: z.string().optional(),
-      orgName: z.string().optional(),
-      userId: z.string().optional(),
-    }).optional().nullable(),
-  });
-
-  // Initialize feedback bucket on startup
-  ensureFeedbackBucket().catch(console.error);
-
-  // Feedback submission route
-  app.post("/api/feedback", feedbackRateLimit, async (req: Request, res: Response) => {
-    try {
-      // Validate request body
-      const validatedData = feedbackSchema.parse(req.body);
-
-      let screenshotUrl: string | null = null;
-
-      // Handle screenshot upload if provided
-      if (validatedData.screenshotBase64) {
-        try {
-          const timestamp = Date.now();
-          const filename = `feedback-${timestamp}.png`;
-          screenshotUrl = await uploadScreenshot(validatedData.screenshotBase64, filename);
-        } catch (uploadError) {
-          console.error('Screenshot upload failed:', uploadError);
-          // Continue without screenshot rather than failing the entire request
-        }
-      }
-
-      // Get user ID from auth header if available
-      let userId: string | null = null;
-      try {
-        const authHeader = req.headers.authorization;
-        if (authHeader?.startsWith('Bearer ')) {
-          // For now, we'll skip token verification and let Supabase handle it
-        }
-      } catch (authError) {
-        // Non-authenticated users can still submit feedback
-      }
-
-      // Prepare metadata
-      const metadata = {
-        ...validatedData.context,
-        ip: req.ip,
-        timestamp: new Date().toISOString(),
-      };
-
-      // Insert feedback into Supabase
-      const { data: feedbackData, error: insertError } = await supabaseServer
-        .from('feedback')
-        .insert({
-          user_id: userId,
-          email: validatedData.email,
-          type: validatedData.type,
-          severity: validatedData.severity,
-          message: validatedData.message,
-          screenshot_url: screenshotUrl,
-          metadata,
-          status: 'New'
-        })
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error('Database insert failed:', insertError);
-        return res.status(500).json({ 
-          error: 'Kunne ikke lagre tilbakemelding',
-          code: 'DATABASE_ERROR'
-        });
-      }
-
-      // Send email notification
-      try {
-        await mailerService.sendFeedbackEmail({
-          id: feedbackData.id,
-          type: validatedData.type,
-          severity: validatedData.severity,
-          message: validatedData.message,
-          email: validatedData.email || undefined,
-          screenshotUrl: screenshotUrl || undefined,
-          metadata,
-        });
-      } catch (emailError) {
-        console.error('Email sending failed:', emailError);
-        // Don't fail the request if email fails
-      }
-
-      // Log activity
-      ActivityLogger.logActivity({
-        userId: userId || 'anonymous',
-        companyId: 'system',
-        action: 'feedback_submitted',
-        resourceType: 'feedback',
-        resourceId: feedbackData.id,
-        description: `Feedback submitted: ${validatedData.type} - ${validatedData.severity}`,
-        metadata: { type: validatedData.type, severity: validatedData.severity }
-      });
-
-      res.json({ 
-        ok: true, 
-        id: feedbackData.id,
-        message: 'Tilbakemelding mottatt. Takk!'
-      });
-
-    } catch (error) {
-      console.error('Feedback submission error:', error);
-
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          error: 'Ugyldig data',
-          code: 'VALIDATION_ERROR',
-          details: error.errors
-        });
-      }
-
-      res.status(500).json({
-        error: 'Intern serverfeil',
-        code: 'INTERNAL_ERROR'
-      });
-    }
-  });
 
   const httpServer = createServer(app);
   return httpServer;
