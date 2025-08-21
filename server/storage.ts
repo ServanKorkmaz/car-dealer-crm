@@ -285,7 +285,7 @@ export class DatabaseStorage implements IStorage {
       model: row.model,
       variant: row.variant || null,
       year: row.year,
-      vin: row.vin || null,
+
       mileage: row.mileage,
       color: row.color,
       fuelType: row.fuel_type,
@@ -303,8 +303,6 @@ export class DatabaseStorage implements IStorage {
       profitMargin: row.profit_margin,
       recondCost: row.recond_cost,
       notes: row.notes,
-      notes: row.notes,
-      equipment: row.equipment || null,
       images: row.images,
       svvData: row.svv_data || null,
       finnUrl: row.finn_url,
