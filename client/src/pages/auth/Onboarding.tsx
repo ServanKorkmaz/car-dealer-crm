@@ -104,7 +104,7 @@ export default function Onboarding() {
       if (!isSupabaseConfigured) {
         // Mock organization creation for development
         const mockOrg = {
-          id: 'mock-org-123',
+          id: 'default-company',
           name: orgData?.name || 'Test Organization',
           slug: orgData?.name?.toLowerCase().replace(/\s+/g, '-') || 'test-org',
           orgnr: orgData?.orgnr,
@@ -115,8 +115,13 @@ export default function Onboarding() {
         };
         
         localStorage.setItem('mockOrg', JSON.stringify(mockOrg));
-        await refreshUser();
-        setCurrentStep(4);
+        localStorage.setItem('hasCompletedOnboarding', 'true');
+        
+        // Short delay to ensure state updates
+        setTimeout(() => {
+          setCurrentStep(4);
+        }, 100);
+        
         return;
       }
 
@@ -170,12 +175,19 @@ export default function Onboarding() {
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
+    // Ensure user data is refreshed before navigating
+    await refreshUser();
+    
     toast({
       title: 'Velkommen til ForhandlerPRO!',
       description: 'Din organisasjon er klar til bruk.',
     });
-    setLocation('/');
+    
+    // Navigate to dashboard
+    setTimeout(() => {
+      setLocation('/');
+    }, 500);
   };
 
   const getAuthToken = async () => {

@@ -188,23 +188,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isSupabaseConfigured) {
       // Development mode - simulate login
       console.log('Development mode: simulating login');
+      
+      // Check if user has completed onboarding
+      const mockOrg = localStorage.getItem('mockOrg');
+      const hasCompletedOnboarding = localStorage.getItem('hasCompletedOnboarding');
+      
+      let organizations = [];
+      let currentOrg = null;
+      let role = null;
+      
+      if (mockOrg && hasCompletedOnboarding) {
+        const org = JSON.parse(mockOrg);
+        organizations = [{ ...org, role: 'owner' }];
+        currentOrg = org;
+        role = 'owner' as OrgRole;
+      } else {
+        // Default org for existing users
+        organizations = [{ id: 'default-company', name: 'Test Company', role: 'owner' }];
+        currentOrg = { id: 'default-company', name: 'Test Company' };
+        role = 'owner' as OrgRole;
+      }
+      
       const mockUser: AuthUser = {
         id: 'test-user-123',
         email: 'test@forhandlerpro.no',
         profile: { user_id: 'test-user-123', full_name: 'Test User', created_at: new Date(), updated_at: new Date() },
-        organizations: [{ id: 'default-company', name: 'Test Company' }],
-        current_org: { id: 'default-company', name: 'Test Company' },
-        role: 'owner' as OrgRole,
+        organizations: organizations,
+        current_org: currentOrg,
+        role: role,
       };
       
       setUser(mockUser);
-      setCurrentOrg({ id: 'default-company', name: 'Test Company' });
-      setUserRole('owner' as OrgRole);
-      setOrganizations([{ id: 'default-company', name: 'Test Company' }]);
+      setCurrentOrg(currentOrg);
+      setUserRole(role);
+      setOrganizations(organizations);
       
       // Store in localStorage to persist across reloads
       localStorage.setItem('mockUser', JSON.stringify(mockUser));
-      localStorage.setItem('currentOrgId', 'default-company');
+      if (currentOrg) {
+        localStorage.setItem('currentOrgId', currentOrg.id);
+      }
       return;
     }
 
@@ -296,6 +319,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const refreshUser = async () => {
+    if (!isSupabaseConfigured) {
+      // In development mode, check for mock org and update state
+      const mockOrg = localStorage.getItem('mockOrg');
+      const hasCompletedOnboarding = localStorage.getItem('hasCompletedOnboarding');
+      
+      if (mockOrg && hasCompletedOnboarding) {
+        const org = JSON.parse(mockOrg);
+        const mockUser: AuthUser = {
+          id: 'test-user-123',
+          email: 'test@forhandlerpro.no',
+          profile: {
+            id: 'test-user-123',
+            user_id: 'test-user-123',
+            display_name: 'Test User',
+            avatar_url: null,
+          },
+          organizations: [org],
+          current_org: org,
+          role: 'owner' as OrgRole,
+        };
+        
+        setUser(mockUser);
+        setCurrentOrg(org);
+        setUserRole('owner' as OrgRole);
+        setOrganizations([org]);
+        localStorage.setItem('mockUser', JSON.stringify(mockUser));
+      }
+      return;
+    }
+    
     if (session?.user) {
       await fetchUserData(session.user.id, session.user.email || '');
     }
