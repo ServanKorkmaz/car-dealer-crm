@@ -1,0 +1,75 @@
+
+### Test Feedback API
+
+# Basic feedback submission
+POST http://localhost:5000/api/feedback
+Content-Type: application/json
+
+{
+  "type": "Bug",
+  "severity": "High",
+  "message": "Jeg fant en feil i biloversikten hvor filteret ikke fungerer som forventet. Når jeg prøver å filtrere på merke, vises ingen resultater selv om det finnes biler av det merket.",
+  "email": "test@forhandlerpro.no",
+  "context": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "currentPage": "http://localhost:5173/cars",
+    "appVersion": "1.0.0",
+    "orgName": "Test Forhandler AS",
+    "userId": "test-user-123"
+  }
+}
+
+###
+
+# Feature request with screenshot
+POST http://localhost:5000/api/feedback
+Content-Type: application/json
+
+{
+  "type": "Feature",
+  "severity": "Medium",
+  "message": "Det ville vært flott med en mulighet til å eksportere kundelister til Excel. Dette ville spare oss for mye tid når vi skal lage rapporter.",
+  "email": "bruker@forhandlerpro.no",
+  "screenshotBase64": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "context": {
+    "userAgent": "Mozilla/5.0 (macOS) AppleWebKit/537.36",
+    "currentPage": "http://localhost:5173/customers",
+    "appVersion": "1.0.0"
+  }
+}
+
+###
+
+# Critical bug report
+POST http://localhost:5000/api/feedback
+Content-Type: application/json
+
+{
+  "type": "Bug",
+  "severity": "Critical",
+  "message": "Systemet krasjer helt når jeg prøver å lagre en ny kontrakt. Dette skjer hver gang og hindrer oss i å jobbe.",
+  "email": "kritisk@forhandlerpro.no",
+  "context": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "currentPage": "http://localhost:5173/contracts/new",
+    "appVersion": "1.0.0",
+    "orgName": "Kritisk Bilforhandler AS"
+  }
+}
+
+###
+
+# Question without email
+POST http://localhost:5000/api/feedback
+Content-Type: application/json
+
+{
+  "type": "Question",
+  "severity": "Low",
+  "message": "Hvordan kan jeg endre brukerrettigheter for teammedlemmer? Jeg finner ikke denne innstillingen i menyen.",
+  "context": {
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+    "currentPage": "http://localhost:5173/settings/users",
+    "appVersion": "1.0.0"
+  }
+}
