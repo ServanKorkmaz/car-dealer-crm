@@ -21,7 +21,7 @@ import {
   XCircle,
   Clock,
   TrendingUp,
-  Sparkles,
+
   Upload,
   Eye,
   Edit,
@@ -774,17 +774,7 @@ export default function CarsInventory() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* AI Price Suggestion */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <Sparkles className="w-4 h-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>AI Prisforslag</p>
-              </TooltipContent>
-            </Tooltip>
+
 
             {/* Publish to platforms */}
             <DropdownMenu>

@@ -29,7 +29,7 @@ import {
   type InsertMarketComp,
   type PricingRules,
   type InsertPricingRules,
-  type PriceSuggestion,
+
   type Followup,
   type InsertFollowup
 } from "@shared/schema";
@@ -158,7 +158,7 @@ export interface IStorage {
     limit?: number;
   }): Promise<MarketComp[]>;
   createMarketComp(comp: InsertMarketComp, companyId: string): Promise<MarketComp>;
-  getSuggestedPrice(carId: string, userId: string): Promise<PriceSuggestion>;
+
 
   // Multi-tenant and role-based methods
   getUserMembership(userId: string, companyId: string): Promise<{ 
@@ -277,35 +277,42 @@ export class DatabaseStorage implements IStorage {
   private mapRowToCar(row: any): Car {
     return {
       id: row.id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      companyId: row.company_id,
       registrationNumber: row.registration_number,
       make: row.make,
       model: row.model,
+      variant: row.variant || null,
       year: row.year,
+      vin: row.vin || null,
       mileage: row.mileage,
-      costPrice: row.cost_price, // Will be null for SELGER/VERKSTED roles
-      salePrice: row.sale_price,
-      profitMargin: row.profit_margin,
-      notes: row.notes,
-      images: row.images,
-      status: row.status,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      userId: row.user_id,
       color: row.color,
       fuelType: row.fuel_type,
       transmission: row.transmission,
+      gearbox: row.gearbox,
+      powerKw: row.power_kw || null,
       power: row.power,
       co2Emissions: row.co2_emissions,
+      vehicleClass: row.vehicle_class,
       lastEuControl: row.last_eu_control,
       nextEuControl: row.next_eu_control,
-      vehicleClass: row.vehicle_class,
+      euControl: row.eu_control,
+      costPrice: row.cost_price, // Will be null for SELGER/VERKSTED roles
+      salePrice: row.sale_price,
+      profitMargin: row.profit_margin,
+      recondCost: row.recond_cost,
+      notes: row.notes,
+      notes: row.notes,
+      equipment: row.equipment || null,
+      images: row.images,
+      svvData: row.svv_data || null,
+      finnUrl: row.finn_url,
+      status: row.status,
       soldDate: row.sold_date,
       soldPrice: row.sold_price,
       soldToCustomerId: row.sold_to_customer_id,
-      recondCost: row.recond_cost,
-      euControl: row.eu_control,
-      finnUrl: row.finn_url,
-      companyId: row.company_id
+      userId: row.user_id
     };
   }
 
@@ -1254,8 +1261,10 @@ export class DatabaseStorage implements IStorage {
     const [updatedFollowup] = await db
       .update(followups)
       .set({
-        ...followup,
-        updatedAt: new Date(),
+        customerId: followup.customerId,
+        dueDate: followup.dueDate,
+        note: followup.note,
+        status: followup.status as 'OPEN' | 'DONE' | 'SKIPPED'
       })
       .where(and(eq(followups.id, id), eq(followups.companyId, membership.companyId)))
       .returning();
@@ -1349,7 +1358,11 @@ export class DatabaseStorage implements IStorage {
     // Add user as EIER of the new company
     await this.addUserToCompany(userId, company.id, 'EIER');
 
-    return company;
+    return {
+      id: company.id,
+      name: company.name,
+      createdAt: company.createdAt || new Date()
+    };
   }
 
   async getTodayFollowups(userId: string): Promise<Followup[]> {
@@ -1369,128 +1382,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(followups.dueDate);
   }
 
-  async getSuggestedPrice(carId: string, userId: string): Promise<PriceSuggestion> {
-    // Get user's company 
-    const membership = await this.getUserMembership(userId, 'default-company');
-    if (!membership) throw new Error('User not in company');
 
-    // Get car data (using RLS-secure view)
-    await db.execute(sql`SELECT set_config('app.current_user_id', ${userId}, false)`);
-    const carResult = await db.execute(sql`
-      SELECT id, make, model, year, fuel_type as fuel, transmission as gearbox, 
-             mileage as km, sale_price, cost_price, recond_cost, created_at,
-             CURRENT_DATE - DATE(created_at) as days_on_lot
-      FROM cars_secure 
-      WHERE id = ${carId}
-    `);
-
-    if (!carResult.rows.length) throw new Error('Car not found');
-    const car = carResult.rows[0] as any;
-
-    // Get company pricing rules
-    const rules = await this.getPricingRules(membership.companyId) || {
-      targetGrossPct: '0.12',
-      minGrossPct: '0.05', 
-      agingDays1: 30,
-      agingDisc1: '0.02',
-      agingDays2: 45,
-      agingDisc2: '0.03',
-      agingDays3: 60,
-      agingDisc3: '0.05'
-    };
-
-    // Get market comparables
-    const comps = await this.getMarketComps({
-      companyId: membership.companyId,
-      brand: car.make,
-      model: car.model,
-      yearMin: car.year - 1,
-      yearMax: car.year + 1,
-      fuel: car.fuel,
-      gearbox: car.gearbox,
-      kmMin: Math.floor(car.km * 0.7),
-      kmMax: Math.ceil(car.km * 1.3),
-      limit: 200
-    });
-
-    // Adjust prices based on KM difference
-    const adjusted = comps.map(c => {
-      const deltaKm = (car.km - (c.km || car.km)) / 10000;
-      const adjKm = 1 + Math.max(-0.2, Math.min(0.2, 0.02 * deltaKm));
-      return {
-        ...c,
-        adjustedPrice: Math.round(Number(c.price) * adjKm)
-      };
-    });
-
-    // Take middle 80% to remove outliers
-    const sorted = adjusted.sort((a, b) => a.adjustedPrice - b.adjustedPrice);
-    const trimStart = Math.floor(sorted.length * 0.1);
-    const trimEnd = Math.floor(sorted.length * 0.9);
-    const trimmed = sorted.slice(trimStart, trimEnd);
-
-    // Calculate market anchor (median)
-    const marketAnchor = trimmed.length > 0 
-      ? trimmed[Math.floor(trimmed.length / 2)].adjustedPrice
-      : Number(car.sale_price) || 200000;
-
-    // Apply aging discounts
-    let agingAnchor = marketAnchor;
-    const daysOnLot = car.days_on_lot || 0;
-    
-    if (daysOnLot >= rules.agingDays1) {
-      agingAnchor *= (1 - Number(rules.agingDisc1));
-    }
-    if (daysOnLot >= rules.agingDays2) {
-      agingAnchor *= (1 - Number(rules.agingDisc2));
-    }
-    if (daysOnLot >= rules.agingDays3) {
-      agingAnchor *= (1 - Number(rules.agingDisc3));
-    }
-
-    // Calculate cost floor if user can see costs
-    const costPrice = car.cost_price ? Number(car.cost_price) : null;
-    const recondCost = car.recond_cost ? Number(car.recond_cost) : 0;
-    
-    const floorForGross = costPrice 
-      ? Math.ceil((costPrice + recondCost) / (1 - Number(rules.targetGrossPct)))
-      : null;
-
-    // Final suggestion (rounded to nearest 500)
-    const round500 = (price: number) => Math.round(price / 500) * 500;
-    
-    let finalSuggestion = round500(agingAnchor);
-    if (floorForGross) {
-      finalSuggestion = Math.max(finalSuggestion, round500(floorForGross));
-    }
-
-    const lowBand = round500(agingAnchor * 0.98);
-    const highBand = round500(agingAnchor * 1.03);
-
-    // Build reasons array
-    const reasons = [
-      `Median of ${trimmed.length} comps`,
-      daysOnLot >= rules.agingDays1 ? `Aging ${daysOnLot}d → discounts applied` : 'Fresh stock',
-      costPrice ? `Target gross ${Number(rules.targetGrossPct) * 100}%` : 'Cost hidden for your role'
-    ];
-
-    return {
-      marketAnchor,
-      agingAppliedAnchor: agingAnchor,
-      finalSuggestion,
-      lowBand,
-      midBand: finalSuggestion,
-      highBand,
-      sampleComps: trimmed.slice(0, 10).map(c => ({
-        price: Number(c.price),
-        km: c.km || 0,
-        year: c.year || car.year,
-        adjustedPrice: c.adjustedPrice,
-        source: c.source
-      })),
-      reasons
-    };
-  }
 
   // Accounting integration methods (stub implementations)
   async getAccountingSettings(companyId: string, provider: string): Promise<any | null> {
@@ -1563,18 +1455,7 @@ export class DatabaseStorage implements IStorage {
     return [];
   }
   
-  async updateContract(contractId: string, updates: any, userId: string): Promise<any> {
-    const [contract] = await db
-      .update(contracts)
-      .set({
-        ...updates,
-        updatedAt: new Date()
-      })
-      .where(eq(contracts.id, contractId))
-      .returning();
-    
-    return contract;
-  }
+
 }
 
 // Dynamic storage configuration - FORCED to use Replit to fix "sold" functionality

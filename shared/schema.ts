@@ -472,23 +472,7 @@ export const insertPricingRulesSchema = createInsertSchema(pricingRules).omit({
 export type PricingRules = typeof pricingRules.$inferSelect;
 export type InsertPricingRules = z.infer<typeof insertPricingRulesSchema>;
 
-// Price suggestion response type
-export type PriceSuggestion = {
-  marketAnchor: number;
-  agingAppliedAnchor: number;
-  finalSuggestion: number;
-  lowBand: number;
-  midBand: number;
-  highBand: number;
-  sampleComps: {
-    price: number;
-    km: number;
-    year: number;
-    adjustedPrice: number;
-    source: string;
-  }[];
-  reasons: string[];
-};
+
 
 // Follow-ups table for customer follow-ups and reminders
 export const followups = pgTable("followups", {
