@@ -79,6 +79,7 @@ import { useLocation } from "wouter";
 import type { Car } from "@shared/schema";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import AddCarModal from "@/components/cars/AddCarModal";
 
 // Professional status configuration
 const statusConfig = {
@@ -424,6 +425,7 @@ export default function CarsInventory() {
   const [sortBy, setSortBy] = useState("newest");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isExporting, setIsExporting] = useState(false);
+  const [showAddCarModal, setShowAddCarModal] = useState(false);
   
   // Filters
   const [filters, setFilters] = useState({
@@ -626,9 +628,9 @@ export default function CarsInventory() {
   // Keyboard shortcuts
   useCallback((e: KeyboardEvent) => {
     if (e.key === 'a' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT') {
-      navigate('/cars/new');
+      setShowAddCarModal(true);
     }
-  }, [navigate]);
+  }, []);
 
   // Stats
   const stats = useMemo(() => ({
@@ -730,7 +732,7 @@ export default function CarsInventory() {
             {/* Add new car */}
             <Button 
               className="gap-2"
-              onClick={() => navigate('/cars/new')}
+              onClick={() => setShowAddCarModal(true)}
             >
               <Plus className="w-4 h-4" />
               Legg til bil
@@ -1160,7 +1162,7 @@ export default function CarsInventory() {
                 </p>
               </div>
               {!searchQuery && !Object.values(filters).some(v => v !== "all") && (
-                <Button onClick={() => navigate('/cars/new')}>
+                <Button onClick={() => setShowAddCarModal(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   Legg til første bil
                 </Button>
@@ -1206,6 +1208,11 @@ export default function CarsInventory() {
         </div>
         </div>
       </div>
+      
+      {/* Add Car Modal */}
+      {showAddCarModal && (
+        <AddCarModal onClose={() => setShowAddCarModal(false)} />
+      )}
     </div>
   );
 }
