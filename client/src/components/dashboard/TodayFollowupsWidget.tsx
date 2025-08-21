@@ -12,7 +12,16 @@ export function TodayFollowupsWidget() {
 
   const { data: todayFollowups = [], isLoading } = useQuery<Followup[]>({
     queryKey: ['/api/followups/today'],
-    queryFn: () => apiRequest('/api/followups/today'),
+    queryFn: async () => {
+      try {
+        const response = await apiRequest('GET', '/api/followups/today');
+        return await response.json();
+      } catch (error) {
+        // Gracefully handle missing API endpoint
+        console.log('Followups API not yet implemented');
+        return [];
+      }
+    },
     refetchInterval: 300000, // Refresh every 5 minutes
   });
 
