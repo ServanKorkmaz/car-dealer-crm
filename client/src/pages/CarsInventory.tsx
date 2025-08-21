@@ -579,6 +579,7 @@ export default function CarsInventory() {
     onError: (error: any) => {
       // Revert optimistic update on error
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       toast({
         title: "Feil",
         description: error.message || "Kunne ikke markere biler som solgt",
@@ -612,6 +613,7 @@ export default function CarsInventory() {
     onError: (error: any) => {
       // Revert optimistic update on error
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       toast({
         title: "Feil",
         description: error.message || "Kunne ikke slette biler",
@@ -737,19 +739,8 @@ export default function CarsInventory() {
 
 
 
-  // Stats - use API data when available, fallback to calculated stats
+  // Stats - always calculate from current cars data for accuracy
   const stats = useMemo(() => {
-    if (dashboardStats) {
-      return {
-        total: dashboardStats.totalCars || 0,
-        available: dashboardStats.totalCars - (dashboardStats.totalSold || 0),
-        reserved: 0, // Not tracked in dashboard stats
-        sold: dashboardStats.totalSold || 0,
-        totalValue: dashboardStats.totalValue || 0
-      };
-    }
-    
-    // Fallback to calculated stats from cars data
     return {
       total: cars.length,
       available: cars.filter(c => c.status === 'available').length,
@@ -759,7 +750,7 @@ export default function CarsInventory() {
         .filter(c => c.status === 'available')
         .reduce((sum, car) => sum + parseInt(car.salePrice || "0"), 0)
     };
-  }, [cars, dashboardStats]);
+  }, [cars]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
