@@ -452,7 +452,6 @@ export default function CarsInventory() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(car => 
         car.registrationNumber?.toLowerCase().includes(query) ||
-        car.vin?.toLowerCase().includes(query) ||
         car.make?.toLowerCase().includes(query) ||
         car.model?.toLowerCase().includes(query) ||
         `${car.make} ${car.model}`.toLowerCase().includes(query)
@@ -475,19 +474,19 @@ export default function CarsInventory() {
 
     // Price range
     filtered = filtered.filter(car => {
-      const price = parseInt(car.salePrice || "0");
+      const price = parseInt(String(car.salePrice || "0"));
       return price >= filters.priceRange[0] && price <= filters.priceRange[1];
     });
 
     // Year range
     filtered = filtered.filter(car => {
-      const year = parseInt(car.year || "0");
+      const year = car.year || 0;
       return year >= filters.yearRange[0] && year <= filters.yearRange[1];
     });
 
     // Mileage range
     filtered = filtered.filter(car => {
-      const mileage = parseInt(car.mileage || "0");
+      const mileage = car.mileage || 0;
       return mileage >= filters.mileageRange[0] && mileage <= filters.mileageRange[1];
     });
 
@@ -497,13 +496,13 @@ export default function CarsInventory() {
       
       switch (sortBy) {
         case "price":
-          comparison = parseInt(a.salePrice || "0") - parseInt(b.salePrice || "0");
+          comparison = parseInt(String(a.salePrice || "0")) - parseInt(String(b.salePrice || "0"));
           break;
         case "year":
-          comparison = parseInt(a.year || "0") - parseInt(b.year || "0");
+          comparison = (a.year || 0) - (b.year || 0);
           break;
         case "mileage":
-          comparison = parseInt(a.mileage || "0") - parseInt(b.mileage || "0");
+          comparison = (a.mileage || 0) - (b.mileage || 0);
           break;
         case "name":
           comparison = `${a.make} ${a.model}`.localeCompare(`${b.make} ${b.model}`);
@@ -625,12 +624,7 @@ export default function CarsInventory() {
     }
   };
 
-  // Keyboard shortcuts
-  useCallback((e: KeyboardEvent) => {
-    if (e.key === 'a' && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== 'INPUT') {
-      setShowAddCarModal(true);
-    }
-  }, []);
+
 
   // Stats
   const stats = useMemo(() => ({
@@ -972,7 +966,7 @@ export default function CarsInventory() {
                         <SelectContent>
                           <SelectItem value="all">Alle typer</SelectItem>
                           {uniqueFuels.map(fuel => (
-                            <SelectItem key={fuel} value={fuel}>{fuel}</SelectItem>
+                            <SelectItem key={fuel} value={fuel || ""}>{fuel || ""}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -1189,23 +1183,7 @@ export default function CarsInventory() {
           </div>
         )}
 
-        {/* Keyboard shortcut hint */}
-        <div className="fixed bottom-6 right-6 z-50">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Card className="shadow-lg">
-                <CardContent className="p-3">
-                  <p className="text-xs text-muted-foreground">
-                    Trykk <kbd className="px-1.5 py-0.5 text-xs font-semibold bg-slate-100 dark:bg-slate-800 rounded">A</kbd> for å legge til bil
-                  </p>
-                </CardContent>
-              </Card>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Hurtigtast</p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
+
         </div>
       </div>
       
