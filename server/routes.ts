@@ -393,10 +393,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.status(201).json(car);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
+      
+      // Handle duplicate registration number
+      if (error.code === '23505' && error.constraint === 'cars_registration_number_unique') {
+        return res.status(409).json({ 
+          message: "En bil med dette registreringsnummeret eksisterer allerede",
+          code: "DUPLICATE_REGISTRATION"
+        });
+      }
+      
       console.error("Error creating car:", error);
       res.status(500).json({ message: "Failed to create car" });
     }

@@ -290,9 +290,19 @@ export default function AddCarDialog({ onClose }: AddCarDialogProps) {
       onClose();
     },
     onError: (error: any) => {
+      let errorMessage = "Kunne ikke legge til bil";
+      
+      if (error.message?.includes("duplicate key")) {
+        errorMessage = "En bil med dette registreringsnummeret eksisterer allerede";
+      } else if (error.message?.includes("23505")) {
+        errorMessage = "Registreringsnummeret er allerede registrert i systemet";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
-        title: "Feil",
-        description: error.message || "Kunne ikke legge til bil",
+        title: "Feil ved registrering",
+        description: errorMessage,
         variant: "destructive",
       });
     },
