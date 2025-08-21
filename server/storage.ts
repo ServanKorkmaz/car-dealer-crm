@@ -363,9 +363,18 @@ export class DatabaseStorage implements IStorage {
     const membership = await this.getUserMembership(userId, 'default-company');
     if (!membership) return false;
     
-    const result = await db.delete(cars)
-      .where(and(eq(cars.id, id), eq(cars.companyId, membership.companyId), eq(cars.userId, userId)));
-    return (result.rowCount || 0) > 0;
+    try {
+      // First delete related price predictions to avoid foreign key constraint
+      await db.execute(sql`DELETE FROM price_predictions WHERE car_id = ${id}`);
+      
+      // Then delete the car
+      const result = await db.delete(cars)
+        .where(and(eq(cars.id, id), eq(cars.companyId, membership.companyId), eq(cars.userId, userId)));
+      return (result.rowCount || 0) > 0;
+    } catch (error) {
+      console.error('Error deleting car:', error);
+      return false;
+    }
   }
 
   // Customer operations - RLS enforced
