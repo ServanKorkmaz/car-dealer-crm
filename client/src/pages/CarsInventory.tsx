@@ -576,10 +576,35 @@ export default function CarsInventory() {
     }
   });
 
+  // Delete cars mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (carIds: string[]) => {
+      const promises = carIds.map(carId => 
+        apiRequest('DELETE', `/api/cars/${carId}`, {})
+      );
+      await Promise.all(promises);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      toast({
+        title: "Biler slettet",
+        description: "Bilene er slettet fra systemet",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Feil",
+        description: error.message || "Kunne ikke slette biler",
+        variant: "destructive",
+      });
+    }
+  });
+
   const handleBulkAction = (action: string) => {
+    const carIds = Array.from(selectedCars);
+    
     if (action === "Marker som solgt") {
-      const carIds = Array.from(selectedCars);
-      
       // Optimistic update - immediately update UI
       queryClient.setQueryData(['/api/cars'], (oldCars: Car[] | undefined) => {
         if (!oldCars) return oldCars;
@@ -593,6 +618,22 @@ export default function CarsInventory() {
       
       // Make API call
       markAsSoldMutation.mutate(carIds);
+      
+      // Clear selection
+      setSelectedCars(new Set());
+      
+      return;
+    }
+    
+    if (action === "Slett") {
+      // Optimistic update - immediately remove from UI
+      queryClient.setQueryData(['/api/cars'], (oldCars: Car[] | undefined) => {
+        if (!oldCars) return oldCars;
+        return oldCars.filter(car => !carIds.includes(car.id));
+      });
+      
+      // Make API call
+      deleteMutation.mutate(carIds);
       
       // Clear selection
       setSelectedCars(new Set());
