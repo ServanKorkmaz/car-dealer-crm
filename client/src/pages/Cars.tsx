@@ -20,13 +20,16 @@ import {
   Plus, Search, Edit, Trash2, Car as CarIcon, Eye, DollarSign, 
   TrendingUp, TrendingDown, AlertCircle, Copy, Star, Grid3x3, 
   Fuel, X, UserPlus, ChevronDown, FilterX, ArrowUpDown, 
-  Grid2x2, SquareStack, TableProperties, Filter, LayoutGrid
+  Grid2x2, SquareStack, TableProperties, Filter, LayoutGrid,
+  FileDown, Download
 } from "lucide-react";
 import { InviteTeamDialog } from "@/components/team/InviteTeamDialog";
 import { useCanViewSensitive, useCanDelete, useCanInvite } from "@/hooks/useUserRole";
 import { apiRequest } from "@/lib/queryClient";
 import type { Car } from "@shared/schema";
 import { Link } from "wouter";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 
 
@@ -294,6 +297,7 @@ export default function Cars() {
   const [showFilters, setShowFilters] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
   const canDelete = useCanDelete();
@@ -441,6 +445,73 @@ export default function Cars() {
     setFavorites(newFavorites);
   };
 
+  // PDF Export function
+  const exportToPDF = async () => {
+    setIsExporting(true);
+    try {
+      const element = document.getElementById('cars-inventory-content');
+      if (!element) {
+        toast({
+          title: "Eksport feilet",
+          description: "Kunne ikke finne innhold å eksportere",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create canvas from the content
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        allowTaint: true,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('l', 'mm', 'a4'); // Landscape orientation for better table view
+      
+      const imgWidth = 297; // A4 landscape width in mm
+      const pageHeight = 210; // A4 landscape height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+
+      let position = 0;
+
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      // Add additional pages if needed
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // Generate filename with current date
+      const today = new Date().toLocaleDateString('no-NO');
+      const filename = `ForhandlerPRO-Beholding-${today}.pdf`;
+      
+      pdf.save(filename);
+      
+      toast({
+        title: "Eksport fullført",
+        description: `Beholding eksportert som ${filename}`,
+      });
+    } catch (error) {
+      console.error('PDF Export error:', error);
+      toast({
+        title: "Eksport feilet",
+        description: "Kunne ikke eksportere beholding til PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (!isAuthenticated) {
     return <div>Please log in to view cars.</div>;
   }
@@ -458,6 +529,17 @@ export default function Cars() {
           </div>
           
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={exportToPDF}
+              disabled={isExporting}
+              className="border-slate-300 dark:border-slate-600"
+              data-testid="button-export-pdf"
+            >
+              <FileDown className="w-4 h-4 mr-2" />
+              {isExporting ? "Eksporterer..." : "Eksporter PDF"}
+            </Button>
+            
             {canInvite && (
               <Button
                 variant="outline"
@@ -648,6 +730,7 @@ export default function Cars() {
         </div>
 
         {/* Content */}
+        <div id="cars-inventory-content">
         {carsLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
@@ -871,6 +954,7 @@ export default function Cars() {
             )}
           </>
         )}
+        </div>
 
         {/* Modals */}
         {showAddModal && (
