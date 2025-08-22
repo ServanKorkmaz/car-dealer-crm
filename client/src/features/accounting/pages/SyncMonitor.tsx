@@ -56,8 +56,8 @@ export function SyncMonitor() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({
-    entityType: '',
-    status: '',
+    entityType: 'all',
+    status: 'all',
     search: '',
   });
   const [selectedLogs, setSelectedLogs] = useState<Set<string>>(new Set());
@@ -140,8 +140,8 @@ export function SyncMonitor() {
 
   // Filter logs
   const filteredLogs = logs.filter((log: SyncLog) => {
-    if (filters.entityType && log.entityType !== filters.entityType) return false;
-    if (filters.status && log.status !== filters.status) return false;
+    if (filters.entityType && filters.entityType !== 'all' && log.entityType !== filters.entityType) return false;
+    if (filters.status && filters.status !== 'all' && log.status !== filters.status) return false;
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       return (
@@ -182,7 +182,7 @@ export function SyncMonitor() {
                   <SelectValue placeholder="Alle enheter" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Alle enheter</SelectItem>
+                  <SelectItem value="all">Alle enheter</SelectItem>
                   <SelectItem value="customer">Kunde</SelectItem>
                   <SelectItem value="item">Vare</SelectItem>
                   <SelectItem value="contract">Kontrakt</SelectItem>
@@ -203,7 +203,7 @@ export function SyncMonitor() {
                   <SelectValue placeholder="Alle statuser" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Alle statuser</SelectItem>
+                  <SelectItem value="all">Alle statuser</SelectItem>
                   <SelectItem value="success">Vellykket</SelectItem>
                   <SelectItem value="failed">Feilet</SelectItem>
                   <SelectItem value="warning">Advarsel</SelectItem>
@@ -224,7 +224,7 @@ export function SyncMonitor() {
             <div className="flex items-end gap-2">
               <Button
                 variant="outline"
-                onClick={() => setFilters({ entityType: '', status: '', search: '' })}
+                onClick={() => setFilters({ entityType: 'all', status: 'all', search: '' })}
               >
                 Nullstill
               </Button>
