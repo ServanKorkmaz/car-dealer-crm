@@ -126,7 +126,7 @@ export function SyncMonitor() {
     
     const csv = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...rows.map((row: string[]) => row.map((cell: string) => `"${cell}"`).join(','))
     ].join('\n');
     
     const blob = new Blob([csv], { type: 'text/csv' });
