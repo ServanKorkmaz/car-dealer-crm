@@ -1,0 +1,111 @@
+Her er en perfekt prompt for Replit AI:
+
+Build a premium contract management dashboard for ForhandlerPRO DMS using React + TypeScript + TailwindCSS
+Create a sophisticated, high-end contract management interface that feels like a premium SaaS application for Norwegian car dealerships.
+Tech Stack:
+
+React + TypeScript
+TailwindCSS for styling
+Lucide React for icons
+Responsive design (mobile-first)
+
+Design System:
+
+Dark theme: bg-slate-900/950, text-white/slate-100
+Accent colors: emerald-500 (completed), amber-500 (pending), blue-500 (drafts)
+Glass-morphism effects with backdrop-blur
+Subtle shadows and hover animations
+
+Layout Structure:
+
+Header Section:
+
+jsx- Title: "Kontraktsadministrasjon" 
+- Subtitle: "Administrer salgskontrakter effektivt"
+- "Opprett ny kontrakt" button (prominent, blue)
+- Stats cards: Total kontrakter, Venter signatur, Fullført denne måneden, Omsetning
+
+Filter Bar:
+
+jsx- Pill-style filter buttons: "Alle", "Kladd", "Venter signatur", "Fullført", "Kansellert"
+- Search input with search icon
+- View toggle: Grid/List view options
+
+Contract Cards Grid:
+Each card should include:
+
+jsx- Contract ID (large, copyable)
+- Status badge with appropriate colors and icons
+- Customer info with avatar circle (initials)
+- Car thumbnail with make/model overlay
+- Financial summary (purchase price, total amount)
+- Created date (relative: "2 timer siden")
+- Progress indicator for signature status
+- Quick action buttons: "Se kontrakt", "Send", "Rediger"
+- Hover effects: scale-105, shadow increase
+Status Styling:
+css- Draft: bg-slate-700, text-slate-300, border-dashed
+- Sent: bg-blue-500/20, text-blue-400, pulse animation
+- Signed: bg-emerald-500/20, text-emerald-400, checkmark icon
+- Cancelled: bg-red-500/20, text-red-400, X icon
+Sample Data Structure:
+typescriptconst mockContracts = [
+  {
+    id: "KONTRAKT-001",
+    contractNumber: "17545678787865",
+    customerName: "Kaiwan Hassan",
+    customerInitials: "KH",
+    carBrand: "BMW",
+    carModel: "M760Li xDrive",
+    carYear: 2025,
+    totalAmount: 5000000,
+    purchasePrice: 4500000,
+    status: "sent",
+    createdAt: new Date("2025-08-19"),
+    signaturesReceived: 0,
+    signaturesRequired: 2
+  },
+  // Add more mock data
+];
+Interactive Features:
+
+Smooth hover animations with Tailwind transforms
+Modal for contract preview
+Dropdown menus for quick actions
+Loading states with skeleton screens
+Success toast notifications
+Responsive grid (3-4 cols desktop, 2 tablet, 1 mobile)
+
+Key Components to Build:
+
+ContractCard - Individual contract display
+StatusBadge - Dynamic status indicators
+FilterBar - Search and filter controls
+StatsCards - Dashboard metrics
+ContractModal - Preview/edit modal
+
+Styling Guidelines:
+
+Use consistent spacing (p-4, p-6, gap-4, gap-6)
+Round corners: rounded-lg, rounded-xl
+Shadows: shadow-sm on cards, shadow-lg on modals
+Transitions: transition-all duration-200
+Hover effects: hover:scale-105, hover:shadow-lg
+
+Norwegian Labels:
+
+"Opprett ny kontrakt" (Create new contract)
+"Venter signatur" (Awaiting signature)
+"Se kontrakt" (View contract)
+"Fullført" (Completed)
+"Kladd" (Draft)
+"Rediger" (Edit)
+"Send for signering" (Send for signing)
+
+Responsive Behavior:
+
+Desktop: 4-column grid with full details
+Tablet: 2-column grid with condensed info
+Mobile: Single column with stacked layout
+
+Build this as a complete, functional React component with TypeScript interfaces. Focus on smooth animations, professional aesthetics, and intuitive UX that makes contract management feel effortless and modern.
