@@ -1,0 +1,196 @@
+Her er en utvidet prompt for Replit AI med realistiske bilforhandler-funksjoner:
+
+Build a comprehensive contract management system for ForhandlerPRO DMS with real dealership workflows
+Create a professional contract management dashboard that handles the complete sales process for Norwegian car dealerships, from initial offer to final delivery.
+Tech Stack:
+
+React + TypeScript
+TailwindCSS for styling
+Lucide React for icons
+Responsive design
+
+Real Dealership Contract Types:
+
+Kjøpekontrakt (Purchase Agreement)
+
+Customer buys car from dealership
+Includes: Car details, price, delivery date, warranty terms
+Status flow: Tilbud → Signert → Betalt → Levert
+
+
+Innbyttekontrakt (Trade-in Agreement)
+
+Customer trades old car + cash for new car
+Includes: Trade-in valuation, condition report, settlement calculation
+Status flow: Vurdering → Avtalt → Innlevert
+
+
+Finansieringsavtale (Financing Agreement)
+
+Bank/finance company contracts
+Integration with financing partners
+Status flow: Søknad → Godkjent → Signert → Utbetalt
+
+
+Leasingkontrakt (Lease Agreement)
+
+Long-term rental agreements
+Monthly payment tracking
+Status flow: Tilbud → Godkjent → Aktiv → Avsluttet
+
+
+Servicekontrakt (Service Agreement)
+
+Extended warranty, maintenance packages
+Recurring service intervals
+Status flow: Solgt → Aktiv → Brukt → Utløpt
+
+
+
+Enhanced Dashboard Features:
+Main Stats Cards:
+jsx- Aktive salg (Active sales in progress)
+- Venter dokumenter (Awaiting documents) 
+- Klar for levering (Ready for delivery)
+- Månedlig omsetning (Monthly revenue)
+- Gjennomsnittlig salgstid (Average sale time)
+- Finansieringsandel (% financed vs cash sales)
+Advanced Filtering:
+jsx- Contract type (Kjøp, Innbytte, Finansiering, Leasing, Service)
+- Price ranges (Under 200k, 200k-500k, 500k-1M, Over 1M)
+- Financing status (Kontant, Bank, Leasing)  
+- Delivery status (Bestilt, Ankommet, Klar, Levert)
+- Sales person filter
+- Date ranges (Siste uke, Måned, Kvartal)
+Contract Card Enhanced Information:
+jsx- Contract type icon and color coding
+- Customer contact info with click-to-call
+- Car status (På lager, Bestilt, Ankommet)  
+- Payment method (Kontant, Bank, Leasing)
+- Trade-in vehicle (if applicable)
+- Delivery date countdown
+- Required documents checklist
+- Salesperson assigned
+- Commission calculation
+- Next action required
+Workflow Actions:
+For Kjøpekontrakt:
+
+Send tilbud (Send offer)
+Bestill bil (Order car)
+Registrer betaling (Register payment)
+Book levering (Schedule delivery)
+Generer faktura (Generate invoice)
+Send til regnskap (Send to accounting)
+
+For Innbytte:
+
+Vurder innbytte (Evaluate trade-in)
+Ta bilder (Take photos)
+Sjekk historikk (Check history via SVV API)
+Sett pris (Set price)
+Registrer mottak (Register receipt)
+
+For Finansiering:
+
+Send finanssøknad (Submit financing application)
+Last opp dokumenter (Upload documents)
+Følg opp bank (Follow up with bank)
+Bekreft godkjenning (Confirm approval)
+
+Document Management:
+jsx- Signed contracts (PDF storage)
+- Customer ID/driver license copies  
+- Insurance certificates
+- Registration documents
+- Financing pre-approval letters
+- Trade-in evaluation reports
+- Delivery checklists
+- Customer satisfaction surveys
+Integration Readiness:
+
+SVV API for car registration/transfer
+Bank APIs for financing status
+Accounting system (PowerOffice Go) sync
+SMS/Email notifications to customers
+Calendar integration for delivery appointments
+
+Sample Enhanced Data Structure:
+typescriptinterface DealershipContract {
+  id: string;
+  type: 'purchase' | 'trade-in' | 'financing' | 'lease' | 'service';
+  contractNumber: string;
+  
+  // Customer
+  customer: {
+    name: string;
+    phone: string;
+    email: string;
+    personnummer: string;
+  };
+  
+  // Car being sold
+  vehicle: {
+    brand: string;
+    model: string;
+    year: number;
+    vin: string;
+    price: number;
+    status: 'in-stock' | 'ordered' | 'arrived' | 'delivered';
+    deliveryDate?: Date;
+  };
+  
+  // Trade-in (if applicable)
+  tradeIn?: {
+    brand: string;
+    model: string;
+    year: number;
+    regNr: string;
+    valuedAt: number;
+    condition: string;
+    received: boolean;
+  };
+  
+  // Financial
+  financial: {
+    totalPrice: number;
+    downPayment: number;
+    tradeInValue: number;
+    financedAmount: number;
+    paymentMethod: 'cash' | 'financing' | 'lease';
+    bankName?: string;
+    approved?: boolean;
+  };
+  
+  // Workflow
+  status: 'offer' | 'signed' | 'financed' | 'paid' | 'ready' | 'delivered';
+  salesPerson: string;
+  commission: number;
+  requiredDocuments: string[];
+  completedDocuments: string[];
+  nextAction: string;
+  createdAt: Date;
+  deliveryDate?: Date;
+}
+Smart Features:
+
+Automatic document reminders
+Overdue contract highlighting
+Delivery date countdown timers
+Commission calculations
+Monthly sales targets vs actual
+Customer follow-up reminders
+Integration status indicators
+
+Norwegian Dealership Terms:
+
+"Kjøpekontrakt" (Purchase agreement)
+"Innbyttevurdering" (Trade-in evaluation)
+"Finansieringsavtale" (Financing agreement)
+"Leveringsavtale" (Delivery agreement)
+"Garantikontrakt" (Warranty contract)
+"Servicekontrakt" (Service agreement)
+"Registreringsattest" (Registration certificate)
+"Omregistrering" (Re-registration)
+
+Build this as a complete dealership workflow system that handles real-world car sales processes from initial customer contact through final delivery and follow-up.

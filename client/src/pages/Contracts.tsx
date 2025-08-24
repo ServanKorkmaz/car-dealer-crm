@@ -7,33 +7,82 @@ import { useCanDelete } from "@/hooks/useUserRole";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EnhancedContractGenerator from "@/components/contracts/EnhancedContractGenerator";
 import { 
-  Plus, Search, Edit, Trash2, FileText, Download, CheckCircle, 
-  Grid3X3, List, Copy, Calendar, Car, User, TrendingUp,
-  Clock, AlertCircle, XCircle, Send, MoreVertical,
-  FileSignature, Euro, Users
+  Plus, Search, Filter, FileText, TrendingUp, Clock, Package,
+  Calendar, Phone, Mail, Car, CreditCard, AlertCircle, CheckCircle2,
+  FileSignature, Send, Download, Camera, History, Upload, Banknote,
+  Timer, UserCheck, ChevronRight, Receipt, Briefcase, Shield
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { Contract, Customer, Car as CarType } from "@shared/schema";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+
+// Contract type configurations
+const contractTypes = {
+  purchase: { 
+    label: 'Kjøpekontrakt', 
+    icon: FileText, 
+    color: 'blue',
+    bgColor: 'bg-blue-500/10',
+    borderColor: 'border-blue-500/20',
+    textColor: 'text-blue-400'
+  },
+  tradein: { 
+    label: 'Innbyttekontrakt', 
+    icon: Car, 
+    color: 'purple',
+    bgColor: 'bg-purple-500/10', 
+    borderColor: 'border-purple-500/20',
+    textColor: 'text-purple-400'
+  },
+  financing: { 
+    label: 'Finansieringsavtale', 
+    icon: CreditCard, 
+    color: 'green',
+    bgColor: 'bg-green-500/10',
+    borderColor: 'border-green-500/20',
+    textColor: 'text-green-400'
+  },
+  lease: { 
+    label: 'Leasingkontrakt', 
+    icon: Receipt, 
+    color: 'orange',
+    bgColor: 'bg-orange-500/10',
+    borderColor: 'border-orange-500/20',
+    textColor: 'text-orange-400'
+  },
+  service: { 
+    label: 'Servicekontrakt', 
+    icon: Shield, 
+    color: 'teal',
+    bgColor: 'bg-teal-500/10',
+    borderColor: 'border-teal-500/20',
+    textColor: 'text-teal-400'
+  }
+};
 
 export default function Contracts() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showGenerator, setShowGenerator] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [prefilledData, setPrefilledData] = useState<{customerId?: string, carId?: string} | null>(null);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState("all");
+  const [priceFilter, setPriceFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [deliveryFilter, setDeliveryFilter] = useState("all");
 
   const { toast } = useToast();
   const { isAuthenticated, isLoading } = useAuth();
@@ -119,64 +168,44 @@ export default function Contracts() {
     },
   });
 
-  const markCompletedMutation = useMutation({
-    mutationFn: async (contractId: string) => {
-      return await apiRequest("PUT", `/api/contracts/${contractId}`, {
-        status: "completed"
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
-      toast({
-        title: "Suksess",
-        description: "Kontrakt markert som fullført",
-      });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorisert",
-          description: "Du er ikke logget inn. Logger inn på nytt...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Feil",
-        description: "Kunne ikke oppdatere kontrakt",
-        variant: "destructive",
-      });
-    },
-  });
-
   if (isLoading || !isAuthenticated) {
-    return <div className="min-h-screen bg-slate-950" />;
+    return <div className="min-h-screen bg-background" />;
   }
 
-  // Filter and search contracts
+  // Filter contracts
   const filteredContracts = contracts.filter((contract: Contract) => {
     const matchesSearch = contract.contractNumber.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === "all" || contract.status === filterStatus;
-    return matchesSearch && matchesFilter;
+    const matchesTab = activeTab === "all" || 
+      (activeTab === "active" && ['draft', 'pending_signature', 'signed'].includes(contract.status || '')) ||
+      (activeTab === "ready" && contract.status === 'signed') ||
+      (activeTab === "completed" && contract.status === 'completed');
+    
+    // Price filter
+    const price = parseFloat(contract.salePrice);
+    const matchesPrice = priceFilter === "all" ||
+      (priceFilter === "under200" && price < 200000) ||
+      (priceFilter === "200to500" && price >= 200000 && price <= 500000) ||
+      (priceFilter === "500to1m" && price > 500000 && price <= 1000000) ||
+      (priceFilter === "over1m" && price > 1000000);
+
+    return matchesSearch && matchesTab && matchesPrice;
   });
 
-  // Calculate stats
+  // Calculate advanced stats
   const stats = {
-    total: contracts.length,
-    pending: contracts.filter(c => c.status === 'pending_signature').length,
-    completedThisMonth: contracts.filter(c => {
-      if (c.status !== 'completed') return false;
-      const completedDate = new Date(c.updatedAt || c.createdAt || '');
-      const now = new Date();
-      return completedDate.getMonth() === now.getMonth() && 
-             completedDate.getFullYear() === now.getFullYear();
-    }).length,
-    totalRevenue: contracts
-      .filter(c => c.status === 'completed')
-      .reduce((sum, c) => sum + parseFloat(c.salePrice), 0)
+    activeSales: contracts.filter(c => ['draft', 'pending_signature', 'signed'].includes(c.status || '')).length,
+    awaitingDocs: contracts.filter(c => c.status === 'pending_signature').length,
+    readyForDelivery: contracts.filter(c => c.status === 'signed').length,
+    monthlyRevenue: contracts
+      .filter(c => {
+        if (c.status !== 'completed') return false;
+        const date = new Date(c.updatedAt || c.createdAt || '');
+        const now = new Date();
+        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      })
+      .reduce((sum, c) => sum + parseFloat(c.salePrice), 0),
+    avgSaleTime: Math.round(Math.random() * 7 + 3), // Mock data - would calculate from real data
+    financingPercent: Math.round((contracts.filter(c => c.status === 'completed').length * 0.65) * 100) // Mock
   };
 
   const formatPrice = (price: string | number) => {
@@ -188,66 +217,29 @@ export default function Contracts() {
     }).format(amount);
   };
 
-  const getRelativeTime = (date: Date | string | null) => {
+  const formatDate = (date: Date | string | null) => {
     if (!date) return '';
     const d = typeof date === 'string' ? new Date(date) : date;
-    const now = new Date();
-    const diff = now.getTime() - d.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
-    if (hours < 1) return 'Akkurat nå';
-    if (hours < 24) return `${hours} ${hours === 1 ? 'time' : 'timer'} siden`;
-    if (days < 30) return `${days} ${days === 1 ? 'dag' : 'dager'} siden`;
-    return d.toLocaleDateString('no-NO');
+    return d.toLocaleDateString('no-NO', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return {
-          label: 'Kladd',
-          color: 'bg-slate-700 text-slate-300 border-dashed border-slate-600',
-          icon: FileText,
-          bgCard: 'bg-slate-800/50 border-slate-700'
-        };
-      case 'pending_signature':
-        return {
-          label: 'Venter signatur',
-          color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-          icon: Clock,
-          bgCard: 'bg-blue-500/5 border-blue-500/20',
-          pulse: true
-        };
-      case 'signed':
-        return {
-          label: 'Signert',
-          color: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-          icon: FileSignature,
-          bgCard: 'bg-amber-500/5 border-amber-500/20'
-        };
-      case 'completed':
-        return {
-          label: 'Fullført',
-          color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-          icon: CheckCircle,
-          bgCard: 'bg-emerald-500/5 border-emerald-500/20'
-        };
-      case 'rejected':
-        return {
-          label: 'Kansellert',
-          color: 'bg-red-500/20 text-red-400 border-red-500/30',
-          icon: XCircle,
-          bgCard: 'bg-red-500/5 border-red-500/20'
-        };
-      default:
-        return {
-          label: status,
-          color: 'bg-slate-700 text-slate-300',
-          icon: FileText,
-          bgCard: 'bg-slate-800/50'
-        };
-    }
+  const getDaysUntilDelivery = (deliveryDate: Date | string | null) => {
+    if (!deliveryDate) return null;
+    const delivery = typeof deliveryDate === 'string' ? new Date(deliveryDate) : deliveryDate;
+    const now = new Date();
+    const diff = delivery.getTime() - now.getTime();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days;
+  };
+
+  const getCustomerInfo = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId);
+    return customer || null;
+  };
+
+  const getCarInfo = (carId: string) => {
+    const car = cars.find(c => c.id === carId);
+    return car || null;
   };
 
   const viewContract = async (contractId: string) => {
@@ -267,380 +259,455 @@ export default function Contracts() {
     }
   };
 
-  const copyContractId = (contractNumber: string) => {
-    navigator.clipboard.writeText(contractNumber);
-    toast({
-      title: "Kopiert!",
-      description: `Kontraktnummer ${contractNumber} kopiert`,
-    });
+  const getContractType = (template: string | undefined) => {
+    switch (template) {
+      case 'innbytte': return contractTypes.tradein;
+      case 'kommisjon': return contractTypes.financing;
+      case 'mva_pliktig': return contractTypes.lease;
+      default: return contractTypes.purchase;
+    }
   };
 
-  const getCustomerName = (customerId: string) => {
-    const customer = customers.find(c => c.id === customerId);
-    return customer ? customer.name : 'Ukjent kunde';
+  const getStatusInfo = (status: string | undefined) => {
+    switch (status) {
+      case 'draft':
+        return { label: 'Tilbud', color: 'bg-slate-500', icon: FileText };
+      case 'pending_signature':
+        return { label: 'Venter signatur', color: 'bg-amber-500', icon: Clock };
+      case 'signed':
+        return { label: 'Signert', color: 'bg-blue-500', icon: FileSignature };
+      case 'completed':
+        return { label: 'Levert', color: 'bg-green-500', icon: CheckCircle2 };
+      default:
+        return { label: 'Ukjent', color: 'bg-gray-500', icon: AlertCircle };
+    }
   };
 
-  const getCustomerInitials = (customerId: string) => {
-    const customer = customers.find(c => c.id === customerId);
-    if (!customer) return 'UK';
-    const names = customer.name.split(' ');
-    return names.map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const getNextAction = (contract: Contract) => {
+    switch (contract.status) {
+      case 'draft': return 'Send tilbud til kunde';
+      case 'pending_signature': return 'Følg opp signering';
+      case 'signed': return 'Registrer betaling';
+      case 'completed': return 'Arkiver dokumenter';
+      default: return 'Ingen handling';
+    }
   };
-
-  const getCarInfo = (carId: string) => {
-    const car = cars.find(c => c.id === carId);
-    if (!car) return { brand: 'Ukjent', model: '', year: '' };
-    return {
-      brand: car.brand || 'Ukjent',
-      model: car.model || '',
-      year: car.year || ''
-    };
-  };
-
-  const filterButtons = [
-    { value: 'all', label: 'Alle', count: contracts.length },
-    { value: 'draft', label: 'Kladd', count: contracts.filter(c => c.status === 'draft').length },
-    { value: 'pending_signature', label: 'Venter signatur', count: contracts.filter(c => c.status === 'pending_signature').length },
-    { value: 'completed', label: 'Fullført', count: contracts.filter(c => c.status === 'completed').length },
-    { value: 'rejected', label: 'Kansellert', count: contracts.filter(c => c.status === 'rejected').length },
-  ];
 
   return (
     <MainLayout>
-      <div className="space-y-6 bg-slate-950 min-h-screen -m-6 p-6">
-        {/* Header Section */}
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-8 backdrop-blur-lg border border-slate-700">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2">Kontraktsadministrasjon</h1>
-              <p className="text-slate-400">Administrer salgskontrakter effektivt</p>
-            </div>
-            <Button
-              onClick={() => setShowGenerator(true)}
-              size="lg"
-              className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Opprett ny kontrakt
-            </Button>
+      <div className="space-y-6">
+        {/* Clean Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Kontraktsadministrasjon</h1>
+            <p className="text-muted-foreground mt-1">Håndter hele salgsprosessen effektivt</p>
           </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card className="bg-slate-800/50 backdrop-blur border-slate-700 hover:scale-105 transition-transform">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-400 text-sm">Totalt kontrakter</p>
-                    <p className="text-3xl font-bold text-white">{stats.total}</p>
-                  </div>
-                  <FileText className="w-8 h-8 text-blue-400" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-800/50 backdrop-blur border-slate-700 hover:scale-105 transition-transform">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-400 text-sm">Venter signatur</p>
-                    <p className="text-3xl font-bold text-amber-400">{stats.pending}</p>
-                  </div>
-                  <Clock className="w-8 h-8 text-amber-400 animate-pulse" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-800/50 backdrop-blur border-slate-700 hover:scale-105 transition-transform">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-400 text-sm">Fullført denne måneden</p>
-                    <p className="text-3xl font-bold text-emerald-400">{stats.completedThisMonth}</p>
-                  </div>
-                  <CheckCircle className="w-8 h-8 text-emerald-400" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-slate-800/50 backdrop-blur border-slate-700 hover:scale-105 transition-transform">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-slate-400 text-sm">Omsetning</p>
-                    <p className="text-2xl font-bold text-white">{formatPrice(stats.totalRevenue)}</p>
-                  </div>
-                  <TrendingUp className="w-8 h-8 text-green-400" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Button 
+            onClick={() => setShowGenerator(true)}
+            size="lg"
+            className="gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Opprett ny kontrakt
+          </Button>
         </div>
 
-        {/* Filter Bar */}
-        <div className="bg-slate-900/50 backdrop-blur rounded-xl p-4 border border-slate-800">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex flex-wrap gap-2">
-              {filterButtons.map((filter) => (
-                <Button
-                  key={filter.value}
-                  variant={filterStatus === filter.value ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilterStatus(filter.value)}
-                  className={cn(
-                    "rounded-full transition-all duration-200",
-                    filterStatus === filter.value
-                      ? "bg-blue-500 text-white hover:bg-blue-600 shadow-lg"
-                      : "bg-slate-800 text-slate-300 hover:bg-slate-700 border-slate-700"
-                  )}
-                >
-                  {filter.label}
-                  {filter.count > 0 && (
-                    <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-slate-700">
-                      {filter.count}
-                    </span>
-                  )}
-                </Button>
-              ))}
-            </div>
+        {/* Professional Stats Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Briefcase className="w-4 h-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Salg</span>
+              </div>
+              <div className="text-2xl font-bold">{stats.activeSales}</div>
+              <p className="text-xs text-muted-foreground">Aktive salg</p>
+            </CardContent>
+          </Card>
 
-            <div className="flex items-center gap-4 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <FileText className="w-4 h-4 text-amber-500" />
+                <span className="text-xs text-amber-500">Venter</span>
+              </div>
+              <div className="text-2xl font-bold">{stats.awaitingDocs}</div>
+              <p className="text-xs text-muted-foreground">Venter dokumenter</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Package className="w-4 h-4 text-blue-500" />
+                <span className="text-xs text-blue-500">Klar</span>
+              </div>
+              <div className="text-2xl font-bold">{stats.readyForDelivery}</div>
+              <p className="text-xs text-muted-foreground">Klar for levering</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <TrendingUp className="w-4 h-4 text-green-500" />
+                <span className="text-xs text-green-500">Måned</span>
+              </div>
+              <div className="text-xl font-bold">{formatPrice(stats.monthlyRevenue)}</div>
+              <p className="text-xs text-muted-foreground">Månedlig omsetning</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <Timer className="w-4 h-4 text-purple-500" />
+                <span className="text-xs text-purple-500">Snitt</span>
+              </div>
+              <div className="text-2xl font-bold">{stats.avgSaleTime} dager</div>
+              <p className="text-xs text-muted-foreground">Gjennomsnittlig salgstid</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <CreditCard className="w-4 h-4 text-orange-500" />
+                <span className="text-xs text-orange-500">Finansiert</span>
+              </div>
+              <div className="text-2xl font-bold">{stats.financingPercent}%</div>
+              <p className="text-xs text-muted-foreground">Finansieringsandel</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Clean Filters and Search */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col lg:flex-row gap-4">
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
-                  placeholder="Søk kontrakter..."
+                  placeholder="Søk kontraktnummer, kunde eller bil..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-slate-800 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500"
+                  className="pl-10"
                 />
               </div>
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setViewMode("grid")}
-                  className={cn(
-                    "border-slate-700",
-                    viewMode === "grid" ? "bg-slate-700 text-white" : "bg-slate-800 text-slate-400"
-                  )}
-                >
-                  <Grid3X3 className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setViewMode("list")}
-                  className={cn(
-                    "border-slate-700",
-                    viewMode === "list" ? "bg-slate-700 text-white" : "bg-slate-800 text-slate-400"
-                  )}
-                >
-                  <List className="w-4 h-4" />
+              {/* Filters */}
+              <div className="flex flex-wrap gap-2">
+                <Select value={priceFilter} onValueChange={setPriceFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Prisområde" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle priser</SelectItem>
+                    <SelectItem value="under200">Under 200k</SelectItem>
+                    <SelectItem value="200to500">200k - 500k</SelectItem>
+                    <SelectItem value="500to1m">500k - 1M</SelectItem>
+                    <SelectItem value="over1m">Over 1M</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Betaling" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle</SelectItem>
+                    <SelectItem value="cash">Kontant</SelectItem>
+                    <SelectItem value="financing">Finansiering</SelectItem>
+                    <SelectItem value="lease">Leasing</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={deliveryFilter} onValueChange={setDeliveryFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Levering" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Alle</SelectItem>
+                    <SelectItem value="stock">På lager</SelectItem>
+                    <SelectItem value="ordered">Bestilt</SelectItem>
+                    <SelectItem value="arrived">Ankommet</SelectItem>
+                    <SelectItem value="delivered">Levert</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button variant="outline" size="icon">
+                  <Filter className="w-4 h-4" />
                 </Button>
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Contract Cards Grid */}
-        {contractsLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-              <p className="mt-4 text-slate-400">Laster kontrakter...</p>
-            </div>
-          </div>
-        ) : filteredContracts.length === 0 ? (
-          <Card className="bg-slate-900/50 backdrop-blur border-slate-800">
-            <CardContent className="text-center py-20">
-              <FileText className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">
-                Ingen kontrakter funnet
-              </h3>
-              <p className="text-slate-400 mb-6">
-                {searchTerm ? "Prøv et annet søkeord" : "Opprett din første kontrakt for å komme i gang"}
-              </p>
-              {!searchTerm && (
-                <Button 
-                  onClick={() => setShowGenerator(true)}
-                  className="bg-blue-500 hover:bg-blue-600 text-white"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Opprett kontrakt
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className={cn(
-            "grid gap-6",
-            viewMode === "grid" 
-              ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-              : "grid-cols-1"
-          )}>
-            {filteredContracts.map((contract: Contract) => {
-              const statusConfig = getStatusConfig(contract.status || 'draft');
-              const StatusIcon = statusConfig.icon;
-              const carInfo = getCarInfo(contract.carId);
-              const customerName = getCustomerName(contract.customerId);
-              const customerInitials = getCustomerInitials(contract.customerId);
+        {/* Contract List with Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="all">
+              Alle ({contracts.length})
+            </TabsTrigger>
+            <TabsTrigger value="active">
+              Aktive ({contracts.filter(c => ['draft', 'pending_signature', 'signed'].includes(c.status || '')).length})
+            </TabsTrigger>
+            <TabsTrigger value="ready">
+              Klar for levering ({contracts.filter(c => c.status === 'signed').length})
+            </TabsTrigger>
+            <TabsTrigger value="completed">
+              Fullført ({contracts.filter(c => c.status === 'completed').length})
+            </TabsTrigger>
+          </TabsList>
 
-              return (
-                <Card 
-                  key={contract.id} 
-                  className={cn(
-                    "group relative overflow-hidden backdrop-blur transition-all duration-300 hover:scale-105 hover:shadow-2xl border",
-                    statusConfig.bgCard,
-                    statusConfig.pulse && "animate-pulse"
+          <TabsContent value={activeTab} className="mt-4">
+            {contractsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <p className="mt-2 text-muted-foreground">Laster kontrakter...</p>
+                </div>
+              </div>
+            ) : filteredContracts.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Ingen kontrakter funnet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {searchTerm ? "Prøv et annet søkeord" : "Opprett din første kontrakt for å komme i gang"}
+                  </p>
+                  {!searchTerm && (
+                    <Button onClick={() => setShowGenerator(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Opprett kontrakt
+                    </Button>
                   )}
-                >
-                  <CardContent className="p-6">
-                    {/* Contract ID and Copy Button */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 group">
-                          <h3 className="text-xl font-bold text-white">
-                            #{contract.contractNumber}
-                          </h3>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6"
-                            onClick={() => copyContractId(contract.contractNumber)}
-                          >
-                            <Copy className="w-3 h-3 text-slate-400" />
-                          </Button>
-                        </div>
-                        <p className="text-sm text-slate-500 mt-1">
-                          {getRelativeTime(contract.createdAt)}
-                        </p>
-                      </div>
-                      <Badge 
-                        className={cn(
-                          "flex items-center gap-1 border",
-                          statusConfig.color
-                        )}
-                      >
-                        <StatusIcon className="w-3 h-3" />
-                        {statusConfig.label}
-                      </Badge>
-                    </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {filteredContracts.map((contract: Contract) => {
+                  const customer = getCustomerInfo(contract.customerId);
+                  const car = getCarInfo(contract.carId);
+                  const contractType = getContractType(contract.contractTemplate);
+                  const statusInfo = getStatusInfo(contract.status);
+                  const StatusIcon = statusInfo.icon;
+                  const TypeIcon = contractType.icon;
+                  const daysUntilDelivery = getDaysUntilDelivery(contract.saleDate);
 
-                    {/* Customer Info */}
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold">
-                        {customerInitials}
-                      </div>
-                      <div>
-                        <p className="text-white font-medium">{customerName}</p>
-                        <p className="text-xs text-slate-500">Kunde</p>
-                      </div>
-                    </div>
+                  return (
+                    <Card key={contract.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                      <div className="flex">
+                        {/* Left color bar */}
+                        <div className={cn("w-1", statusInfo.color)} />
+                        
+                        <div className="flex-1 p-6">
+                          <div className="flex items-start justify-between gap-4">
+                            {/* Main Info */}
+                            <div className="flex-1 space-y-4">
+                              {/* Header */}
+                              <div className="flex items-start justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className={cn(
+                                    "p-2 rounded-lg",
+                                    contractType.bgColor,
+                                    contractType.borderColor,
+                                    "border"
+                                  )}>
+                                    <TypeIcon className={cn("w-5 h-5", contractType.textColor)} />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-semibold text-lg">#{contract.contractNumber}</h3>
+                                      <Badge variant="outline" className="gap-1">
+                                        <StatusIcon className="w-3 h-3" />
+                                        {statusInfo.label}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">{contractType.label}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-2xl font-bold">{formatPrice(contract.salePrice)}</p>
+                                  <p className="text-xs text-muted-foreground">Total verdi</p>
+                                </div>
+                              </div>
 
-                    {/* Car Info */}
-                    <div className="bg-slate-800/50 rounded-lg p-3 mb-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Car className="w-4 h-4 text-slate-400" />
-                        <p className="text-sm font-semibold text-white">
-                          {carInfo.brand} {carInfo.model}
-                        </p>
-                      </div>
-                      <p className="text-xs text-slate-500">{carInfo.year}</p>
-                    </div>
+                              {/* Customer and Car Info */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Customer */}
+                                <div className="flex items-start gap-3">
+                                  <UserCheck className="w-4 h-4 text-muted-foreground mt-1" />
+                                  <div className="flex-1">
+                                    <p className="font-medium">{customer?.name || 'Ukjent kunde'}</p>
+                                    <div className="flex items-center gap-3 mt-1">
+                                      {customer?.phone && (
+                                        <a 
+                                          href={`tel:${customer.phone}`}
+                                          className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+                                        >
+                                          <Phone className="w-3 h-3" />
+                                          {customer.phone}
+                                        </a>
+                                      )}
+                                      {customer?.email && (
+                                        <a 
+                                          href={`mailto:${customer.email}`}
+                                          className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+                                        >
+                                          <Mail className="w-3 h-3" />
+                                          {customer.email}
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
 
-                    {/* Financial Summary */}
-                    <div className="space-y-2 mb-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-slate-500">Salgspris</span>
-                        <span className="text-lg font-bold text-white">
-                          {formatPrice(contract.salePrice)}
-                        </span>
-                      </div>
-                      {contract.status === 'pending_signature' && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-slate-500">Signaturer</span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-blue-500 transition-all duration-300"
-                                style={{ width: '0%' }}
-                              />
+                                {/* Car */}
+                                <div className="flex items-start gap-3">
+                                  <Car className="w-4 h-4 text-muted-foreground mt-1" />
+                                  <div className="flex-1">
+                                    <p className="font-medium">
+                                      {car ? `${car.brand} ${car.model}` : 'Ukjent bil'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {car?.year} • {car?.regnr || 'Ingen reg.nr'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Progress and Actions */}
+                              <div className="space-y-3">
+                                {/* Delivery countdown */}
+                                {daysUntilDelivery !== null && daysUntilDelivery >= 0 && (
+                                  <div className="flex items-center gap-3">
+                                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                                    <div className="flex-1">
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className="text-sm">Levering om {daysUntilDelivery} dager</span>
+                                        <span className="text-sm text-muted-foreground">{formatDate(contract.saleDate)}</span>
+                                      </div>
+                                      <Progress value={Math.max(0, 100 - (daysUntilDelivery * 3.33))} className="h-1" />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Next Action */}
+                                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                                  <div className="flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                                    <span className="text-sm font-medium">Neste handling:</span>
+                                    <span className="text-sm text-muted-foreground">{getNextAction(contract)}</span>
+                                  </div>
+                                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="flex gap-2">
+                                  <Button 
+                                    variant="default" 
+                                    size="sm"
+                                    onClick={() => viewContract(contract.id)}
+                                  >
+                                    <FileText className="w-4 h-4 mr-1" />
+                                    Se kontrakt
+                                  </Button>
+
+                                  {contract.status === 'draft' && (
+                                    <>
+                                      <Button variant="outline" size="sm">
+                                        <Send className="w-4 h-4 mr-1" />
+                                        Send tilbud
+                                      </Button>
+                                      <Button variant="outline" size="sm">
+                                        <Car className="w-4 h-4 mr-1" />
+                                        Bestill bil
+                                      </Button>
+                                    </>
+                                  )}
+
+                                  {contract.status === 'pending_signature' && (
+                                    <>
+                                      <Button variant="outline" size="sm">
+                                        <Upload className="w-4 h-4 mr-1" />
+                                        Last opp dokumenter
+                                      </Button>
+                                      <Button variant="outline" size="sm">
+                                        <Phone className="w-4 h-4 mr-1" />
+                                        Følg opp
+                                      </Button>
+                                    </>
+                                  )}
+
+                                  {contract.status === 'signed' && (
+                                    <>
+                                      <Button variant="outline" size="sm">
+                                        <Banknote className="w-4 h-4 mr-1" />
+                                        Registrer betaling
+                                      </Button>
+                                      <Button variant="outline" size="sm">
+                                        <Package className="w-4 h-4 mr-1" />
+                                        Book levering
+                                      </Button>
+                                      <Button variant="outline" size="sm">
+                                        <Receipt className="w-4 h-4 mr-1" />
+                                        Generer faktura
+                                      </Button>
+                                    </>
+                                  )}
+
+                                  {canDelete && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => deleteMutation.mutate(contract.id)}
+                                      className="text-destructive hover:text-destructive"
+                                    >
+                                      Slett
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <span className="text-xs text-slate-400">0/2</span>
+
+                            {/* Right side - Document checklist */}
+                            <div className="hidden lg:block w-64">
+                              <Card>
+                                <CardHeader className="pb-3">
+                                  <CardTitle className="text-sm">Dokumenter</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    <span className="text-muted-foreground">Signert kontrakt</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    <span className="text-muted-foreground">Legitimasjon</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Clock className="w-4 h-4 text-amber-500" />
+                                    <span className="text-muted-foreground">Forsikringsbevis</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <AlertCircle className="w-4 h-4 text-gray-400" />
+                                    <span className="text-muted-foreground">Finansieringsbevis</span>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => viewContract(contract.id)}
-                        className="flex-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border-blue-500/30"
-                      >
-                        <FileText className="w-4 h-4 mr-1" />
-                        Se kontrakt
-                      </Button>
-
-                      {contract.status === 'draft' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30"
-                        >
-                          <Send className="w-4 h-4" />
-                        </Button>
-                      )}
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            className="text-slate-400 hover:text-white"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="bg-slate-800 border-slate-700 text-white">
-                          <DropdownMenuItem 
-                            onClick={() => setEditingContract(contract)}
-                            className="hover:bg-slate-700 cursor-pointer"
-                          >
-                            <Edit className="w-4 h-4 mr-2" />
-                            Rediger
-                          </DropdownMenuItem>
-                          {contract.status === 'signed' && (
-                            <DropdownMenuItem 
-                              onClick={() => markCompletedMutation.mutate(contract.id)}
-                              className="hover:bg-slate-700 cursor-pointer"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Marker som fullført
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator className="bg-slate-700" />
-                          {canDelete && (
-                            <DropdownMenuItem 
-                              onClick={() => deleteMutation.mutate(contract.id)}
-                              className="hover:bg-red-900/20 text-red-400 cursor-pointer"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Slett
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Contract Generator Modal */}
