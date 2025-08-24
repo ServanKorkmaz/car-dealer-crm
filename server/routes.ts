@@ -33,20 +33,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Role-based endpoints
   app.get('/api/user/role', authMiddleware, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const storage = await storagePromise;
-      const membership = await storage.getUserMembership(userId, 'default-company');
-      
-      if (!membership) {
-        return res.status(404).json({ message: "User not found in company" });
-      }
-      
       res.json({
-        role: membership.role,
-        companyId: membership.companyId,
-        canViewSensitive: ['EIER', 'REGNSKAP'].includes(membership.role),
-        canDelete: membership.role === 'EIER',
-        canInvite: membership.role === 'EIER'
+        role: 'EIER', // Single tenant - user is owner
+        canViewSensitive: true,
+        canDelete: true,
+        canInvite: true,
       });
     } catch (error) {
       console.error("Error fetching user role:", error);
@@ -249,7 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const storage = await storagePromise;
       
       // Get the new enhanced activities instead of legacy activityLog
-      const activities = await storage.getActivities(userId, 'default-company', { 
+      const activities = await storage.getActivities(userId, { 
         limit,
         resolved: false // Show unresolved first
       });
@@ -268,7 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { type, priority, resolved, limit = '50', offset = '0' } = req.query;
       
       const storage = await storagePromise;
-      const activities = await storage.getActivities(userId, 'default-company', {
+      const activities = await storage.getActivities(userId, {
         type: type as string,
         priority: priority as string,
         resolved: resolved === 'true',

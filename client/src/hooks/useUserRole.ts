@@ -1,8 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from '@tanstack/react-query';
 
-export interface UserRole {
-  role: "EIER" | "SELGER" | "REGNSKAP" | "VERKSTED";
-  companyId: string;
+interface UserRole {
+  role: string;
   canViewSensitive: boolean;
   canDelete: boolean;
   canInvite: boolean;
@@ -17,15 +16,15 @@ export function useUserRole() {
 
 export function useCanViewSensitive() {
   const { data: userRole } = useUserRole();
-  return userRole?.canViewSensitive ?? false;
+  return userRole?.canViewSensitive ?? true; // Single tenant - always true
 }
 
 export function useCanDelete() {
   const { data: userRole } = useUserRole();
-  return userRole?.canDelete ?? false;
+  return userRole?.canDelete ?? true; // Single tenant - always true
 }
 
 export function useCanInvite() {
   const { data: userRole } = useUserRole();
-  return userRole?.canInvite ?? false;
+  return userRole?.canInvite ?? false; // Single tenant - invites disabled
 }

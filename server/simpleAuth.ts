@@ -71,9 +71,8 @@ export function setupSimpleAuth(app: Express) {
           profileImageUrl: null,
         });
 
-        // Ensure user has profile and company membership
+        // Create user profile (single tenant mode)
         await storage.createProfile("test-user-123", "Demo Bruker");
-        await storage.addUserToCompany("test-user-123", "default-company", "EIER");
 
         // Set up session
         (req.session as any).user = {

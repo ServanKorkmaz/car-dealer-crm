@@ -42,27 +42,11 @@ export const users = pgTable("users", {
 });
 
 // Multi-tenant support tables
-export const companies = pgTable("companies", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
 export const profiles = pgTable("profiles", {
   id: varchar("id").primaryKey(), // Auth user ID
   fullName: text("full_name"),
   createdAt: timestamp("created_at").defaultNow(),
 });
-
-export const memberships = pgTable("memberships", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
-  role: varchar("role").notNull().default("SELGER").$type<"EIER" | "SELGER" | "REGNSKAP" | "VERKSTED">(),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("idx_memberships_user_company").on(table.userId, table.companyId),
-]);
 
 // SVV Cache table
 export const svvCache = pgTable("svv_cache", {
@@ -74,7 +58,6 @@ export const svvCache = pgTable("svv_cache", {
 // Cars table
 export const cars = pgTable("cars", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().default("default-company").references(() => companies.id, { onDelete: "cascade" }),
   registrationNumber: varchar("registration_number").notNull().unique(),
   make: varchar("make").notNull(),
   model: varchar("model").notNull(),
@@ -117,7 +100,6 @@ export const cars = pgTable("cars", {
 // Customers table
 export const customers = pgTable("customers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().default("default-company").references(() => companies.id, { onDelete: "cascade" }),
   name: varchar("name").notNull(),
   email: varchar("email"),
   phone: varchar("phone"),
@@ -134,7 +116,6 @@ export const customers = pgTable("customers", {
 // Contracts table
 export const contracts = pgTable("contracts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().default("default-company").references(() => companies.id, { onDelete: "cascade" }),
   contractNumber: varchar("contract_number").notNull().unique(),
   carId: varchar("car_id").notNull().references(() => cars.id),
   customerId: varchar("customer_id").notNull().references(() => customers.id),
@@ -197,25 +178,11 @@ export const activityLog = pgTable("activity_log", {
   index("idx_activity_log_entity").on(table.entityId, table.entityType),
 ]);
 
-// Invites table for team member invitations
-export const invites = pgTable("invites", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
-  email: text("email").notNull(),
-  role: varchar("role").notNull().default("SELGER").$type<"EIER" | "SELGER" | "REGNSKAP" | "VERKSTED">(),
-  token: text("token").notNull().unique(),
-  expiresAt: timestamp("expires_at").notNull().default(sql`now() + interval '7 days'`),
-  accepted: boolean("accepted").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("idx_invites_company").on(table.companyId),
-  index("idx_invites_token").on(table.token),
-]);
+// Removed invites table - no longer needed without multi-tenant
 
 // Enhanced Activities table for smart alerts and notifications
 export const activities = pgTable("activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().default("default-company").references(() => companies.id, { onDelete: "cascade" }),
   userId: varchar("user_id"),
   type: varchar("type").notNull(), // IMPORT, CAR_UPDATE, CONTRACT_CREATED, CONTRACT_SIGNED, SALE, PRICE_CHANGE, FOLLOW_UP, ALERT
   entityId: varchar("entity_id"), // ID of the related entity (car, customer, contract)
@@ -224,7 +191,6 @@ export const activities = pgTable("activities", {
   resolved: boolean("resolved").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
-  index("idx_activities_company_created").on(table.companyId, table.createdAt),
   index("idx_activities_user_type").on(table.userId, table.type),
   index("idx_activities_priority").on(table.priority, table.resolved),
 ]);
@@ -233,14 +199,13 @@ export const activities = pgTable("activities", {
 export const userSavedViews = pgTable("user_saved_views", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
-  companyId: varchar("company_id").notNull(), // For multi-tenant support
   page: varchar("page").notNull(), // 'cars' or 'customers'
   name: varchar("name").notNull(),
   payload: jsonb("payload").notNull(), // Contains all filter state
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
-  index("idx_saved_views_user_company").on(table.userId, table.companyId, table.page),
+  index("idx_saved_views_user_page").on(table.userId, table.page),
 ]);
 
 // Relations
@@ -426,7 +391,6 @@ export type InsertActivity = z.infer<typeof insertActivitySchema>;
 // Market comparables table
 export const marketComps = pgTable("market_comps", {
   id: uuid("id").primaryKey().defaultRandom(),
-  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   source: text("source").notNull(),
   regnr: text("regnr"),
   brand: text("brand"),
@@ -453,7 +417,7 @@ export type InsertMarketComp = z.infer<typeof insertMarketCompSchema>;
 
 // Pricing rules table
 export const pricingRules = pgTable("pricing_rules", {
-  companyId: varchar("company_id").primaryKey().references(() => companies.id, { onDelete: "cascade" }),
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   targetGrossPct: numeric("target_gross_pct").notNull().default("0.12"),
   minGrossPct: numeric("min_gross_pct").notNull().default("0.05"),
   agingDays1: integer("aging_days_1").notNull().default(30),
@@ -477,9 +441,8 @@ export type InsertPricingRules = z.infer<typeof insertPricingRulesSchema>;
 // Follow-ups table for customer follow-ups and reminders
 export const followups = pgTable("followups", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
   customerId: varchar("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
-  userId: varchar("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   dueDate: varchar("due_date").notNull(), // Using varchar for date to match existing pattern
   note: text("note"),
   status: varchar("status").notNull().default("OPEN").$type<'OPEN' | 'DONE' | 'SKIPPED'>(),
