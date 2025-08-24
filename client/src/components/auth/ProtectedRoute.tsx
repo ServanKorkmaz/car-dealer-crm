@@ -5,24 +5,19 @@ import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  requireOrg?: boolean;
+  requireOrg?: boolean; // Kept for compatibility but ignored in single-tenant mode
 }
 
 export function ProtectedRoute({ children, requireOrg = true }: ProtectedRouteProps) {
-  const { user, isLoading, currentOrg } = useAuth();
+  const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (!user) {
-        // Not authenticated, redirect to login
-        setLocation('/login');
-      } else if (requireOrg && !currentOrg) {
-        // Authenticated but no org, redirect to onboarding
-        setLocation('/onboarding');
-      }
+    if (!isLoading && !user) {
+      // Not authenticated, redirect to login
+      setLocation('/login');
     }
-  }, [user, currentOrg, isLoading, setLocation, requireOrg]);
+  }, [user, isLoading, setLocation]);
 
   if (isLoading) {
     return (
@@ -32,9 +27,10 @@ export function ProtectedRoute({ children, requireOrg = true }: ProtectedRoutePr
     );
   }
 
-  if (!user || (requireOrg && !currentOrg)) {
+  if (!user) {
     return null;
   }
 
+  // In single-tenant mode, we don't need org checks
   return <>{children}</>;
 }
