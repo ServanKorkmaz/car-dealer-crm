@@ -107,7 +107,7 @@ export default function CustomerProfile() {
 
   // Delete customer mutation
   const deleteCustomerMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/customers/${customerId}`, { method: 'DELETE' }),
+    mutationFn: () => apiRequest("DELETE", `/api/customers/${customerId}`),
     onSuccess: () => {
       toast({
         title: "Kunde slettet",
@@ -178,51 +178,61 @@ export default function CustomerProfile() {
 
   return (
     <div className="p-8 space-y-6">
-      {/* Header with back button and actions */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => setLocation('/customers')} data-testid="button-back">
-            <ArrowLeft className="h-4 w-4" />
-            Tilbake til kunder
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold" data-testid="text-customer-name">{customer.name}</h1>
-            <p className="text-muted-foreground" data-testid="text-customer-type">
-              {customer.organizationNumber ? 'Bedriftskunde' : 'Privatkunde'}
-            </p>
-          </div>
+      {/* Header with back button and title */}
+      <div className="flex items-center gap-4 mb-4">
+        <Button variant="ghost" size="sm" onClick={() => setLocation('/customers')} data-testid="button-back">
+          <ArrowLeft className="h-4 w-4" />
+          Tilbake til kunder
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold" data-testid="text-customer-name">{customer.name}</h1>
+          <p className="text-muted-foreground" data-testid="text-customer-type">
+            {customer.organizationNumber ? 'Bedriftskunde' : 'Privatkunde'}
+          </p>
         </div>
-        
-        <div className="flex items-center gap-4">
-          {/* Next Action Alert */}
-          {nextAction && (
-            <Alert className={`${nextAction.bgColor} ${nextAction.borderColor} border max-w-xs`}>
-              <nextAction.icon className={`h-4 w-4 ${nextAction.color}`} />
-              <AlertDescription className="ml-2">
-                <div className="font-medium">{nextAction.message}</div>
-                <div className="text-sm mt-1">
-                  <span className="font-semibold">Neste handling:</span> {nextAction.action}
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} data-testid="button-edit-customer">
-              <Edit className="h-4 w-4" />
-              Rediger
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDelete}
-              disabled={deleteCustomerMutation.isPending}
-              data-testid="button-delete-customer"
-            >
-              <Trash2 className="h-4 w-4" />
-              Slett
-            </Button>
-          </div>
+      </div>
+
+      {/* Prominent Next Action Alert - Top Right */}
+      {nextAction && (
+        <div className="mb-6">
+          <Alert className={`${nextAction.bgColor} ${nextAction.borderColor} border-l-4 shadow-lg`}>
+            <div className="flex items-start gap-3">
+              <nextAction.icon className={`h-5 w-5 ${nextAction.color} mt-0.5`} />
+              <div className="flex-1">
+                <AlertDescription>
+                  <div className="font-semibold text-base mb-1">{nextAction.message}</div>
+                  <div className="text-sm opacity-90">
+                    <span className="font-medium">Neste handling:</span> {nextAction.action}
+                  </div>
+                </AlertDescription>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className={`${nextAction.color} border-current hover:bg-current hover:text-white`}
+              >
+                Utfør
+              </Button>
+            </div>
+          </Alert>
         </div>
+      )}
+
+      {/* Action buttons */}
+      <div className="flex gap-2 mb-6">
+        <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} data-testid="button-edit-customer">
+          <Edit className="h-4 w-4" />
+          Rediger
+        </Button>
+        <Button 
+          variant="destructive" 
+          onClick={handleDelete}
+          disabled={deleteCustomerMutation.isPending}
+          data-testid="button-delete-customer"
+        >
+          <Trash2 className="h-4 w-4" />
+          Slett
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -382,7 +392,7 @@ export default function CustomerProfile() {
                             {parseFloat(contract.salePrice).toLocaleString('no-NO')} kr
                           </span>
                           <span className="text-muted-foreground">
-                            {new Date(contract.saleDate).toLocaleDateString('no-NO')}
+                            {contract.saleDate ? new Date(contract.saleDate).toLocaleDateString('no-NO') : 'Ingen dato'}
                           </span>
                         </div>
 
