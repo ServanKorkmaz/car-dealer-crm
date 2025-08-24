@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Mail, Phone, MapPin, Building, FileText, Car as CarIcon, Edit, Trash2 } from "lucide-react";
+import { ArrowLeft, Mail, Phone, MapPin, Building, FileText, Car as CarIcon, Edit, Trash2, AlertCircle, Clock, CheckCircle2, Send, FileSignature, Package, Banknote } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import CustomerForm from "@/components/customers/CustomerForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { Customer, Contract, Car } from "@shared/schema";
 
 export default function CustomerProfile() {
@@ -39,6 +40,70 @@ export default function CustomerProfile() {
 
   // Filter contracts for this customer
   const customerContracts = contracts.filter(contract => contract.customerId === customerId);
+
+  // Find the most important next action for this customer
+  const getNextAction = () => {
+    // Check for contracts needing immediate attention
+    const pendingContracts = customerContracts.filter(c => c.status === 'pending_signature');
+    const draftContracts = customerContracts.filter(c => c.status === 'draft');
+    const signedContracts = customerContracts.filter(c => c.status === 'signed');
+    
+    if (pendingContracts.length > 0) {
+      return {
+        message: `${pendingContracts.length} kontrakt${pendingContracts.length > 1 ? 'er' : ''} venter på signering`,
+        action: "Følg opp signering",
+        icon: Clock,
+        color: "text-amber-500",
+        bgColor: "bg-amber-50 dark:bg-amber-900/20",
+        borderColor: "border-amber-200 dark:border-amber-800"
+      };
+    }
+    
+    if (signedContracts.length > 0) {
+      return {
+        message: `${signedContracts.length} kontrakt${signedContracts.length > 1 ? 'er' : ''} klar for levering`,
+        action: "Registrer betaling",
+        icon: Banknote,
+        color: "text-blue-500",
+        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        borderColor: "border-blue-200 dark:border-blue-800"
+      };
+    }
+    
+    if (draftContracts.length > 0) {
+      return {
+        message: `${draftContracts.length} utkast venter på handling`,
+        action: "Send tilbud",
+        icon: Send,
+        color: "text-slate-500",
+        bgColor: "bg-slate-50 dark:bg-slate-900/20",
+        borderColor: "border-slate-200 dark:border-slate-800"
+      };
+    }
+
+    // Check if customer hasn't been contacted in a while
+    const lastContract = customerContracts.sort((a, b) => 
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    )[0];
+    
+    if (lastContract) {
+      const daysSinceLastContract = Math.floor((Date.now() - new Date(lastContract.createdAt || 0).getTime()) / (1000 * 60 * 60 * 24));
+      if (daysSinceLastContract > 30) {
+        return {
+          message: "Ingen aktivitet siste 30 dager",
+          action: "Ta kontakt",
+          icon: Phone,
+          color: "text-gray-500",
+          bgColor: "bg-gray-50 dark:bg-gray-900/20",
+          borderColor: "border-gray-200 dark:border-gray-800"
+        };
+      }
+    }
+    
+    return null;
+  };
+
+  const nextAction = getNextAction();
 
   // Delete customer mutation
   const deleteCustomerMutation = useMutation({
@@ -114,7 +179,7 @@ export default function CustomerProfile() {
   return (
     <div className="p-8 space-y-6">
       {/* Header with back button and actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => setLocation('/customers')} data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
@@ -128,20 +193,35 @@ export default function CustomerProfile() {
           </div>
         </div>
         
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} data-testid="button-edit-customer">
-            <Edit className="h-4 w-4" />
-            Rediger
-          </Button>
-          <Button 
-            variant="destructive" 
-            onClick={handleDelete}
-            disabled={deleteCustomerMutation.isPending}
-            data-testid="button-delete-customer"
-          >
-            <Trash2 className="h-4 w-4" />
-            Slett
-          </Button>
+        <div className="flex items-center gap-4">
+          {/* Next Action Alert */}
+          {nextAction && (
+            <Alert className={`${nextAction.bgColor} ${nextAction.borderColor} border max-w-xs`}>
+              <nextAction.icon className={`h-4 w-4 ${nextAction.color}`} />
+              <AlertDescription className="ml-2">
+                <div className="font-medium">{nextAction.message}</div>
+                <div className="text-sm mt-1">
+                  <span className="font-semibold">Neste handling:</span> {nextAction.action}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(true)} data-testid="button-edit-customer">
+              <Edit className="h-4 w-4" />
+              Rediger
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDelete}
+              disabled={deleteCustomerMutation.isPending}
+              data-testid="button-delete-customer"
+            >
+              <Trash2 className="h-4 w-4" />
+              Slett
+            </Button>
+          </div>
         </div>
       </div>
 
