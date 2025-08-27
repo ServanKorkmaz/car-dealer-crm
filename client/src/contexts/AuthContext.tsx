@@ -43,8 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      // Check if user is stored in localStorage
-      const storedAuth = localStorage.getItem('forhandler_auth');
+      // Check if user is stored in localStorage or sessionStorage
+      const storedAuth = localStorage.getItem('forhandler_auth') || sessionStorage.getItem('forhandler_auth');
       if (storedAuth) {
         const { user: storedUser, company: storedCompany } = JSON.parse(storedAuth);
         setUser(storedUser);
