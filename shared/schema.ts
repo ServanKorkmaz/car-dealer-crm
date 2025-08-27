@@ -335,6 +335,7 @@ export const insertCustomerSchema = createInsertSchema(customers).omit({
   createdAt: true,
   updatedAt: true,
   userId: true,
+  companyId: true,
 });
 
 export const insertContractSchema = createInsertSchema(contracts).omit({
