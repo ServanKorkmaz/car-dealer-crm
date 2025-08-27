@@ -182,6 +182,32 @@ export default function ContractWizard({
 
   const watchedValues = form.watch();
 
+  // Update selected car and customer when form values change
+  useEffect(() => {
+    const carId = watchedValues.carId;
+    if (carId && cars.length > 0) {
+      const car = cars.find(c => c.id === carId);
+      setSelectedCar(car || null);
+      
+      // Auto-fill sale price from car's sale price
+      if (car && car.salePrice && form.getValues("salePrice") === "0") {
+        form.setValue("salePrice", car.salePrice.toString());
+      }
+    } else {
+      setSelectedCar(null);
+    }
+  }, [watchedValues.carId, cars, form]);
+
+  useEffect(() => {
+    const customerId = watchedValues.customerId;
+    if (customerId && customers.length > 0) {
+      const customer = customers.find(c => c.id === customerId);
+      setSelectedCustomer(customer || null);
+    } else {
+      setSelectedCustomer(null);
+    }
+  }, [watchedValues.customerId, customers]);
+
   // Calculate pricing in real-time
   const calculatePricing = useCallback(
     debounce(() => {
@@ -458,14 +484,13 @@ export default function ContractWizard({
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent className="max-h-60 overflow-y-auto">
-                                    {availableCars.map((car) => (
+                                    {availableCars.length > 0 ? availableCars.map((car) => (
                                       <SelectItem key={car.id} value={car.id}>
                                         {car.make} {car.model} ({car.year}) - {car.registrationNumber}
                                       </SelectItem>
-                                    ))}
-                                    {availableCars.length === 0 && (
+                                    )) : (
                                       <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-                                        Ingen tilgjengelige biler funnet
+                                        {cars.length === 0 ? "Laster biler..." : "Ingen tilgjengelige biler funnet"}
                                       </div>
                                     )}
                                   </SelectContent>
@@ -548,14 +573,13 @@ export default function ContractWizard({
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent className="max-h-60 overflow-y-auto">
-                                    {customers.map((customer) => (
+                                    {customers.length > 0 ? customers.map((customer) => (
                                       <SelectItem key={customer.id} value={customer.id}>
                                         {customer.name} - {customer.phone}
                                       </SelectItem>
-                                    ))}
-                                    {customers.length === 0 && (
+                                    )) : (
                                       <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-                                        Ingen kunder funnet
+                                        Laster kunder...
                                       </div>
                                     )}
                                   </SelectContent>
