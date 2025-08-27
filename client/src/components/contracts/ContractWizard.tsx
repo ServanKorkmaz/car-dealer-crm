@@ -24,12 +24,13 @@ import {
   Car as CarIcon, User, CreditCard, FileText, ChevronRight, ChevronLeft,
   Package, Shield, Wrench, Calendar, Clock, AlertCircle, CheckCircle2,
   Save, Send, Download, Eye, X, Plus, Minus, Info, TrendingUp, Calculator,
-  Banknote, Receipt, Phone, Mail, MapPin, Hash, DollarSign, RefreshCw
+  Banknote, Receipt, Phone, Mail, MapPin, Hash, DollarSign
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { z } from "zod";
 import { debounce } from "@/lib/utils";
 import { renderContractTemplate, prepareContractData } from "@/lib/contracts/render";
+import { generateAndDownloadPdf, htmlToPdf } from "@/lib/contracts/pdf";
 
 interface ContractWizardProps {
   open: boolean;
@@ -142,10 +143,10 @@ export default function ContractWizard({
     enabled: open,
   });
 
-  const availableCars = useMemo(() => {
-    // Show all cars for now, filter by status later if needed
-    return cars;
-  }, [cars]);
+  const availableCars = useMemo(() => 
+    cars.filter((car: Car) => car.status === "available" || car.id === contract?.carId),
+    [cars, contract]
+  );
 
   // Form setup with defaults
   const form = useForm<WizardFormData>({
@@ -181,32 +182,6 @@ export default function ContractWizard({
   });
 
   const watchedValues = form.watch();
-
-  // Update selected car and customer when form values change
-  useEffect(() => {
-    const carId = watchedValues.carId;
-    if (carId && cars.length > 0) {
-      const car = cars.find(c => c.id === carId);
-      setSelectedCar(car || null);
-      
-      // Auto-fill sale price from car's sale price
-      if (car && car.salePrice && form.getValues("salePrice") === "0") {
-        form.setValue("salePrice", car.salePrice.toString());
-      }
-    } else {
-      setSelectedCar(null);
-    }
-  }, [watchedValues.carId, cars, form]);
-
-  useEffect(() => {
-    const customerId = watchedValues.customerId;
-    if (customerId && customers.length > 0) {
-      const customer = customers.find(c => c.id === customerId);
-      setSelectedCustomer(customer || null);
-    } else {
-      setSelectedCustomer(null);
-    }
-  }, [watchedValues.customerId, customers]);
 
   // Calculate pricing in real-time
   const calculatePricing = useCallback(
@@ -484,54 +459,17 @@ export default function ContractWizard({
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent className="max-h-60 overflow-y-auto">
-                                    {availableCars.length > 0 ? availableCars.map((car) => (
+                                    {availableCars.map((car) => (
                                       <SelectItem key={car.id} value={car.id}>
                                         {car.make} {car.model} ({car.year}) - {car.registrationNumber}
                                       </SelectItem>
-                                    )) : (
-                                      <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-                                        {cars.length === 0 ? "Laster biler..." : "Ingen tilgjengelige biler funnet"}
-                                      </div>
-                                    )}
+                                    ))}
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
-                          
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="flex-1"
-                              onClick={() => {
-                                // Open car creation modal
-                                window.open("/cars", "_blank");
-                                toast({
-                                  title: "Opprett bil",
-                                  description: "Åpner bilregistrering i ny fane. Oppdater siden når bilen er opprettet.",
-                                });
-                              }}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Opprett ny bil
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={() => {
-                                queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
-                                toast({
-                                  title: "Oppdatert",
-                                  description: "Billisten er oppdatert",
-                                });
-                              }}
-                            >
-                              <RefreshCw className="h-4 w-4" />
-                            </Button>
-                          </div>
                           
                           {selectedCar && (
                             <div className="rounded-lg bg-muted p-4 space-y-2">
@@ -573,54 +511,17 @@ export default function ContractWizard({
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent className="max-h-60 overflow-y-auto">
-                                    {customers.length > 0 ? customers.map((customer) => (
+                                    {customers.map((customer) => (
                                       <SelectItem key={customer.id} value={customer.id}>
                                         {customer.name} - {customer.phone}
                                       </SelectItem>
-                                    )) : (
-                                      <div className="px-2 py-4 text-sm text-muted-foreground text-center">
-                                        Laster kunder...
-                                      </div>
-                                    )}
+                                    ))}
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
-                          
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="flex-1"
-                              onClick={() => {
-                                // Open customer creation modal
-                                window.open("/customers", "_blank");
-                                toast({
-                                  title: "Opprett kunde",
-                                  description: "Åpner kunderegistrering i ny fane. Oppdater siden når kunden er opprettet.",
-                                });
-                              }}
-                            >
-                              <Plus className="h-4 w-4 mr-2" />
-                              Opprett ny kunde
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              onClick={() => {
-                                queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
-                                toast({
-                                  title: "Oppdatert",
-                                  description: "Kundelisten er oppdatert",
-                                });
-                              }}
-                            >
-                              <RefreshCw className="h-4 w-4" />
-                            </Button>
-                          </div>
                           
                           {selectedCustomer && (
                             <div className="rounded-lg bg-muted p-4 space-y-2">
@@ -1116,18 +1017,29 @@ export default function ContractWizard({
                             type="button" 
                             className="w-full" 
                             variant="outline"
-                            onClick={() => {
-                              if (!contract?.id) {
-                                toast({
-                                  title: "Lagre først",
-                                  description: "Kontrakten må lagres før PDF kan forhåndsvises",
-                                  variant: "destructive",
-                                });
-                                return;
-                              }
-                              
+                            onClick={async () => {
                               try {
-                                window.open(`/print/contracts/${contract.id}`, '_blank');
+                                // Get form data
+                                const formData = form.getValues();
+                                
+                                // Prepare contract data
+                                const contractData = prepareContractData(
+                                  formData,
+                                  selectedCar,
+                                  selectedCustomer,
+                                  { name: "ForhandlerPRO AS", orgNumber: "123456789" } // TODO: Get from auth context
+                                );
+                                
+                                // Generate HTML
+                                const html = renderContractTemplate(contractData);
+                                
+                                // Open preview in new window
+                                const previewWindow = window.open("", "_blank");
+                                if (previewWindow) {
+                                  previewWindow.document.write(html);
+                                  previewWindow.document.close();
+                                }
+                                
                                 toast({ 
                                   title: "Forhåndsvisning åpnet", 
                                   description: "Kontrakten vises i nytt vindu" 
@@ -1136,7 +1048,7 @@ export default function ContractWizard({
                                 console.error("Preview error:", error);
                                 toast({ 
                                   title: "Feil ved forhåndsvisning", 
-                                  description: "Kunne ikke åpne forhåndsvisning",
+                                  description: "Kunne ikke generere forhåndsvisning",
                                   variant: "destructive" 
                                 });
                               }
@@ -1149,27 +1061,35 @@ export default function ContractWizard({
                             type="button" 
                             className="w-full" 
                             variant="outline"
-                            onClick={() => {
-                              if (!contract?.id) {
-                                toast({
-                                  title: "Lagre først",
-                                  description: "Kontrakten må lagres før PDF kan lastes ned",
-                                  variant: "destructive",
-                                });
-                                return;
-                              }
-                              
+                            onClick={async () => {
                               try {
-                                window.open(`/api/pdf/contracts/${contract.id}.pdf`, '_blank');
+                                // Get form data
+                                const formData = form.getValues();
+                                
+                                // Prepare contract data
+                                const contractData = prepareContractData(
+                                  formData,
+                                  selectedCar,
+                                  selectedCustomer,
+                                  { name: "ForhandlerPRO AS", orgNumber: "123456789" } // TODO: Get from auth context
+                                );
+                                
+                                // Generate HTML
+                                const html = renderContractTemplate(contractData);
+                                
+                                // Generate and download PDF
+                                const filename = `kontrakt_${formData.contractNumber || Date.now()}.pdf`;
+                                await generateAndDownloadPdf(html, filename);
+                                
                                 toast({ 
-                                  title: "PDF genereres", 
-                                  description: "Kontrakten åpnes i ny fane for nedlasting" 
+                                  title: "Kontrakt lastet ned", 
+                                  description: `Filen ${filename} er lastet ned` 
                                 });
                               } catch (error) {
                                 console.error("Download error:", error);
                                 toast({ 
                                   title: "Feil ved nedlasting", 
-                                  description: "Kunne ikke generere PDF",
+                                  description: "Kunne ikke laste ned kontrakten",
                                   variant: "destructive" 
                                 });
                               }

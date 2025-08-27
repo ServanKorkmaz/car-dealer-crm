@@ -27,7 +27,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { SettingsAccounting } from "@/features/accounting/pages/SettingsAccounting";
 import { SyncMonitor } from "@/features/accounting/pages/SyncMonitor";
 import { SettingsOrganization } from "@/pages/settings/SettingsOrganization";
-import ContractPrint from "@/pages/print/ContractPrint";
 // import { SettingsUsers } from "@/pages/settings/SettingsUsers";
 // import { SettingsPlan } from "@/pages/settings/SettingsPlan";
 
@@ -98,7 +97,6 @@ function Router() {
           <Contracts />
         </ProtectedRoute>
       </Route>
-      <Route path="/print/contracts/:id" component={ContractPrint} />
       <Route path="/activities">
         <ProtectedRoute>
           <Activities />

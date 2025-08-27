@@ -9,7 +9,6 @@ import { generateContractHTML, generatePDF } from "./pdf-generator";
 import { scrapeFinnAd } from "./finn-scraper";
 import { ActivityLogger } from "./activityLogger";
 import { AlertSystem } from "./alerts";
-import { pdfRouter } from "./pdf";
 import OpenAI from "openai";
 import * as tools from "./assistantTools";
 import type { UserHints } from "./assistantTools";
@@ -1413,9 +1412,6 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
   // Register accounting routes
   const { registerAccountingRoutes } = await import('./accounting/routes');
   registerAccountingRoutes(app, authMiddleware);
-
-  // Register PDF routes
-  app.use('/api/pdf', pdfRouter);
 
   const httpServer = createServer(app);
   return httpServer;
