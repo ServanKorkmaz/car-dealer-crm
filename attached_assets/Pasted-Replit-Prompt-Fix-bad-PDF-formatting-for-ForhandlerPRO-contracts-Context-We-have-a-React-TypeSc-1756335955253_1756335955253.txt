@@ -1,0 +1,215 @@
+Replit Prompt — Fix bad PDF formatting for ForhandlerPRO contracts
+
+Context
+We have a React + TypeScript app (ForhandlerPRO). Contract PDF exports are poorly formatted (cut headers, weird line breaks, app chrome visible). Replace client-side html2canvas/jsPDF with a server-rendered PDF using Puppeteer and proper print CSS. Final PDF must be A4 with controlled margins, stable page breaks, embedded fonts, header/footer with page numbers, and no sticky sidebars or overlays from the app.
+
+Tasks
+
+Create a dedicated print route that renders the contract alone (no app chrome):
+
+Route: /print/contracts/:id (or /print/contract?contractId=...).
+
+It should render minimal HTML with the contract content only.
+
+Load a dedicated stylesheet contract-print.css.
+
+Print CSS (/src/styles/contract-print.css) to force A4 and clean layout:
+
+/* A4 page and margins */
+@page {
+  size: A4;
+  margin: 18mm 16mm 18mm 16mm;
+}
+
+/* Exact colors + font control */
+html, body {
+  padding: 0;
+  margin: 0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  font-family: "Inter", "Roboto", Arial, sans-serif;
+  line-height: 1.25;
+  color: #111;
+}
+
+/* Container width in mm (avoid px to prevent scaling artifacts) */
+.contract {
+  width: 178mm; /* page width (210) - left/right margins (16+16) */
+  margin: 0 auto;
+}
+
+/* Headings and sections should not break across pages */
+h1, h2, h3 { break-after: avoid; break-inside: avoid; }
+.section, .card, .row { break-inside: avoid; page-break-inside: avoid; }
+
+/* Tables that can span pages but keep rows intact */
+table { width: 100%; border-collapse: collapse; page-break-inside: auto; }
+tr, td, th { break-inside: avoid; page-break-inside: avoid; }
+
+/* Avoid sticky/absolute UI elements in print */
+.app-chrome, .navbar, .sidebar, .toast, .modal, .drawer, .dev-tools,
+.sticky, [data-sticky], [style*="position: sticky"], [style*="position: fixed"] {
+  display: none !important;
+}
+
+/* Images and logos */
+img { max-width: 100%; height: auto; }
+
+/* Optional: light borders/backgrounds that still print */
+.box { border: 0.2mm solid #e5e7eb; border-radius: 2mm; padding: 4mm; }
+.muted { background: #f9fafb; }
+
+
+Server-side PDF endpoint (Node/Express)
+Create server/pdf.ts (or equivalent). It must:
+
+Accept contractId.
+
+Build the print URL: http://localhost:<port>/print/contracts/:id.
+
+Launch Puppeteer with printBackground: true and preferCSSPageSize: true.
+
+Add header/footer templates with page numbers.
+
+Upload resulting PDF to Supabase Storage (or return as stream).
+
+// server/pdf.ts
+import express from "express";
+import puppeteer from "puppeteer";
+
+export const pdfRouter = express.Router();
+
+pdfRouter.get("/contracts/:id.pdf", async (req, res) => {
+  const { id } = req.params;
+  const baseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+  const url = `${baseUrl}/print/contracts/${id}`;
+
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ["--no-sandbox","--disable-setuid-sandbox"]
+  });
+  try {
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle0" });
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: { top: "20mm", right: "14mm", bottom: "16mm", left: "14mm" },
+      displayHeaderFooter: true,
+      headerTemplate: `
+        <div style="font-size:8px;width:100%;padding:0 10mm;color:#666;">
+          <span>KJØPEKONTRAKT – BRUKTBIL</span>
+          <span style="float:right;">Kontraktnr: <span class="date"></span></span>
+        </div>`,
+      footerTemplate: `
+        <div style="font-size:8px;width:100%;padding:0 10mm;color:#666;">
+          <span>ForhandlerPRO</span>
+          <span style="float:right;">Side <span class="pageNumber"></span>/<span class="totalPages"></span></span>
+        </div>`
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="kontrakt-${id}.pdf"`);
+    res.send(pdfBuffer);
+  } finally {
+    await browser.close();
+  }
+});
+
+
+Print route (React) with clean markup
+Create /src/pages/print/ContractPrint.tsx (or matching router page) that:
+
+Fetches contract by id.
+
+Renders a single .contract container with semantic sections (h1, h2, .section, tables).
+
+Imports contract-print.css.
+
+No app layout, no sticky headers, no sidebars.
+
+Sample skeleton:
+
+// src/pages/print/ContractPrint.tsx
+import React from "react";
+import "./../../styles/contract-print.css";
+
+export default function ContractPrint() {
+  // Get :id from router, fetch contract data
+  // const { id } = useParams(); const data = useContract(id)
+
+  return (
+    <html>
+      <head>
+        <meta charSet="utf-8" />
+        <title>Kjøpekontrakt</title>
+      </head>
+      <body>
+        <main className="contract">
+          <h1>KJØPEKONTRAKT – BRUKTBIL</h1>
+          <section className="section">
+            <h2>1. PARTER</h2>
+            {/* seller/buyer two-column grid as a table to avoid breaks */}
+            {/* ... */}
+          </section>
+          <section className="section">
+            <h2>2. KJØRETØY</h2>
+            {/* ... */}
+          </section>
+          {/* Repeat for all sections. Use tables for rows, avoid flex wrapping for print. */}
+        </main>
+      </body>
+    </html>
+  );
+}
+
+
+Client button → server PDF
+On the contract view page, change the “Download PDF” to call the new endpoint:
+
+const openPdf = (id: string) => {
+  window.open(`/api/pdf/contracts/${id}.pdf`, "_blank");
+};
+
+
+Remove old html2canvas/jsPDF path (or keep as fallback), and ensure no position: sticky/fixed elements are inside .contract.
+
+Acceptance Criteria
+
+ PDF is A4 with margins: 18/16/18/16 mm.
+
+ No app UI elements (sidebar, topbar) appear in the PDF.
+
+ Headings are never split across pages; section boxes don’t break mid-box.
+
+ Tables keep rows intact across page breaks.
+
+ Colors and soft backgrounds print (printBackground + exact color adjust).
+
+ Page numbers show as 1/3, 2/3, etc.
+
+ Norwegian characters (ÆØÅ) render correctly (embed font if needed).
+
+Notes / Pitfalls
+
+Do not rely on px for page sizing; use mm to match @page.
+
+Avoid position: sticky/fixed inside print markup—it causes overlaps like the current “4. VILKÅR OG BETINGELSER”.
+
+If you need branded fonts, self-host WOFF/WOFF2 and import in contract-print.css.
+
+For serverless environments, consider a lightweight Chrome build or Playwright. Locally and on Replit, puppeteer with --no-sandbox is fine.
+
+Deliverables
+
+New /print/contracts/:id route and contract-print.css.
+
+Express router /api/pdf/contracts/:id.pdf using Puppeteer.
+
+Updated “Download PDF” button.
+
+Remove legacy client-side export (or keep as fallback).
+
+Brief README note on how to run the PDF server locally.

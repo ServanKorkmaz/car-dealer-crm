@@ -30,7 +30,6 @@ import { cn } from "@/lib/utils";
 import { z } from "zod";
 import { debounce } from "@/lib/utils";
 import { renderContractTemplate, prepareContractData } from "@/lib/contracts/render";
-import { generateAndDownloadPdf, htmlToPdf } from "@/lib/contracts/pdf";
 
 interface ContractWizardProps {
   open: boolean;
@@ -1017,29 +1016,18 @@ export default function ContractWizard({
                             type="button" 
                             className="w-full" 
                             variant="outline"
-                            onClick={async () => {
+                            onClick={() => {
+                              if (!contract?.id) {
+                                toast({
+                                  title: "Lagre først",
+                                  description: "Kontrakten må lagres før PDF kan forhåndsvises",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              
                               try {
-                                // Get form data
-                                const formData = form.getValues();
-                                
-                                // Prepare contract data
-                                const contractData = prepareContractData(
-                                  formData,
-                                  selectedCar,
-                                  selectedCustomer,
-                                  { name: "ForhandlerPRO AS", orgNumber: "123456789" } // TODO: Get from auth context
-                                );
-                                
-                                // Generate HTML
-                                const html = renderContractTemplate(contractData);
-                                
-                                // Open preview in new window
-                                const previewWindow = window.open("", "_blank");
-                                if (previewWindow) {
-                                  previewWindow.document.write(html);
-                                  previewWindow.document.close();
-                                }
-                                
+                                window.open(`/print/contracts/${contract.id}`, '_blank');
                                 toast({ 
                                   title: "Forhåndsvisning åpnet", 
                                   description: "Kontrakten vises i nytt vindu" 
@@ -1048,7 +1036,7 @@ export default function ContractWizard({
                                 console.error("Preview error:", error);
                                 toast({ 
                                   title: "Feil ved forhåndsvisning", 
-                                  description: "Kunne ikke generere forhåndsvisning",
+                                  description: "Kunne ikke åpne forhåndsvisning",
                                   variant: "destructive" 
                                 });
                               }
@@ -1061,35 +1049,27 @@ export default function ContractWizard({
                             type="button" 
                             className="w-full" 
                             variant="outline"
-                            onClick={async () => {
+                            onClick={() => {
+                              if (!contract?.id) {
+                                toast({
+                                  title: "Lagre først",
+                                  description: "Kontrakten må lagres før PDF kan lastes ned",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              
                               try {
-                                // Get form data
-                                const formData = form.getValues();
-                                
-                                // Prepare contract data
-                                const contractData = prepareContractData(
-                                  formData,
-                                  selectedCar,
-                                  selectedCustomer,
-                                  { name: "ForhandlerPRO AS", orgNumber: "123456789" } // TODO: Get from auth context
-                                );
-                                
-                                // Generate HTML
-                                const html = renderContractTemplate(contractData);
-                                
-                                // Generate and download PDF
-                                const filename = `kontrakt_${formData.contractNumber || Date.now()}.pdf`;
-                                await generateAndDownloadPdf(html, filename);
-                                
+                                window.open(`/api/pdf/contracts/${contract.id}.pdf`, '_blank');
                                 toast({ 
-                                  title: "Kontrakt lastet ned", 
-                                  description: `Filen ${filename} er lastet ned` 
+                                  title: "PDF genereres", 
+                                  description: "Kontrakten åpnes i ny fane for nedlasting" 
                                 });
                               } catch (error) {
                                 console.error("Download error:", error);
                                 toast({ 
                                   title: "Feil ved nedlasting", 
-                                  description: "Kunne ikke laste ned kontrakten",
+                                  description: "Kunne ikke generere PDF",
                                   variant: "destructive" 
                                 });
                               }
