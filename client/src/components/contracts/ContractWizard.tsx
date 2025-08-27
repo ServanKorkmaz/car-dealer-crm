@@ -369,10 +369,10 @@ export default function ContractWizard({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 gap-0 lg:max-w-6xl">
-        <div className="flex flex-col lg:flex-row h-full">
+      <DialogContent className="max-w-[98vw] max-h-[95vh] p-0 gap-0 lg:max-w-6xl xl:max-w-7xl">
+        <div className="flex flex-col lg:flex-row h-full min-h-0">
           {/* Main Content Area */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {/* Header with Progress */}
             <div className="p-4 lg:p-6 border-b">
               <div className="flex items-center justify-between mb-4">
@@ -1100,7 +1100,7 @@ export default function ContractWizard({
           </div>
 
           {/* Right Sidebar - Price Summary */}
-          <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l bg-muted/30 p-4 lg:p-6 overflow-y-auto shrink-0">
+          <div className="w-full lg:w-72 xl:w-80 border-t lg:border-t-0 lg:border-l bg-muted/30 p-4 lg:p-6 overflow-y-auto shrink-0">
             <div className="sticky top-0">
               <h3 className="font-semibold text-lg mb-4">PRISSAMMENDRAG</h3>
               
