@@ -129,13 +129,6 @@ export default function ContractWizard({
   
   const { toast } = useToast();
   
-  // Generate contract number if not existing
-  useEffect(() => {
-    if (!form.getValues("contractNumber")) {
-      const contractNum = `K-${Date.now().toString().slice(-8)}`;
-      form.setValue("contractNumber", contractNum);
-    }
-  }, [form]);
   const queryClient = useQueryClient();
   const isEditing = !!contract;
 
