@@ -145,8 +145,18 @@ export async function authenticateToken(req: Request & { user?: TokenPayload }, 
       return res.status(401).json({ message: 'Ugyldig eller utløpt token' });
     }
 
-    // Attach user to request
-    req.user = payload;
+    // Attach user to request in format expected by routes
+    req.user = {
+      claims: {
+        sub: payload.userId,
+        email: payload.email,
+        role: payload.role
+      },
+      id: payload.userId,
+      email: payload.email,
+      role: payload.role,
+      companyId: payload.companyId
+    };
     next();
   } catch (error) {
     console.error('Authentication error:', error);
