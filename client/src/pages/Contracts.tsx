@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import EnhancedContractGenerator from "@/components/contracts/EnhancedContractGenerator";
+import ContractWizard from "@/components/contracts/ContractWizard";
 import { 
   Plus, Search, Filter, FileText, TrendingUp, Clock, Package,
   Calendar, Phone, Mail, Car, CreditCard, AlertCircle, CheckCircle2,
@@ -722,18 +722,17 @@ export default function Contracts() {
         </Tabs>
       </div>
 
-      {/* Contract Generator Modal */}
-      {(showGenerator || editingContract) && (
-        <EnhancedContractGenerator
-          contract={editingContract}
-          prefilledData={prefilledData}
-          onClose={() => {
-            setShowGenerator(false);
-            setEditingContract(null);
-            setPrefilledData(null);
-          }}
-        />
-      )}
+      {/* Contract Wizard Modal */}
+      <ContractWizard
+        open={showGenerator || !!editingContract}
+        contract={editingContract}
+        prefilledData={prefilledData}
+        onClose={() => {
+          setShowGenerator(false);
+          setEditingContract(null);
+          setPrefilledData(null);
+        }}
+      />
     </MainLayout>
   );
 }

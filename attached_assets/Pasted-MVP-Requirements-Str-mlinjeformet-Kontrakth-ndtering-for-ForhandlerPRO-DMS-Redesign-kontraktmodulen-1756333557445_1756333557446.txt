@@ -1,0 +1,127 @@
+MVP Requirements: Strømlinjeformet Kontrakthåndtering for ForhandlerPRO DMS
+Redesign kontraktmodulen for optimal brukeropplevelse og effektivitet i bilforhandler-arbeidsflyten. Fokuser på å minimere kognitiv belastning og maksimere datakvalitet.
+UX/UI Forbedringer
+Layout & Visuell Hierarki
+
+Implementer en trinn-for-trinn wizard (3-4 steg maks)
+Progressbar som viser hvor langt brukeren har kommet
+Kollapsbare seksjoner med smart auto-expand basert på kontekst
+Tydelig visuell separasjon mellom input-områder og kalkulasjoner
+Høyrekolonne dedikert til live-oppdatert prissammendrag (sticky positioning)
+
+Smart Form Design
+Steg 1: Kjøretøy & Kunde
+- Auto-complete søk for eksisterende kunder
+- VIN-dekoder for automatisk bilinfo
+- Kun vis relevante felter basert på kontrakttype
+
+Steg 2: Økonomi
+- Slider-inputs for finansiering (visuell feedback)
+- Real-time validering av priser
+- Smart defaults basert på historisk data
+- Tooltip-hjelpetekster ved komplekse felt
+
+Steg 3: Tillegg & Opsjoner
+- Checkbox-grid med priser synlige
+- Kategoriserte add-ons (Forsikring, Garanti, Utstyr)
+- Bulk-actions for vanlige pakker
+
+Steg 4: Gjennomgang & Signering
+- Kompakt oppsummering
+- Uthevede viktige detaljer
+- Ett-klikks PDF-generering
+Intelligente Funksjoner
+
+Auto-save hvert 30. sekund
+Keyboard shortcuts for power users (Tab-navigasjon, Enter for neste felt)
+Smart copy fra tidligere kontrakter
+Mal-bibliotek for vanlige kontrakttyper
+Duplicate detection (advar hvis lignende kontrakt eksisterer)
+
+Tekniske Krav
+Frontend Optimalisering
+javascript// Implementer følgende patterns:
+- Debounced kalkulasjoner (300ms delay)
+- Optimistic UI updates
+- Skeleton loaders under datahenting
+- Error boundaries for graceful degradation
+- Responsive breakpoints (mobile, tablet, desktop)
+Validering & Forretningslogikk
+
+Priskalkulering skjer server-side for konsistens
+Regelmotor for rabatter og kampanjer
+MVA-beregning basert på kjøretøytype
+Marginkontroll med varsler ved lave marginer
+Automatisk dokumentvalidering (org.nr, personnummer format)
+
+Data & State Management
+
+Kontrakt-objekt med tydelig struktur
+Versjonering av kontraktendringer
+Undo/Redo funksjonalitet
+Draft-modus med auto-recovery
+Audit trail for compliance
+
+Prissammendrag Panel (Høyre side)
+┌─────────────────────────┐
+│ PRISSAMMENDRAG         │
+├─────────────────────────┤
+│ Kjøretøy:    995 000 kr │
+│ Add-ons:     +25 000 kr │
+│ Rabatt:      -20 000 kr │
+│ ─────────────────────── │
+│ SUM eks MVA: 1000 000   │
+│ MVA (25%):   +250 000   │
+│ ═══════════════════════ │
+│ TOTALT:    1 250 000 kr │
+│                         │
+│ Fortjeneste: 125 000 kr │
+│ Margin:         12.5%   │
+└─────────────────────────┘
+Kontraktgenerering
+PDF Features
+
+Profesjonell mal med forhandler-branding
+QR-kode for digital signering
+Automatisk vedlegg-håndtering
+Arkiverbar PDF/A standard
+Separate kopier for kunde/forhandler
+
+Digital Signering
+
+BankID-integrasjon for norske kunder
+Touch-signature for tablet
+SMS-verifikasjon som fallback
+Tidsstempel og IP-logging
+
+Performance Metrics
+Mål for suksess:
+
+Kontraktutfylling < 3 minutter for erfarne brukere
+0% kalkulasjonsfeil
+< 200ms responstid på kalkulasjoner
+95% first-time-right rate
+Mobile-first responsive design
+
+Database Schema Optimalisering
+sql-- Forenklet struktur
+contracts (
+  id, contract_number, status, version,
+  customer_id, vehicle_id, salesperson_id,
+  pricing_json, metadata_json,
+  created_at, signed_at
+)
+
+-- Separer volatile data
+contract_calculations (
+  contract_id, calculation_type,
+  amount, valid_until
+)
+Integrasjoner
+
+Finn.no for bruktbilpriser
+Autosys for bildata
+Økonomisystem for fakturering
+CRM for kundedata
+
+Implementer med fokus på brukeropplevelse og effektivitet. Hver interaksjon skal føles naturlig og hver kalkulasjon skal være transparent og forståelig.
