@@ -368,13 +368,13 @@ export default function ContractWizard({
   };
 
   return (
-    <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="max-w-7xl h-[90vh] p-0 gap-0">
-        <div className="flex h-full">
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 gap-0 lg:max-w-6xl">
+        <div className="flex flex-col lg:flex-row h-full">
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col">
             {/* Header with Progress */}
-            <div className="p-6 border-b">
+            <div className="p-4 lg:p-6 border-b">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-2xl font-bold">
                   {isEditing ? "Rediger kontrakt" : "Opprett ny kontrakt"}
@@ -421,7 +421,7 @@ export default function ContractWizard({
                           <step.icon className="h-4 w-4" />
                         )}
                       </div>
-                      <span className="hidden sm:inline">{step.title}</span>
+                      <span className="hidden md:inline">{step.title}</span>
                     </button>
                   ))}
                 </div>
@@ -429,7 +429,7 @@ export default function ContractWizard({
             </div>
 
             {/* Form Content */}
-            <ScrollArea className="flex-1 p-6">
+            <ScrollArea className="flex-1 p-4 lg:p-6">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   {/* Step 1: Kjøretøy & Kunde */}
@@ -985,7 +985,7 @@ export default function ContractWizard({
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Status</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value || ""}>
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Velg status" />
@@ -1031,7 +1031,7 @@ export default function ContractWizard({
             </ScrollArea>
 
             {/* Footer with navigation */}
-            <div className="border-t p-6">
+            <div className="border-t p-4 lg:p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   {autoSaveStatus === "saving" && (
@@ -1100,7 +1100,7 @@ export default function ContractWizard({
           </div>
 
           {/* Right Sidebar - Price Summary */}
-          <div className="w-80 border-l bg-muted/30 p-6 overflow-y-auto">
+          <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l bg-muted/30 p-4 lg:p-6 overflow-y-auto shrink-0">
             <div className="sticky top-0">
               <h3 className="font-semibold text-lg mb-4">PRISSAMMENDRAG</h3>
               
