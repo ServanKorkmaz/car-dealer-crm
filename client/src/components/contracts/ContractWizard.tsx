@@ -24,7 +24,7 @@ import {
   Car as CarIcon, User, CreditCard, FileText, ChevronRight, ChevronLeft,
   Package, Shield, Wrench, Calendar, Clock, AlertCircle, CheckCircle2,
   Save, Send, Download, Eye, X, Plus, Minus, Info, TrendingUp, Calculator,
-  Banknote, Receipt, Phone, Mail, MapPin, Hash, DollarSign
+  Banknote, Receipt, Phone, Mail, MapPin, Hash, DollarSign, RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { z } from "zod";
@@ -463,12 +463,50 @@ export default function ContractWizard({
                                         {car.make} {car.model} ({car.year}) - {car.registrationNumber}
                                       </SelectItem>
                                     ))}
+                                    {availableCars.length === 0 && (
+                                      <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                                        Ingen tilgjengelige biler funnet
+                                      </div>
+                                    )}
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
+                          
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => {
+                                // Open car creation modal
+                                window.open("/cars", "_blank");
+                                toast({
+                                  title: "Opprett bil",
+                                  description: "Åpner bilregistrering i ny fane. Oppdater siden når bilen er opprettet.",
+                                });
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Opprett ny bil
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => {
+                                queryClient.invalidateQueries({ queryKey: ["/api/cars"] });
+                                toast({
+                                  title: "Oppdatert",
+                                  description: "Billisten er oppdatert",
+                                });
+                              }}
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
+                          </div>
                           
                           {selectedCar && (
                             <div className="rounded-lg bg-muted p-4 space-y-2">
@@ -515,12 +553,50 @@ export default function ContractWizard({
                                         {customer.name} - {customer.phone}
                                       </SelectItem>
                                     ))}
+                                    {customers.length === 0 && (
+                                      <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                                        Ingen kunder funnet
+                                      </div>
+                                    )}
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
+                          
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={() => {
+                                // Open customer creation modal
+                                window.open("/customers", "_blank");
+                                toast({
+                                  title: "Opprett kunde",
+                                  description: "Åpner kunderegistrering i ny fane. Oppdater siden når kunden er opprettet.",
+                                });
+                              }}
+                            >
+                              <Plus className="h-4 w-4 mr-2" />
+                              Opprett ny kunde
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => {
+                                queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+                                toast({
+                                  title: "Oppdatert",
+                                  description: "Kundelisten er oppdatert",
+                                });
+                              }}
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </Button>
+                          </div>
                           
                           {selectedCustomer && (
                             <div className="rounded-lg bg-muted p-4 space-y-2">
