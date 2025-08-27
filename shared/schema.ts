@@ -343,6 +343,7 @@ export const insertContractSchema = createInsertSchema(contracts).omit({
   createdAt: true,
   updatedAt: true,
   userId: true,
+  companyId: true,
   // Make optional fields truly optional
   pdfUrl: true,
   signingProvider: true,
