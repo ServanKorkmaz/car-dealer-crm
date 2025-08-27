@@ -1010,15 +1010,50 @@ export default function ContractWizard({
                           <CardTitle>Handlinger</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                          <Button type="button" className="w-full" variant="outline">
+                          <Button 
+                            type="button" 
+                            className="w-full" 
+                            variant="outline"
+                            onClick={() => {
+                              // TODO: Implement PDF preview
+                              toast({ title: "Forhåndsvis PDF", description: "Denne funksjonen kommer snart" });
+                            }}
+                          >
                             <Eye className="h-4 w-4 mr-2" />
                             Forhåndsvis PDF
                           </Button>
-                          <Button type="button" className="w-full" variant="outline">
+                          <Button 
+                            type="button" 
+                            className="w-full" 
+                            variant="outline"
+                            onClick={() => {
+                              // TODO: Implement contract download
+                              toast({ title: "Last ned kontrakt", description: "Denne funksjonen kommer snart" });
+                            }}
+                          >
                             <Download className="h-4 w-4 mr-2" />
                             Last ned kontrakt
                           </Button>
-                          <Button type="button" className="w-full" variant="outline">
+                          <Button 
+                            type="button" 
+                            className="w-full" 
+                            variant="outline"
+                            onClick={() => {
+                              if (!selectedCustomer?.email) {
+                                toast({ 
+                                  title: "Ingen e-post", 
+                                  description: "Kunde mangler e-postadresse for å kunne sende kontrakt",
+                                  variant: "destructive" 
+                                });
+                                return;
+                              }
+                              // TODO: Implement send to customer
+                              toast({ 
+                                title: "Send til kunde", 
+                                description: `Kontrakt vil bli sendt til ${selectedCustomer.email}` 
+                              });
+                            }}
+                          >
                             <Send className="h-4 w-4 mr-2" />
                             Send til kunde
                           </Button>
