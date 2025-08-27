@@ -1,0 +1,255 @@
+Context:
+You are building the Contracts (MVP) module for ForhandlerPRO, a multi-tenant DMS. Stack: React + TypeScript, Supabase (Postgres, Auth, Storage, RLS), and supabase-js. Keep it simple, clean, and production-lean.
+
+Goals (MVP)
+
+Create, edit, preview, and store car sale contracts (B2C default; B2B toggle).
+
+Fill contracts from existing data: vehicle, customer, dealer (tenant).
+
+Render contract from a Markdown template with {{variables}}.
+
+Save immutable snapshot (HTML + hash) and a PDF (basic, not PDF/A yet).
+
+Track status: DRAFT, SENT, SIGNED, DECLINED, EXPIRED.
+
+Prepare e-sign provider adapter (stubbed; webhook ready).
+
+MVP Scope (MoSCoW)
+
+MUST
+
+Multi-tenant data isolation via Supabase RLS (tenant_id from JWT).
+
+Tables: contract_templates, contracts, contract_events, contract_signatures.
+
+Minimal UI: /contracts (list), /contracts/new, /contracts/:id (view/preview).
+
+Template variables: seller.*, buyer.*, vehicle.*, price.*, delivery.*, sale.is_distance, sale.is_b2b.
+
+Markdown → HTML render on client; PDF export via jspdf (or similar) for MVP.
+
+File storage to Supabase Storage: store PDF and HTML snapshot; record SHA-256 hash in DB.
+
+Simple status machine with buttons: Save draft, Mark as Sent, Mark as Signed (manual for MVP).
+
+SHOULD
+
+Basic search/filter in /contracts.
+
+Import buyer/vehicle from existing tables (provide mock selectors if none exist).
+
+Toggle sections: Angrerett only if sale.is_distance = true; B2B clause if sale.is_b2b = true.
+
+Event log in contract_events for state changes and file uploads.
+
+WON’T (for this MVP)
+
+BankID or real e-sign integration (only adapter interface + fake webhook).
+
+PDF/A, long-term archival features.
+
+Advanced clause logic or AI suggestions.
+
+Data Model (SQL)
+
+Create SQL for Supabase (Postgres):
+
+-- Tenancy: every table has tenant_id uuid not null
+create table contract_templates (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null,
+  name text not null,
+  version int not null,
+  body_md text not null,
+  is_b2c_default boolean default true,
+  created_at timestamptz default now()
+);
+
+create unique index on contract_templates(tenant_id, name, version);
+
+create table contracts (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null,
+  template_id uuid references contract_templates(id),
+  data_jsonb jsonb not null, -- filled variables
+  status text not null check (status in ('DRAFT','SENT','SIGNED','DECLINED','EXPIRED')),
+  pdf_url text, -- Supabase Storage
+  html_url text,
+  pdf_sha256 text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table contract_events (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null,
+  contract_id uuid references contracts(id) on delete cascade,
+  type text not null, -- 'STATUS_CHANGE','FILE_UPLOADED','WEBHOOK'
+  payload_jsonb jsonb,
+  created_at timestamptz default now()
+);
+
+create table contract_signatures (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null,
+  contract_id uuid references contracts(id) on delete cascade,
+  party text not null check (party in ('SELLER','BUYER')),
+  provider text, -- e.g. 'signicat' | 'scrive' | 'visma-sign'
+  session_id text,
+  status text not null check (status in ('PENDING','SIGNED','DECLINED','EXPIRED')),
+  audit_trail_url text,
+  signed_at timestamptz
+);
+
+-- RLS (sketch): enable and restrict by tenant_id
+alter table contract_templates enable row level security;
+alter table contracts enable row level security;
+alter table contract_events enable row level security;
+alter table contract_signatures enable row level security;
+
+create policy "tenant read/write templates" on contract_templates
+  for all using (tenant_id = auth.uid()) with check (tenant_id = auth.uid());
+
+create policy "tenant read/write contracts" on contracts
+  for all using (tenant_id = auth.uid()) with check (tenant_id = auth.uid());
+
+create policy "tenant read/write events" on contract_events
+  for all using (tenant_id = auth.uid()) with check (tenant_id = auth.uid());
+
+create policy "tenant read/write signatures" on contract_signatures
+  for all using (tenant_id = auth.uid()) with check (tenant_id = auth.uid());
+
+
+Replace auth.uid() with how your JWT encodes tenant_id (e.g., auth.jwt() ->> 'tenant_id'). Implement correctly in policies.
+
+Template (Markdown) — seed one record
+
+Seed a single B2C used car template with variables and conditional blocks:
+
+# Kjøpekontrakt – Bruktbil (Forhandler → Forbruker)
+Selger: **{{seller.company_name}}** (org.nr {{seller.orgno}})
+Kjøper: **{{buyer.name}}**, {{buyer.address}}
+
+Kjøretøy: **{{vehicle.make}} {{vehicle.model}}**, Årsmodell {{vehicle.year}}, Reg.nr {{vehicle.plate}}, VIN {{vehicle.vin}}, Km {{vehicle.mileage}}.
+
+Totalpris (inkl. mva): **{{price.total}}** NOK. Depositum {{price.deposit}} NOK. Restbeløp {{price.balance}} NOK.
+
+Overtakelse: {{delivery.date}} kl {{delivery.time}} på {{delivery.place}}. Risiko går over ved overtakelse.
+
+{{#if sale.is_distance}}
+**Angrerett:** 14 dager etter Angrerettloven. Angreskjema vedlagt.
+{{/if}}
+
+{{#if sale.is_b2b}}
+**B2B:** Kjøpsloven gjelder. Tilpassede ansvarsbegrensninger kan avtales.
+{{/if}}
+
+Signering: Elektronisk signatur planlagt via BankID (MVP: manuell status).
+
+Frontend (React + TS)
+
+Route /contracts (list with search & status filter).
+
+Route /contracts/new
+
+Stepper: Select Template → Fill Data → Preview → Save Draft → Export PDF.
+
+Form sections: Seller (prefill from tenant profile), Buyer, Vehicle, Price, Delivery, Toggles (Distance sale, B2B).
+
+“Preview” renders Markdown → HTML.
+
+Route /contracts/:id
+
+Show preview, metadata, status, files (HTML/PDF), and event log.
+
+Buttons: “Mark as Sent”, “Mark as Signed”, “Mark as Declined”.
+
+Services & Utils
+
+renderTemplate(bodyMd, data) → HTML (Handlebars / mustache-style lib).
+
+exportPdf(html) → Blob (use jspdf or html2canvas + jspdf).
+
+sha256(fileBlob) → hex string.
+
+storage.upload(path, file) → returns public (or signed) URL.
+
+events.log(contractId, type, payload).
+
+E-sign Adapter (stub)
+
+Create interface and a fake provider for now:
+
+export interface ESignProvider {
+  createSigningSession(contractId: string, party: 'BUYER'|'SELLER'): Promise<{sessionId: string, redirectUrl: string}>;
+  parseWebhook(body: unknown, headers: Record<string,string>): {contractId: string, status: 'SIGNED'|'DECLINED'|'EXPIRED', auditUrl?: string};
+}
+
+
+Implement FakeProvider that simulates webhook updates.
+
+Add a small Express-ish handler (or Next API route) for /api/esign/webhook to update contract_signatures + contracts.status and store event.
+
+Component Quality
+
+Type-safe forms with Zod or React Hook Form + Zod.
+
+Minimal Tailwind styling, clean layout (no design system required).
+
+Error states, loading states, and toasts for success.
+
+Definition of Done (DoD)
+
+I can create a contract from a seeded template, fill a form, preview, save, export to PDF, and see it listed in /contracts.
+
+DB rows are created with tenant_id set; RLS prevents cross-tenant access.
+
+File uploads (HTML/PDF) stored; SHA-256 computed and saved.
+
+Status updates and event log work; fake e-sign webhook flips status → SIGNED.
+
+All code is TypeScript and compiles without errors.
+
+Add minimal unit tests for renderTemplate, sha256, and status reducer.
+
+Acceptance Criteria (Concrete)
+
+ Creating a contract inserts exactly one row into contracts with status='DRAFT'.
+
+ Clicking “Export PDF” generates a non-empty PDF, uploads it, and sets pdf_url + pdf_sha256.
+
+ Toggling sale.is_distance adds/removes Angrerett section in preview.
+
+ GET /contracts (RPC or client query) filters by status.
+
+ Webhook call to /api/esign/webhook updates contract_signatures.status='SIGNED' and contracts.status='SIGNED'.
+
+ RLS blocks reading a contract with a different tenant_id (verify with a second test user).
+
+Project Structure (suggested)
+/src
+  /components/contracts
+  /pages/contracts
+  /lib/supabase.ts
+  /lib/contracts/render.ts
+  /lib/contracts/pdf.ts
+  /lib/crypto/sha256.ts
+  /lib/esign/index.ts
+  /server/api/esign/webhook.ts   (or Next API route)
+
+Deliverables
+
+SQL migrations for tables + RLS policies.
+
+Seed script for one B2C Markdown template.
+
+React pages and components as specified.
+
+Utility functions (render, pdf, sha256, storage).
+
+Fake e-sign adapter + webhook route.
+
+README section: how to run, env vars, and how to test webhook locally.
+
+Now generate the code, step by step, scaffolding any missing pieces and adding brief inline comments.
