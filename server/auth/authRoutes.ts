@@ -332,7 +332,8 @@ export function setupAuthRoutes(app: Express) {
   app.get('/api/auth/user', authenticateToken, async (req: Request & { user?: any }, res: Response) => {
     try {
       const storage = await storagePromise;
-      const user = await storage.getUser(req.user.userId);
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
       
       if (!user) {
         return res.status(404).json({ message: 'Bruker ikke funnet' });
