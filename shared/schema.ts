@@ -504,3 +504,35 @@ export const insertFollowupSchema = createInsertSchema(followups).omit({
 });
 export type InsertFollowup = z.infer<typeof insertFollowupSchema>;
 export type Followup = typeof followups.$inferSelect;
+
+// Authentication tables
+export const refreshTokens = pgTable('refresh_tokens', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  token: text('token').notNull().unique(),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  tokenFamily: text('token_family').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  revoked: boolean('revoked').default(false),
+  revokedAt: timestamp('revoked_at'),
+});
+
+export const loginAudits = pgTable('login_audits', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  userId: text('user_id').notNull(),
+  timestamp: timestamp('timestamp').notNull(),
+  ipAddress: text('ip_address').notNull(),
+  userAgent: text('user_agent').notNull(),
+  success: boolean('success').notNull(),
+  failureReason: text('failure_reason'),
+});
+
+export const passwordResetTokens = pgTable('password_reset_tokens', {
+  id: varchar('id').primaryKey().default(sql`gen_random_uuid()`),
+  token: text('token').notNull().unique(),
+  userId: varchar('user_id').notNull().references(() => users.id),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  used: boolean('used').default(false),
+  usedAt: timestamp('used_at'),
+});

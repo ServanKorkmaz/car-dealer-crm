@@ -1,28 +1,10 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { MOCK_USERS, MOCK_COMPANIES, getUserPermissions } from '@/lib/auth';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  companyId?: string | null;
-}
-
-interface Company {
-  id: string;
-  name: string;
-  subscriptionPlan: string;
-  subscriptionStatus: string;
-  maxUsers: number;
-  maxCars: number;
-  monthlyRevenue: number;
-  createdAt: Date;
-}
+import { login, logout, getCurrentUser, type AuthUser, type AuthCompany } from '@/lib/authApi';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
-  user: User | null;
-  company: Company | null;
+  user: AuthUser | null;
+  company: AuthCompany | null;
   isLoading: boolean;
   signIn: (email: string, password: string, remember?: boolean) => Promise<boolean>;
   signOut: () => Promise<void>;
@@ -33,9 +15,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [company, setCompany] = useState<Company | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [company, setCompany] = useState<AuthCompany | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     checkAuth();
@@ -43,15 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      // Check if user is stored in localStorage or sessionStorage
-      const storedAuth = localStorage.getItem('forhandler_auth') || sessionStorage.getItem('forhandler_auth');
-      if (storedAuth) {
-        const { user: storedUser, company: storedCompany } = JSON.parse(storedAuth);
-        setUser(storedUser);
-        setCompany(storedCompany);
-      }
+      const response = await getCurrentUser();
+      setUser(response.user);
+      setCompany(response.company || null);
     } catch (error) {
-      console.error('Auth check error:', error);
+      // User not authenticated, this is normal
       setUser(null);
       setCompany(null);
     } finally {
@@ -61,61 +40,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string, remember?: boolean): Promise<boolean> => {
     try {
-      // Mock authentication
-      const foundUser = MOCK_USERS.find(u => u.email === email && u.password === password);
-      if (foundUser) {
-        const foundCompany = foundUser.companyId ? 
-          MOCK_COMPANIES.find(c => c.id === foundUser.companyId) : null;
-        
-        const authUser = {
-          id: foundUser.id,
-          email: foundUser.email,
-          name: foundUser.name,
-          role: foundUser.role,
-          companyId: foundUser.companyId
-        };
-        
-        setUser(authUser);
-        setCompany(foundCompany || null);
-        
-        // Store in localStorage if remember is true
-        if (remember) {
-          localStorage.setItem('forhandler_auth', JSON.stringify({ 
-            user: authUser, 
-            company: foundCompany 
-          }));
-        } else {
-          sessionStorage.setItem('forhandler_auth', JSON.stringify({ 
-            user: authUser, 
-            company: foundCompany 
-          }));
-        }
-        
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Sign in error:', error);
+      const response = await login({ email, password, remember });
+      setUser(response.user);
+      setCompany(response.company || null);
+      return true;
+    } catch (error: any) {
+      toast({
+        title: 'Innlogging feilet',
+        description: error.message || 'Kunne ikke logge inn. Sjekk e-post og passord.',
+        variant: 'destructive',
+      });
       return false;
     }
   };
 
   const signOut = async () => {
     try {
+      await logout();
       setUser(null);
       setCompany(null);
-      localStorage.removeItem('forhandler_auth');
-      sessionStorage.removeItem('forhandler_auth');
       window.location.href = '/login';
-    } catch (error) {
-      console.error('Sign out error:', error);
+    } catch (error: any) {
+      toast({
+        title: 'Utlogging feilet',
+        description: error.message || 'En feil oppstod under utlogging.',
+        variant: 'destructive',
+      });
     }
   };
 
   const hasPermission = (feature: string): boolean => {
     if (!user || !company) return false;
-    const permissions = getUserPermissions(user.role, company.subscriptionPlan);
-    return permissions[feature as keyof typeof permissions] || false;
+    
+    // Simple permission check based on role and subscription plan
+    const permissions: Record<string, boolean> = {
+      canCreateCars: true,
+      canEditCars: true,
+      canDeleteCars: user.role === 'admin' || user.role === 'org_admin',
+      canCreateCustomers: true,
+      canEditCustomers: true,
+      canDeleteCustomers: user.role === 'admin' || user.role === 'org_admin',
+      canCreateContracts: true,
+      canEditContracts: true,
+      canDeleteContracts: user.role === 'admin' || user.role === 'org_admin',
+      canViewAnalytics: company.subscriptionPlan !== 'light',
+      canManageUsers: user.role === 'admin' || user.role === 'org_admin',
+      canManageSubscription: user.role === 'admin' || user.role === 'org_admin',
+      canViewAllData: user.role === 'admin' || user.role === 'org_admin',
+    };
+
+    return permissions[feature] || false;
   };
 
   const value = {

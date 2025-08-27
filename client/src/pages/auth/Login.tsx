@@ -60,28 +60,12 @@ export default function Login() {
     }
   };
 
-  // Quick login helpers for demo
-  const quickLogin = async (email: string, password: string) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const success = await signIn(email, password, true);
-      if (success) {
-        toast({
-          title: 'Velkommen tilbake!',
-          description: 'Du er nå logget inn.',
-        });
-        setLocation('/');
-      } else {
-        setError('Ugyldig e-post eller passord');
-      }
-    } catch (error: any) {
-      console.error('Quick login error:', error);
-      setError('En feil oppstod. Vennligst prøv igjen.');
-    } finally {
-      setIsLoading(false);
-    }
+  // Quick login helpers for demo - set form values and submit
+  const quickLogin = (email: string, password: string) => {
+    form.setValue('email', email);
+    form.setValue('password', password);
+    form.setValue('remember', true);
+    form.handleSubmit(onSubmit)();
   };
 
   return (

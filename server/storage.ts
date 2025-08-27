@@ -1,5 +1,7 @@
 import {
   users,
+  companies,
+  memberships,
   cars,
   customers,
   contracts,
@@ -8,6 +10,9 @@ import {
   userSavedViews,
   profiles,
   followups,
+  refreshTokens,
+  loginAudits,
+  passwordResetTokens,
   type User,
   type UpsertUser,
   type Car,
@@ -26,13 +31,13 @@ import {
   type InsertMarketComp,
   type PricingRules,
   type InsertPricingRules,
-
   type Followup,
   type InsertFollowup
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, or } from "drizzle-orm";
 import crypto from "crypto";
+import * as schema from "@shared/schema";
 
 // Interface for storage operations - simplified single-tenant
 export interface IStorage {
@@ -133,6 +138,8 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // Expose schema for auth methods
+  schema = schema;
   // User operations (mandatory for Replit Auth)
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -596,6 +603,120 @@ export class DatabaseStorage implements IStorage {
     const results = await db.select().from(users)
       .orderBy(desc(users.createdAt));
     return results;
+  }
+
+  // Authentication methods
+  async getUserByEmail(email: string) {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0] || null;
+  }
+
+  async createUser(data: {
+    email: string;
+    passwordHash: string;
+    firstName?: string;
+    lastName?: string;
+    companyId?: string | null;
+  }) {
+    const result = await db.insert(users).values({
+      email: data.email,
+      passwordHash: data.passwordHash,
+      firstName: data.firstName || null,
+      lastName: data.lastName || null,
+      role: 'user'
+    }).returning();
+    return result[0];
+  }
+
+  async updateUserPassword(userId: string, passwordHash: string) {
+    await db.update(users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+
+  async createCompany(data: {
+    name: string;
+    orgNumber?: string | null;
+    subscriptionPlan: string;
+    subscriptionStatus: string;
+    maxUsers: number;
+    maxCars: number;
+  }) {
+    const result = await db.insert(companies).values(data).returning();
+    return result[0];
+  }
+
+  async getCompany(id: string) {
+    const result = await db.select().from(companies).where(eq(companies.id, id)).limit(1);
+    return result[0] || null;
+  }
+
+  async createMembership(data: {
+    userId: string;
+    companyId: string;
+    role: string;
+    joinedAt: Date;
+  }) {
+    const result = await db.insert(memberships).values(data).returning();
+    return result[0];
+  }
+
+  async getUserMembership(userId: string, companyId: string) {
+    const result = await db.select().from(memberships)
+      .where(and(
+        eq(memberships.userId, userId),
+        eq(memberships.companyId, companyId)
+      ))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  // Refresh token methods
+  async storeRefreshToken(data: {
+    token: string;
+    userId: string;
+    tokenFamily: string;
+    expiresAt: Date;
+    createdAt: Date;
+  }) {
+    const result = await db.insert(refreshTokens).values(data).returning();
+    return result[0];
+  }
+
+  async getRefreshToken(token: string) {
+    const result = await db.select().from(refreshTokens)
+      .where(eq(refreshTokens.token, token))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  async revokeRefreshToken(token: string) {
+    await db.update(refreshTokens)
+      .set({ revoked: true, revokedAt: new Date() })
+      .where(eq(refreshTokens.token, token));
+  }
+
+  // Password reset token methods
+  async storePasswordResetToken(data: {
+    token: string;
+    userId: string;
+    expiresAt: Date;
+  }) {
+    const result = await db.insert(passwordResetTokens).values(data).returning();
+    return result[0];
+  }
+
+  async getPasswordResetToken(token: string) {
+    const result = await db.select().from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token))
+      .limit(1);
+    return result[0] || null;
+  }
+
+  async markPasswordResetTokenUsed(token: string) {
+    await db.update(passwordResetTokens)
+      .set({ used: true, usedAt: new Date() })
+      .where(eq(passwordResetTokens.token, token));
   }
 }
 

@@ -1,8 +1,29 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { setupAuthRoutes } from "./auth/authRoutes";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
 
 const app = express();
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "wss:", "ws:"],
+      fontSrc: ["'self'", "data:"],
+    },
+  },
+}));
+
+// Parse cookies
+app.use(cookieParser());
+
 // Increase payload size limit for image uploads (50MB)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
@@ -38,6 +59,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Setup authentication routes first
+  setupAuthRoutes(app);
+  
+  // Then register application routes
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

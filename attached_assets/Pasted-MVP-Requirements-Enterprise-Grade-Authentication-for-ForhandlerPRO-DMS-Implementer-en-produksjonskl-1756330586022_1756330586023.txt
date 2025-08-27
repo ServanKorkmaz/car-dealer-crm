@@ -1,0 +1,65 @@
+MVP Requirements: Enterprise-Grade Authentication for ForhandlerPRO DMS
+Implementer en produksjonsklar innloggingsløsning som følger industry best practices for et Dealer Management System. Løsningen skal prioritere sikkerhet, brukeropplevelse og skalerbarhet.
+Kjernefunksjonalitet
+Backend Authentication (Prioritet 1)
+
+Flytt all autentiseringslogikk til backend med sikker API
+Implementer JWT-basert authentication med refresh tokens
+Passord hashing med bcrypt (minimum 10 rounds)
+Rate limiting på login-forsøk (max 5 forsøk per 15 min)
+Session management med automatisk timeout (30 min inaktivitet)
+
+Sikkerhetstiltak
+
+HTTPS-only cookies for token storage
+CSRF protection
+Input sanitization og validering
+SQL injection prevention
+XSS protection headers
+Implementer Content Security Policy (CSP)
+
+Brukeropplevelse
+
+Remember me-funksjonalitet (optional persistent session)
+Forgot password flow med email-verifikasjon
+Clear error messages (uten å avsløre sikkerhetsinformasjon)
+Loading states og disabled form under submission
+Auto-redirect etter vellykket innlogging
+
+Form Validering
+
+Email format validering
+Passord minimum requirements (8+ tegn, inkl. tall og bokstaver)
+Real-time validering med debouncing
+Tydelige feilmeldinger på norsk
+
+Database & API
+
+Bruker-tabell med encrypted sensitive data
+Login audit trail (tidspunkt, IP, device info)
+RESTful API endpoints: POST /api/auth/login, POST /api/auth/logout, POST /api/auth/refresh
+Proper HTTP status codes (401, 403, 429, etc.)
+
+Frontend Requirements
+
+Responsive design som fungerer på alle devices
+Accessibility compliance (WCAG 2.1 AA)
+Browser kompatibilitet (Chrome, Firefox, Safari, Edge)
+Graceful degradation ved JavaScript-feil
+
+Success Criteria
+
+Ingen passord eller sensitive data i frontend-kode
+Alle API-kall er authenticated
+Session vedlikeholdes trygt på tvers av page refreshes
+Brukere kan ikke aksessere beskyttede ruter uten gyldig session
+Systemet logger sikkerhetshendelser for audit
+
+Tech Stack Anbefalinger
+
+Node.js/Express eller .NET Core for backend
+PostgreSQL eller MySQL for database
+Redis for session storage (optional men anbefalt)
+React/Next.js for frontend (hvis ikke allerede valgt)
+
+Implementer denne løsningen med fokus på produksjonskvalitet, selv i MVP. Sikkerhet skal aldri kompromitteres for hastighet.
