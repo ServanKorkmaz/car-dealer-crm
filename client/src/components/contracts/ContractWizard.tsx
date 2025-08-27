@@ -142,10 +142,10 @@ export default function ContractWizard({
     enabled: open,
   });
 
-  const availableCars = useMemo(() => 
-    cars.filter((car: Car) => car.status === "available" || car.id === contract?.carId),
-    [cars, contract]
-  );
+  const availableCars = useMemo(() => {
+    // Show all cars for now, filter by status later if needed
+    return cars;
+  }, [cars]);
 
   // Form setup with defaults
   const form = useForm<WizardFormData>({
