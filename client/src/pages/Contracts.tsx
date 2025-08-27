@@ -94,9 +94,21 @@ export default function Contracts() {
     const params = new URLSearchParams(window.location.search);
     const customerId = params.get('customerId');
     const carId = params.get('carId');
+    const prefillCar = params.get('prefillCar');
+    const openGenerator = params.get('generator') === 'open';
     const shouldPrefill = params.get('prefill') === 'true';
     
-    if (shouldPrefill && customerId && carId) {
+    // Open generator directly with car pre-filled
+    if (openGenerator && prefillCar) {
+      setPrefilledData({ carId: prefillCar });
+      setShowGenerator(true);
+      
+      const url = new URL(window.location.href);
+      url.search = '';
+      window.history.replaceState({}, '', url.toString());
+    }
+    // Legacy prefill support
+    else if (shouldPrefill && customerId && carId) {
       setPrefilledData({ customerId, carId });
       setShowGenerator(true);
       

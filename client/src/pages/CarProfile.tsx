@@ -738,7 +738,7 @@ export default function CarProfile() {
                     variant="outline"
                     onClick={() => {
                       if (currentCar?.registrationNumber) {
-                        window.location.href = `/contracts?prefill=car&carId=${currentCar.id}&carReg=${currentCar.registrationNumber}`;
+                        setLocation(`/contracts?generator=open&prefillCar=${currentCar.id}`);
                       }
                     }}
                   >
