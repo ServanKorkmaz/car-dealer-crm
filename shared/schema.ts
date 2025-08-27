@@ -310,6 +310,7 @@ export const insertCarSchema = createInsertSchema(cars).omit({
   updatedAt: true,
   userId: true,
   profitMargin: true,
+  companyId: true,
 }).extend({
   // Allow more flexible data types for imports and updates
   power: z.union([z.string(), z.number()]).transform(val => val?.toString() || ""),
