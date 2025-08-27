@@ -14,7 +14,7 @@ const BCRYPT_ROUNDS = 10;
 // Validation schemas
 export const loginSchema = z.object({
   email: z.string().email('Ugyldig e-postformat'),
-  password: z.string().min(8, 'Passord må være minst 8 tegn'),
+  password: z.string().min(1, 'Passord er påkrevd'),
   remember: z.boolean().optional().default(false)
 });
 
