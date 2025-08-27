@@ -48,7 +48,11 @@ export default function Login() {
           title: 'Velkommen tilbake!',
           description: 'Du er nå logget inn.',
         });
-        setLocation('/');
+        // Force a short delay to ensure auth state is updated
+        setTimeout(() => {
+          setLocation('/');
+          window.location.reload(); // Ensure auth state is properly loaded
+        }, 500);
       } else {
         setError('Ugyldig e-post eller passord');
       }
