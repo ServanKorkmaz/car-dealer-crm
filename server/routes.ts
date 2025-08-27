@@ -27,8 +27,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await setupAuth(app);
   }
 
+  // Import new auth middleware
+  const { authenticateToken } = await import('./auth/authService');
+  
   // Choose the right auth middleware
-  const authMiddleware = process.env.NODE_ENV === "development" ? isSimpleAuthenticated : isAuthenticated;
+  const authMiddleware = authenticateToken;
 
   // Role-based endpoints
   app.get('/api/user/role', authMiddleware, async (req: any, res) => {
