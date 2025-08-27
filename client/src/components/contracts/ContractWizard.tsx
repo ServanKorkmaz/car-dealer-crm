@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -369,16 +369,16 @@ export default function ContractWizard({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[98vw] max-h-[95vh] p-0 gap-0 lg:max-w-6xl xl:max-w-7xl">
+      <DialogContent className="max-w-[98vw] h-[95vh] p-0 gap-0 lg:max-w-6xl xl:max-w-7xl">
         <div className="flex flex-col lg:flex-row h-full min-h-0">
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {/* Header with Progress */}
             <div className="p-4 lg:p-6 border-b">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold">
+                <DialogTitle className="text-2xl font-bold">
                   {isEditing ? "Rediger kontrakt" : "Opprett ny kontrakt"}
-                </h2>
+                </DialogTitle>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -429,7 +429,7 @@ export default function ContractWizard({
             </div>
 
             {/* Form Content */}
-            <ScrollArea className="flex-1 p-4 lg:p-6">
+            <div className="flex-1 overflow-y-auto p-4 lg:p-6">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   {/* Step 1: Kjøretøy & Kunde */}
@@ -455,7 +455,7 @@ export default function ContractWizard({
                                       <SelectValue placeholder="Velg kjøretøy..." />
                                     </SelectTrigger>
                                   </FormControl>
-                                  <SelectContent>
+                                  <SelectContent className="max-h-60 overflow-y-auto">
                                     {availableCars.map((car) => (
                                       <SelectItem key={car.id} value={car.id}>
                                         {car.make} {car.model} ({car.year}) - {car.registrationNumber}
@@ -507,7 +507,7 @@ export default function ContractWizard({
                                       <SelectValue placeholder="Søk og velg kunde..." />
                                     </SelectTrigger>
                                   </FormControl>
-                                  <SelectContent>
+                                  <SelectContent className="max-h-60 overflow-y-auto">
                                     {customers.map((customer) => (
                                       <SelectItem key={customer.id} value={customer.id}>
                                         {customer.name} - {customer.phone}
@@ -621,7 +621,7 @@ export default function ContractWizard({
                                       <SelectValue placeholder="Velg status" />
                                     </SelectTrigger>
                                   </FormControl>
-                                  <SelectContent>
+                                  <SelectContent className="max-h-60 overflow-y-auto">
                                     <SelectItem value="cash">Kontant</SelectItem>
                                     <SelectItem value="loan">Billån</SelectItem>
                                     <SelectItem value="lease">Leasing</SelectItem>
@@ -991,7 +991,7 @@ export default function ContractWizard({
                                       <SelectValue placeholder="Velg status" />
                                     </SelectTrigger>
                                   </FormControl>
-                                  <SelectContent>
+                                  <SelectContent className="max-h-60 overflow-y-auto">
                                     <SelectItem value="draft">Utkast</SelectItem>
                                     <SelectItem value="pending">Venter</SelectItem>
                                     <SelectItem value="signed">Signert</SelectItem>
@@ -1028,7 +1028,7 @@ export default function ContractWizard({
                   )}
                 </form>
               </Form>
-            </ScrollArea>
+            </div>
 
             {/* Footer with navigation */}
             <div className="border-t p-4 lg:p-6">
