@@ -733,7 +733,15 @@ export default function CarProfile() {
                     <Eye className="h-4 w-4 mr-2" />
                     Forhåndsvis annonse
                   </Button>
-                  <Button className="w-full" variant="outline">
+                  <Button 
+                    className="w-full" 
+                    variant="outline"
+                    onClick={() => {
+                      if (currentCar?.registrationNumber) {
+                        window.location.href = `/contracts?prefill=car&carId=${currentCar.id}&carReg=${currentCar.registrationNumber}`;
+                      }
+                    }}
+                  >
                     <DollarSign className="h-4 w-4 mr-2" />
                     Opprett kontrakt
                   </Button>
