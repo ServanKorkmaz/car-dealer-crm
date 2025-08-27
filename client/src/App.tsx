@@ -140,10 +140,10 @@ function Router() {
 
 // Wrapper component to provide auth context to AssistantBubble
 function AssistantBubbleWrapper() {
-  const { user, currentOrg, userRole } = useAuth();
+  const { user, company } = useAuth();
   
-  // Only show assistant if user is authenticated and has an org
-  if (!user || !currentOrg) {
+  // Only show assistant if user is authenticated and has a company
+  if (!user || !company) {
     return null;
   }
   
@@ -152,6 +152,7 @@ function AssistantBubbleWrapper() {
     if (!role) return "SELGER";
     switch (role.toLowerCase()) {
       case "owner":
+      case "admin":
       case "eier":
         return "EIER";
       case "accountant":
@@ -167,8 +168,8 @@ function AssistantBubbleWrapper() {
   
   return (
     <AssistantBubble 
-      userRole={mapRole(userRole)} 
-      activeCompanyId={currentOrg.id} 
+      userRole={mapRole(user.role)} 
+      activeCompanyId={company.id} 
       userId={user.id} 
     />
   );

@@ -1,0 +1,224 @@
+Build a complete authentication system with login page and subscription management for ForhandlerPRO
+Create a full authentication flow with login/register pages, plus subscription management system with user upgrades and admin panel.
+Tech Stack:
+
+React + TypeScript
+TailwindCSS + shadcn/ui components
+React Router for navigation
+Context API for authentication state
+Local storage for session persistence
+
+Authentication System:
+Mock User Database:
+typescriptconst MOCK_USERS = [
+  // Super Admin
+  {
+    id: "admin_1",
+    email: "admin@forhandlerpro.no",
+    password: "ForhandlerPRO2025!",
+    role: "super_admin",
+    name: "System Administrator"
+  },
+  
+  // Test Organizations
+  {
+    id: "user_1", 
+    email: "ole@hansenbil.no",
+    password: "test123",
+    role: "org_admin",
+    name: "Ole Hansen",
+    organizationId: "org_hansen_bil"
+  },
+  {
+    id: "user_2",
+    email: "kari@svendsen-auto.no", 
+    password: "test123",
+    role: "org_admin",
+    name: "Kari Svendsen",
+    organizationId: "org_svendsen_auto"
+  }
+];
+
+const MOCK_ORGANIZATIONS = [
+  {
+    id: "org_hansen_bil",
+    name: "Hansen Bil AS",
+    subscriptionPlan: "light",
+    subscriptionStatus: "active",
+    totalUsers: 1,
+    totalCars: 8,
+    monthlyRevenue: 1990,
+    createdAt: new Date("2025-01-15")
+  },
+  {
+    id: "org_svendsen_auto", 
+    name: "Svendsen Auto AS",
+    subscriptionPlan: "pro",
+    subscriptionStatus: "active", 
+    totalUsers: 3,
+    totalCars: 24,
+    monthlyRevenue: 3990,
+    createdAt: new Date("2024-11-20")
+  }
+];
+Pages to Build:
+
+Login Page (/login):
+
+jsx- Clean, professional design with ForhandlerPRO branding
+- Email/password form with validation
+- "Husk meg" checkbox
+- "Glemt passord?" link
+- "Opprett konto" link to register
+- Loading spinner during authentication
+- Error messages for invalid credentials
+- Demo credentials shown for testing
+
+Register Page (/register):
+
+jsx- Organization setup form:
+  - Bedriftsnavn (Company name)
+  - Kontaktperson (Contact person)  
+  - E-post (Email)
+  - Telefon (Phone)
+  - Passord + Bekreft passord
+- Plan selection (Light/Pro/Enterprise)
+- Terms and conditions checkbox
+- "Opprett konto og start prøveperiod" button
+
+Dashboard (Protected Route):
+
+jsx- Different views based on user role:
+  - super_admin: Admin dashboard with all organizations
+  - org_admin: Organization dashboard with cars/customers
+  - user: Limited access based on organization plan
+Authentication Context:
+typescriptinterface AuthContextType {
+  user: User | null;
+  organization: Organization | null;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  hasPermission: (feature: string) => boolean;
+}
+Protected Route Component:
+jsxconst ProtectedRoute = ({ children, requiredRole = null }) => {
+  const { isAuthenticated, user, isLoading } = useAuth();
+  
+  if (isLoading) return <LoadingSpinner />;
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (requiredRole && user.role !== requiredRole) {
+    return <Navigate to="/dashboard" />;
+  }
+  
+  return children;
+};
+Subscription Plans (Same as before):
+typescriptconst SUBSCRIPTION_PLANS = {
+  light: {
+    name: "ForhandlerPRO Light",
+    price: 1990,
+    priceLabel: "1 990 kr/mnd",
+    features: [
+      "Opptil 20 biler",
+      "Grunnleggende CRM",
+      "1 bruker",
+      "Epost support"
+    ]
+  },
+  // ... pro and enterprise
+};
+Router Setup:
+jsx// App routing structure
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Navigate to="/login" />
+  },
+  {
+    path: "/login", 
+    element: <LoginPage />
+  },
+  {
+    path: "/register",
+    element: <RegisterPage />
+  },
+  {
+    path: "/dashboard",
+    element: (
+      <ProtectedRoute>
+        <DashboardLayout />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: "/admin",
+    element: (
+      <ProtectedRoute requiredRole="super_admin">
+        <AdminDashboard />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: "/pricing",
+    element: (
+      <ProtectedRoute>
+        <PricingPage />
+      </ProtectedRoute>
+    )
+  }
+]);
+Login Page Design Requirements:
+jsx- Left side: Login form with ForhandlerPRO logo
+- Right side: Feature highlights or testimonials
+- Dark theme consistent with main app
+- Professional typography and spacing
+- Responsive design (mobile-friendly)
+- Demo credentials box for testing:
+  "Test innlogging:"
+  "Admin: admin@forhandlerpro.no / ForhandlerPRO2025!"
+  "Bruker: ole@hansenbil.no / test123"
+Admin Dashboard Features:
+jsx- Organization overview table with:
+  - Company name, plan, status, users, cars, revenue
+  - Quick actions: Upgrade, suspend, view details
+- Revenue analytics with charts
+- Plan distribution (pie chart)  
+- Recent signups and activities
+- Bulk operations for multiple organizations
+Session Management:
+jsx- Store JWT-like token in localStorage
+- Auto-logout after inactivity
+- Remember login preference
+- Secure session validation
+- Handle expired sessions gracefully
+Norwegian Labels:
+jsx- "Logg inn" (Login)
+- "Opprett konto" (Create account)
+- "Glemt passord?" (Forgot password?)
+- "Husk meg" (Remember me)
+- "E-post" (Email)
+- "Passord" (Password)
+- "Bedriftsnavn" (Company name)
+- "Kontaktperson" (Contact person)
+- "Logg ut" (Logout)
+- "Min konto" (My account)
+Demo Credentials for Testing:
+
+Admin: admin@forhandlerpro.no / ForhandlerPRO2025!
+Bruker 1: ole@hansenbil.no / test123
+Bruker 2: kari@svendsen-auto.no / test123
+
+Components to Build:
+
+LoginPage - Main login interface
+RegisterPage - Account creation
+AuthContext - Authentication state management
+ProtectedRoute - Route protection
+DashboardLayout - Main app layout with nav
+AdminDashboard - Super admin interface
+PricingPage - Subscription plans
+UpgradeModal - Plan upgrade flow
+
+Build this as a complete authentication system that seamlessly integrates with the subscription management functionality. Users should be able to log in, see their current plan, upgrade if needed, and admins should have full control over all organizations.
