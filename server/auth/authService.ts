@@ -112,8 +112,11 @@ export async function logLoginAttempt(audit: LoginAudit): Promise<void> {
   try {
     const storage = await storagePromise;
     // Store login audit in database
-    await storage.db
-      .insert(storage.schema.loginAudits)
+    const { loginAudits } = await import('@shared/schema');
+    const { db } = await import('../db');
+    
+    await db
+      .insert(loginAudits)
       .values({
         userId: audit.userId,
         timestamp: audit.timestamp,
