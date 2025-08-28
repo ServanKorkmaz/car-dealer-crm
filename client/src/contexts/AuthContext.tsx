@@ -7,6 +7,7 @@ interface AuthContextType {
   company: AuthCompany | null;
   isLoading: boolean;
   signIn: (email: string, password: string, remember?: boolean) => Promise<boolean>;
+  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   hasPermission: (feature: string) => boolean;
@@ -54,6 +55,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const signUp = async (email: string, password: string): Promise<void> => {
+    try {
+      // Import Supabase client for signup
+      const { supabase } = await import('@/lib/supabase');
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // For development with mock auth, the user will be automatically set
+      if (data?.user) {
+        console.log('User registered successfully:', data.user.email);
+      }
+    } catch (error: any) {
+      throw new Error(error.message || 'Kunne ikke opprette konto');
+    }
+  };
+
   const signOut = async () => {
     try {
       await logout();
@@ -97,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     company,
     isLoading,
     signIn,
+    signUp,
     signOut,
     isAuthenticated: !!user,
     hasPermission,
