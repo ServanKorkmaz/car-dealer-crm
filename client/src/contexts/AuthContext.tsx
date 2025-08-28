@@ -57,22 +57,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string): Promise<void> => {
     try {
-      // Import Supabase client for signup
-      const { supabase } = await import('@/lib/supabase');
+      // Use internal register API to match login system
+      const { register } = await import('@/lib/authApi');
       
-      const { data, error } = await supabase.auth.signUp({
+      await register({
         email,
         password,
+        firstName: 'Ny',
+        lastName: 'Bruker',
+        companyName: 'Min Bilforhandler',
       });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // For development with mock auth, the user will be automatically set
-      if (data?.user) {
-        console.log('User registered successfully:', data.user.email);
-      }
     } catch (error: any) {
       throw new Error(error.message || 'Kunne ikke opprette konto');
     }
