@@ -500,6 +500,20 @@ export default function CarForm({ onClose, car }: CarFormProps) {
 
             <FormField
               control={form.control}
+              name="variant"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Variant</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Sedan, Stasjonsvogn, Coupe..." {...field} value={field.value || ""} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="power"
               render={({ field }) => (
                 <FormItem>

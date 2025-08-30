@@ -66,6 +66,7 @@ async function lookupVehicleData(regNumber: string) {
       fuelType: motorData?.drivstoff?.[0]?.drivstoffKode?.kodeBeskrivelse || "",
       transmission: tekniskData?.motorOgDrivverk?.girkasse?.girkasseType?.kodeBeskrivelse || "",
       color: tekniskData?.karosseriOgLasteplan?.karosseri?.[0]?.farge?.[0]?.kodeBeskrivelse || "",
+      variant: tekniskData?.karosseriOgLasteplan?.karosseri?.[0]?.karosseriType?.kodeBeskrivelse || "",
       power: motorData?.maksNettoEffekt ? `${motorData.maksNettoEffekt} kW` : "",
       engineVolume: motorData?.slagvolum ? `${motorData.slagvolum} ccm` : "",
       
@@ -153,6 +154,7 @@ export async function scrapeFinnAd(url: string, manualRegNumber?: string): Promi
           carData.transmission = svvData.transmission || carData.transmission;
           carData.color = svvData.color || carData.color;
           carData.power = svvData.power || carData.power;
+          carData.variant = svvData.variant || carData.variant;
           
           // Add additional fields from SVV if they exist in our schema
           if (svvData.nextInspectionDate) {
