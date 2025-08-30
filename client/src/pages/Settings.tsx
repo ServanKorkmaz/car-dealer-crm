@@ -33,7 +33,9 @@ import {
   UserPlus,
   Trash2,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronRight,
+  ArrowLeft
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { z } from 'zod';
@@ -73,6 +75,50 @@ const notificationSchema = z.object({
   currency: z.string(),
 });
 
+// Settings items definition
+const settingsItems = [
+  {
+    id: 'profile',
+    title: 'Profil',
+    titleKey: 'Profil',
+    description: 'Administrer personlig informasjon og kontaktdetaljer',
+    descriptionKey: 'profile_description',
+    icon: User,
+  },
+  {
+    id: 'security', 
+    title: 'Sikkerhet',
+    titleKey: 'Sikkerhet',
+    description: 'Passord, autentisering og sikkerhet',
+    descriptionKey: 'security_description',
+    icon: Shield,
+  },
+  {
+    id: 'notifications',
+    title: 'Varsler',
+    titleKey: 'Varsler', 
+    description: 'E-post, SMS og systemvarsler, språk og tidssone',
+    descriptionKey: 'notifications_description',
+    icon: Bell,
+  },
+  {
+    id: 'company',
+    title: 'Firma',
+    titleKey: 'Firma',
+    description: 'Firmainformasjon og organisasjonsdetaljer',
+    descriptionKey: 'company_description', 
+    icon: Building2,
+  },
+  {
+    id: 'team',
+    title: 'Team',
+    titleKey: 'Team',
+    description: 'Administrer brukere og tilganger',
+    descriptionKey: 'team_description',
+    icon: Users,
+  }
+];
+
 export default function SettingsPage() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { data: roleData } = useUserRole();
@@ -80,7 +126,7 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('profile');
+  const [currentView, setCurrentView] = useState<string | null>(null); // null = overview
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 

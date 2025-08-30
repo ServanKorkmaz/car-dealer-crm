@@ -20,7 +20,7 @@ import Customers from "@/pages/Customers";
 import CustomerProfile from "@/pages/CustomerProfile";
 import { CustomerProfilePage } from "@/pages/CustomerProfilePage";
 import Contracts from "@/pages/Contracts";
-import Settings from "@/pages/Settings";
+import SettingsOverviewPage from "@/pages/SettingsOverview";
 import AssistantBubble from "@/components/AssistantBubble";
 import { useAuth } from "@/contexts/AuthContext";
 import { SettingsOrganization } from "@/pages/settings/SettingsOrganization";
@@ -96,7 +96,7 @@ function Router() {
       </Route>
       <Route path="/settings">
         <ProtectedRoute>
-          <Settings />
+          <SettingsOverviewPage />
         </ProtectedRoute>
       </Route>
       <Route path="/settings/organisasjon">
