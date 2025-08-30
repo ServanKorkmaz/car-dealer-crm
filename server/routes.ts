@@ -538,9 +538,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           power = `${motorWithPower.drivstoff[0].maksNettoEffekt} kW`;
         }
         
-        // Get transmission type
+        // Get transmission type - try multiple paths in SVV data
         if (motorData.girkasse?.girkasseType?.kodeBeskrivelse) {
           transmission = motorData.girkasse.girkasseType.kodeBeskrivelse;
+        } else if (motorData.girkassetype?.kodeBeskrivelse) {
+          transmission = motorData.girkassetype.kodeBeskrivelse;
+        } else if (tekniskData?.girkasse?.girkasseType?.kodeBeskrivelse) {
+          transmission = tekniskData.girkasse.girkasseType.kodeBeskrivelse;
         }
       }
       
@@ -551,10 +555,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         color = karosseriData.karosseri[0].farge.kodeBeskrivelse;
       }
       
-      // Extract girkasse (transmission) type properly
-      if (motorData?.girkassetype?.kodeBeskrivelse) {
-        transmission = motorData.girkassetype.kodeBeskrivelse;
-      }
       
       // Extract additional technical details
       const vekter = tekniskData?.vekter;
@@ -576,7 +576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Extract VIN and karosseri type
       const vin = vehicleInfo.kjoretoyId?.understellsnummer || "";
-      const karosseriType = karosseriData?.karosseritype?.kodeBeskrivelse || "";
+      const variant = karosseriData?.karosseri?.[0]?.karosseriType?.kodeBeskrivelse || "";
 
       // Get mileage from most recent registration (usually not available in this API)
       const mileage = vehicleInfo.registrering?.kilometerstand || 0;
@@ -591,6 +591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fuelType,
         transmission,
         color,
+        variant,
         mileage,
         // EU-kontroll data
         lastEuControl,

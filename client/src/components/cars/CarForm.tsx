@@ -248,6 +248,9 @@ export default function CarForm({ onClose, car }: CarFormProps) {
         if (vehicleData.power) {
           form.setValue('power', vehicleData.power, { shouldValidate: true });
         }
+        if (vehicleData.variant) {
+          form.setValue('variant', vehicleData.variant, { shouldValidate: true });
+        }
         
         // Add comprehensive technical info to notes like in the specification image
         let additionalInfo = '';
