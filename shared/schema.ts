@@ -72,7 +72,30 @@ export const memberships = pgTable("memberships", {
 export const profiles = pgTable("profiles", {
   id: varchar("id").primaryKey(), // Auth user ID
   fullName: text("full_name"),
+  phone: varchar("phone"),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Company settings table
+export const companySettings = pgTable("company_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  logoUrl: text("logo_url"),
+  organizationNumber: varchar("organization_number"),
+  address: text("address"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// User settings table
+export const userSettings = pgTable("user_settings", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  notificationsEmail: boolean("notifications_email").default(true),
+  notificationsSms: boolean("notifications_sms").default(false),
+  notificationsSystem: boolean("notifications_system").default(true),
+  language: varchar("language").default("no"), // 'no' or 'en'
+  timezone: varchar("timezone").default("Europe/Oslo"),
+  currency: varchar("currency").default("NOK"),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // SVV Cache table
@@ -388,10 +411,30 @@ export const insertSavedViewSchema = createInsertSchema(userSavedViews).omit({
   updatedAt: true,
 });
 
+// Settings schemas
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
+  id: true,
+  updatedAt: true,
+});
 
+export const insertUserSettingsSchema = createInsertSchema(userSettings).omit({
+  updatedAt: true,
+});
+
+export const updateProfileSchema = createInsertSchema(profiles).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  email: z.string().email().optional(),
+});
 
 export type UserSavedView = typeof userSavedViews.$inferSelect;
 export type InsertSavedView = z.infer<typeof insertSavedViewSchema>;
+export type CompanySettings = typeof companySettings.$inferSelect;
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+export type UserSettings = typeof userSettings.$inferSelect;
+export type InsertUserSettings = z.infer<typeof insertUserSettingsSchema>;
+export type UpdateProfile = z.infer<typeof updateProfileSchema>;
 
 
 // Market comparables table

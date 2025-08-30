@@ -1,0 +1,102 @@
+Complete Settings Module for ForhandlerPRO DMS
+Create a comprehensive settings page to replace the old "Innstillinger" page. I need a professional, modern settings module with complete React component + Supabase integration.
+Required Features
+🛠 Core Functionality
+User Profile Section:
+
+Name, email, phone number fields (editable)
+Password change functionality (current + new + confirm)
+Display current user role (admin/standard) as badge
+
+Company Information:
+
+Company name, organization number (9 digits validation), address
+Logo upload functionality with file handling
+Store logo in Supabase storage bucket
+
+Notifications & Preferences:
+
+Email notifications toggle
+SMS notifications toggle
+System notifications toggle
+Language selection (Norwegian/English)
+Timezone selection (Europe/Oslo default)
+Currency selection (NOK default)
+
+User Management (Admin Only):
+
+View all users in a table/list
+Add new users (name, email, password, role)
+Delete users with confirmation
+Role management (admin/standard)
+
+🎨 UI/UX Requirements
+
+Use ShadCN UI components: Tabs, Cards, Forms, Switches, Selects, Modals, Buttons
+Modern dashboard design with icons from Lucide React
+Responsive grid layout (works on mobile/desktop)
+Clear visual hierarchy with proper spacing
+Save button at bottom of each section
+Loading states with spinners
+Success messages after saving
+
+💾 Database Schema (Supabase)
+Tables needed:
+sql-- profiles table
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id),
+  name TEXT,
+  email TEXT,
+  phone TEXT,
+  role TEXT DEFAULT 'standard' CHECK (role IN ('admin', 'standard')),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- company_settings table  
+CREATE TABLE company_settings (
+  id SERIAL PRIMARY KEY,
+  company_name TEXT,
+  org_nr TEXT,
+  address TEXT,
+  logo_url TEXT,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- user_settings table
+CREATE TABLE user_settings (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id),
+  notifications_email BOOLEAN DEFAULT true,
+  notifications_sms BOOLEAN DEFAULT false,
+  notifications_system BOOLEAN DEFAULT true,
+  language TEXT DEFAULT 'no' CHECK (language IN ('no', 'en')),
+  timezone TEXT DEFAULT 'Europe/Oslo',
+  currency TEXT DEFAULT 'NOK',
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+⚡️ Technical Requirements
+
+Form validation: Email format, org number (9 digits), phone format, password matching
+Optimistic UI: Show loading spinners, success messages ("Lagret!")
+Error handling: Display validation errors clearly
+File upload: Handle logo upload to Supabase storage
+Modular structure: Easy to extend with more settings later
+TypeScript: Proper interfaces and type safety
+
+🔒 Security & Logic
+
+Only admins can access user management section
+Users can only edit their own profile
+Password updates use Supabase auth
+Proper input sanitization and validation
+Confirm dialogs for destructive actions (delete user)
+
+Expected Output
+Create a complete SettingsPage.tsx file that:
+
+Uses React hooks for state management
+Integrates with Supabase for all CRUD operations
+Implements all the UI sections described above
+Includes proper error handling and loading states
+Is production-ready and follows React best practices
+
+The component should be self-contained and ready to drop into a React app with ShadCN UI and Supabase already configured.

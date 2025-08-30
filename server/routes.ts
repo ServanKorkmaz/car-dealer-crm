@@ -1331,6 +1331,113 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
     }
   });
 
+  // Settings API endpoints
+  app.get('/api/settings/user', authMiddleware, async (req: any, res) => {
+    try {
+      const storage = await storagePromise;
+      const settings = await storage.getUserSettings(req.user.id);
+      res.json(settings);
+    } catch (error) {
+      console.error('Get user settings error:', error);
+      res.status(500).json({ error: 'Failed to get user settings' });
+    }
+  });
+
+  app.put('/api/settings/profile', authMiddleware, async (req: any, res) => {
+    try {
+      const storage = await storagePromise;
+      const { fullName, email, phone } = req.body;
+      
+      // Update user table
+      await storage.updateUser(req.user.id, {
+        firstName: fullName.split(' ')[0] || '',
+        lastName: fullName.split(' ').slice(1).join(' ') || '',
+        email,
+      });
+
+      // Update or create profile with phone
+      await storage.upsertProfile(req.user.id, { fullName, phone });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Update profile error:', error);
+      res.status(500).json({ error: 'Failed to update profile' });
+    }
+  });
+
+  app.put('/api/settings/password', authMiddleware, async (req: any, res) => {
+    try {
+      const storage = await storagePromise;
+      const { currentPassword, newPassword } = req.body;
+      
+      // Verify current password
+      const user = await storage.getUserById(req.user.id);
+      if (!user || !user.passwordHash) {
+        return res.status(400).json({ error: 'User not found' });
+      }
+
+      const bcrypt = await import('bcrypt');
+      const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isValid) {
+        return res.status(400).json({ error: 'Nåværende passord er feil' });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+      await storage.updateUser(req.user.id, { passwordHash: hashedPassword });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Update password error:', error);
+      res.status(500).json({ error: 'Failed to update password' });
+    }
+  });
+
+  app.get('/api/settings/company', authMiddleware, async (req: any, res) => {
+    try {
+      const storage = await storagePromise;
+      const settings = await storage.getCompanySettings(req.user.companyId);
+      res.json(settings);
+    } catch (error) {
+      console.error('Get company settings error:', error);
+      res.status(500).json({ error: 'Failed to get company settings' });
+    }
+  });
+
+  app.put('/api/settings/company', authMiddleware, async (req: any, res) => {
+    try {
+      const storage = await storagePromise;
+      const { name, organizationNumber, address } = req.body;
+      
+      // Update company name
+      await storage.updateCompany(req.user.companyId, { name });
+      
+      // Update or create company settings
+      await storage.upsertCompanySettings(req.user.companyId, {
+        organizationNumber,
+        address,
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Update company error:', error);
+      res.status(500).json({ error: 'Failed to update company' });
+    }
+  });
+
+  app.put('/api/settings/notifications', authMiddleware, async (req: any, res) => {
+    try {
+      const storage = await storagePromise;
+      const settings = req.body;
+      
+      await storage.upsertUserSettings(req.user.id, settings);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Update notifications error:', error);
+      res.status(500).json({ error: 'Failed to update notifications' });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

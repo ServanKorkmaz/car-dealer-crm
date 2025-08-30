@@ -12,6 +12,8 @@ import {
   refreshTokens,
   loginAudits,
   passwordResetTokens,
+  userSettings,
+  companySettings,
   type User,
   type UpsertUser,
   type Car,
@@ -29,7 +31,9 @@ import {
   type PricingRules,
   type InsertPricingRules,
   type Followup,
-  type InsertFollowup
+  type InsertFollowup,
+  type UserSettings,
+  type CompanySettings
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, or } from "drizzle-orm";
@@ -121,6 +125,16 @@ export interface IStorage {
   
   getAllUsers(): Promise<User[]>;
   getContractsByCustomer(customerId: string, userId: string): Promise<Contract[]>;
+  
+  // Settings operations
+  getUserSettings(userId: string): Promise<any>;
+  upsertUserSettings(userId: string, settings: any): Promise<any>;
+  getCompanySettings(companyId: string): Promise<any>;
+  upsertCompanySettings(companyId: string, settings: any): Promise<any>;
+  updateUser(userId: string, updates: any): Promise<User>;
+  updateCompany(companyId: string, updates: any): Promise<any>;
+  upsertProfile(userId: string, profile: any): Promise<any>;
+  getUserById(userId: string): Promise<User | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -742,6 +756,94 @@ export class DatabaseStorage implements IStorage {
         inventoryAging: []
       };
     }
+  }
+
+  // Settings operations implementation
+  async getUserSettings(userId: string): Promise<UserSettings | null> {
+    const [settings] = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
+    return settings || null;
+  }
+
+  async upsertUserSettings(userId: string, settings: Partial<UserSettings>): Promise<UserSettings> {
+    const existing = await this.getUserSettings(userId);
+    if (existing) {
+      const [updated] = await db
+        .update(userSettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(userSettings.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(userSettings)
+        .values({ userId, ...settings })
+        .returning();
+      return created;
+    }
+  }
+
+  async getCompanySettings(companyId: string): Promise<CompanySettings | null> {
+    const [settings] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId)).limit(1);
+    return settings || null;
+  }
+
+  async upsertCompanySettings(companyId: string, settings: Partial<CompanySettings>): Promise<CompanySettings> {
+    const existing = await this.getCompanySettings(companyId);
+    if (existing) {
+      const [updated] = await db
+        .update(companySettings)
+        .set({ ...settings, updatedAt: new Date() })
+        .where(eq(companySettings.companyId, companyId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(companySettings)
+        .values({ companyId, ...settings })
+        .returning();
+      return created;
+    }
+  }
+
+  async updateUser(userId: string, updates: Partial<User>): Promise<User> {
+    const [updated] = await db
+      .update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async updateCompany(companyId: string, updates: Partial<any>): Promise<any> {
+    const [updated] = await db
+      .update(companies)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(companies.id, companyId))
+      .returning();
+    return updated;
+  }
+
+  async upsertProfile(userId: string, profile: { fullName?: string; phone?: string }): Promise<any> {
+    const existing = await db.select().from(profiles).where(eq(profiles.id, userId)).limit(1);
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(profiles)
+        .set(profile)
+        .where(eq(profiles.id, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(profiles)
+        .values({ id: userId, ...profile })
+        .returning();
+      return created;
+    }
+  }
+
+  async getUserById(userId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    return user;
   }
 }
 
