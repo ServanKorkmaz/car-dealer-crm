@@ -32,7 +32,7 @@ export default function Sidebar() {
     <div className="hidden md:flex md:flex-shrink-0">
       <div className="flex flex-col w-64 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700">
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between h-[73px] px-6 border-b border-slate-200 dark:border-slate-700">
           <Link href="/">
             <div className="flex items-center space-x-3 cursor-pointer group px-2 py-1 rounded-lg transition-all duration-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:scale-105">
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center group-hover:shadow-lg transition-all duration-200 group-hover:bg-primary-600">

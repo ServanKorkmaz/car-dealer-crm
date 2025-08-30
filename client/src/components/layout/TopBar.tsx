@@ -12,8 +12,8 @@ export default function TopBar() {
 
   return (
     <>
-      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4">
-        <div className="flex items-center justify-between">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-6 h-[73px] flex items-center">
+        <div className="flex items-center justify-between w-full">
           {/* Left side - Company Switcher */}
           <CompanySwitcher />
           
