@@ -69,7 +69,10 @@ export default function SalesChart({ data, period }: SalesChartProps) {
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
           <ComposedChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <CartesianGrid 
+              strokeDasharray="1 1" 
+              className="stroke-border opacity-30"
+            />
             <XAxis 
               dataKey="displayMonth" 
               className="text-xs"
