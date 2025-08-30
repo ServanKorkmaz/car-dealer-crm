@@ -144,10 +144,11 @@ export default function ContractWizard({
   });
 
   const availableCars = useMemo(() => {
-    // Vis alle biler som er tilgjengelige, reserverte, eller allerede i denne kontrakten
+    // Vis alle biler som er tilgjengelige, reserverte, solgte eller allerede i denne kontrakten
     return cars.filter((car: Car) => 
       car.status === "available" || 
       car.status === "reserved" || 
+      car.status === "sold" ||
       car.id === contract?.carId
     );
   }, [cars, contract]);
