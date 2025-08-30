@@ -16,8 +16,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Separator } from "@/components/ui/separator";
 import AddCarModal from "@/components/cars/AddCarModal";
 import EditCarModal from "@/components/cars/EditCarModal";
-import ContractWizard from "@/components/contracts/ContractWizard";
-import ContractPromptModal from "@/components/contracts/ContractPromptModal";
 import { 
   Plus, Search, Edit, Trash2, Car as CarIcon, Eye, DollarSign, 
   TrendingUp, TrendingDown, AlertCircle, Copy, Star, Grid3x3, 
@@ -51,7 +49,6 @@ function ProfessionalCarCard({
   getStatusText,
   calculateProfit,
   canDelete,
-  hasContract,
   size = "normal"
 }: {
   car: Car;
@@ -68,7 +65,6 @@ function ProfessionalCarCard({
   getStatusText: (status: string) => string;
   calculateProfit: (salePrice: string, costPrice?: string) => { amount: number; percentage: number };
   canDelete: boolean;
-  hasContract: (carId: string) => boolean;
   size?: "compact" | "normal" | "comfort";
 }) {
   const canViewSensitive = useCanViewSensitive();
@@ -277,26 +273,6 @@ function ProfessionalCarCard({
                     Selg
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Marker bil som solgt</TooltipContent>
-              </Tooltip>
-            )}
-
-            {car.status === 'sold' && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      setSoldCarForContract(car);
-                      setShowContractWizard(true);
-                    }}
-                    className={`${config.button} bg-blue-600 hover:bg-blue-700 text-white border-0`}
-                    data-testid={`button-create-contract-${car.id}`}
-                  >
-                    <FileText className="w-4 h-4 mr-1" />
-                    Kontrakt
-                  </Button>
-                </TooltipTrigger>
                 <TooltipContent>Opprett salgskontrakt</TooltipContent>
               </Tooltip>
             )}
@@ -311,9 +287,6 @@ export default function Cars() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
-  const [showContractWizard, setShowContractWizard] = useState(false);
-  const [showContractPrompt, setShowContractPrompt] = useState(false);
-  const [soldCarForContract, setSoldCarForContract] = useState<Car | null>(null);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -336,16 +309,6 @@ export default function Cars() {
     queryKey: ["/api/cars"],
     enabled: isAuthenticated,
   });
-
-  const { data: contracts = [] } = useQuery({
-    queryKey: ["/api/contracts"],
-    enabled: isAuthenticated,
-  });
-
-  // Sjekk om bil har kontrakt
-  const hasContract = (carId: string) => {
-    return contracts.some((contract: any) => contract.carId === carId);
-  };
 
   // Utility functions (keeping existing logic)
   const calculateDaysOnStock = (createdAt: string, soldDate?: string | null) => {
@@ -463,14 +426,8 @@ export default function Cars() {
 
   const sellMutation = useMutation({
     mutationFn: (carId: string) => apiRequest(`/api/cars/${carId}/sell`, { method: 'POST' }),
-    onSuccess: (data, carId) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/cars'] });
-      // Finn bilen som ble solgt og vis kontraktprompt
-      const soldCar = cars?.find(car => car.id === carId);
-      if (soldCar) {
-        setSoldCarForContract(soldCar);
-        setShowContractPrompt(true);
-      }
       toast({ title: "Bil solgt", description: "Bilen er markert som solgt." });
     },
     onError: () => {
@@ -486,30 +443,6 @@ export default function Cars() {
       newFavorites.add(carId);
     }
     setFavorites(newFavorites);
-  };
-
-  // Kontraktprompt-funksjoner
-  const handleCreateContractNow = () => {
-    setShowContractPrompt(false);
-    setShowContractWizard(true);
-  };
-
-  const handleCreateContractLater = () => {
-    setShowContractPrompt(false);
-    toast({ 
-      title: "Påminnelse satt", 
-      description: "Du kan opprette kontrakt senere fra bil-detaljene." 
-    });
-  };
-
-  const closeContractPrompt = () => {
-    setShowContractPrompt(false);
-    setSoldCarForContract(null);
-  };
-
-  const closeContractWizard = () => {
-    setShowContractWizard(false);
-    setSoldCarForContract(null);
   };
 
   // PDF Export function
@@ -864,7 +797,6 @@ export default function Cars() {
                     getStatusText={getStatusText}
                     calculateProfit={calculateProfit}
                     canDelete={canDelete}
-                    hasContract={hasContract}
                   />
                 ))}
               </div>
@@ -990,25 +922,6 @@ export default function Cars() {
                                       Selg
                                     </Button>
                                   </TooltipTrigger>
-                                  <TooltipContent>Marker bil som solgt</TooltipContent>
-                                </Tooltip>
-                              )}
-
-                              {car.status === 'sold' && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      size="sm"
-                                      onClick={() => {
-                                        setSoldCarForContract(car);
-                                        setShowContractWizard(true);
-                                      }}
-                                      className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                                      data-testid={`button-create-contract-${car.id}`}
-                                    >
-                                      Kontrakt
-                                    </Button>
-                                  </TooltipTrigger>
                                   <TooltipContent>Opprett salgskontrakt</TooltipContent>
                                 </Tooltip>
                               )}
@@ -1058,22 +971,6 @@ export default function Cars() {
             onOpenChange={setShowInviteModal}
           />
         )}
-
-        {/* Kontraktprompt-modal */}
-        <ContractPromptModal
-          open={showContractPrompt}
-          onClose={closeContractPrompt}
-          car={soldCarForContract}
-          onCreateContract={handleCreateContractNow}
-          onCreateLater={handleCreateContractLater}
-        />
-
-        {/* Kontraktgenerator */}
-        <ContractWizard
-          open={showContractWizard}
-          onClose={closeContractWizard}
-          prefilledData={soldCarForContract ? { carId: soldCarForContract.id } : undefined}
-        />
       </div>
     </MainLayout>
   );
