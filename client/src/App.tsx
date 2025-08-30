@@ -12,7 +12,6 @@ import Register from "@/pages/auth/Register";
 import Onboarding from "@/pages/auth/Onboarding";
 import Dashboard from "@/pages/Dashboard";
 import ProfessionalDashboard from "@/pages/ProfessionalDashboard";
-import Activities from "@/pages/Activities";
 import Cars from "@/pages/Cars";
 import CarsInventory from "@/pages/CarsInventory";
 import CarDetail from "@/pages/CarDetail";
@@ -95,11 +94,6 @@ function Router() {
       <Route path="/contracts">
         <ProtectedRoute>
           <Contracts />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/activities">
-        <ProtectedRoute>
-          <Activities />
         </ProtectedRoute>
       </Route>
       <Route path="/settings">

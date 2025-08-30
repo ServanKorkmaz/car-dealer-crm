@@ -6,7 +6,6 @@ import {
   customers,
   contracts,
   activityLog,
-  activities,
   userSavedViews,
   profiles,
   followups,
@@ -23,8 +22,6 @@ import {
   type InsertContract,
   type ActivityLog,
   type InsertActivityLog,
-  type Activity,
-  type InsertActivity,
   marketComps,
   pricingRules,
   type MarketComp,
@@ -78,16 +75,6 @@ export interface IStorage {
   createActivityLog(activity: InsertActivityLog): Promise<ActivityLog>;
   getRecentActivities(userId: string, limit?: number): Promise<ActivityLog[]>;
   
-  // Enhanced Activities operations
-  getActivities(userId: string, filters?: { 
-    type?: string; 
-    priority?: string; 
-    resolved?: boolean; 
-    limit?: number; 
-    offset?: number; 
-  }): Promise<Activity[]>;
-  createActivity(activity: InsertActivity): Promise<Activity>;
-  resolveActivity(activityId: string, userId: string): Promise<boolean>;
   
   // Saved Views operations
   getSavedViews(userId: string, page: string): Promise<any[]>;
@@ -114,7 +101,6 @@ export interface IStorage {
     cars: Car[];
     contracts: Contract[];
     followups: Followup[];
-    activities: Activity[];
   }>;
   
   // Pricing operations
@@ -347,61 +333,6 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
-  // Enhanced Activities operations
-  async getActivities(userId: string, filters?: { 
-    type?: string; 
-    priority?: string; 
-    resolved?: boolean; 
-    limit?: number; 
-    offset?: number; 
-  }): Promise<Activity[]> {
-    let query = db.select().from(activities);
-    
-    const conditions = [];
-    if (userId) {
-      conditions.push(eq(activities.userId, userId));
-    }
-    if (filters?.type) {
-      conditions.push(eq(activities.type, filters.type));
-    }
-    if (filters?.priority) {
-      conditions.push(eq(activities.priority, filters.priority));
-    }
-    if (filters?.resolved !== undefined) {
-      conditions.push(eq(activities.resolved, filters.resolved));
-    }
-
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-
-    query = query.orderBy(desc(activities.createdAt));
-
-    if (filters?.limit) {
-      query = query.limit(filters.limit);
-    }
-    if (filters?.offset) {
-      query = query.offset(filters.offset);
-    }
-
-    return await query;
-  }
-
-  async createActivity(activity: InsertActivity): Promise<Activity> {
-    const [newActivity] = await db
-      .insert(activities)
-      .values(activity)
-      .returning();
-    return newActivity;
-  }
-
-  async resolveActivity(activityId: string, userId: string): Promise<boolean> {
-    const result = await db
-      .update(activities)
-      .set({ resolved: true })
-      .where(and(eq(activities.id, activityId), eq(activities.userId, userId)));
-    return result.rowCount > 0;
-  }
 
   // Saved Views operations
   async getSavedViews(userId: string, page: string): Promise<any[]> {
@@ -489,7 +420,6 @@ export class DatabaseStorage implements IStorage {
     cars: Car[];
     contracts: Contract[];
     followups: Followup[];
-    activities: Activity[];
   }> {
     // Get customer
     const customer = await this.getCustomerById(customerId, userId);
@@ -514,15 +444,11 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(followups.userId, userId), eq(followups.customerId, customerId)))
       .orderBy(desc(followups.createdAt));
 
-    // Get customer activities (simplified)
-    const customerActivities: Activity[] = [];
-
     return {
       customer,
       cars: customerCars,
       contracts: customerContracts,
       followups: customerFollowups,
-      activities: customerActivities,
     };
   }
 

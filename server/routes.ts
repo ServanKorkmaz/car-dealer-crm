@@ -7,8 +7,6 @@ import { insertCarSchema, insertCustomerSchema, insertContractSchema } from "@sh
 import { z } from "zod";
 import { generateContractHTML, generatePDF } from "./pdf-generator";
 import { scrapeFinnAd } from "./finn-scraper";
-import { ActivityLogger } from "./activityLogger";
-import { AlertSystem } from "./alerts";
 import OpenAI from "openai";
 import * as tools from "./assistantTools";
 import type { UserHints } from "./assistantTools";
@@ -235,90 +233,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Recent activities endpoint
+  // Recent activities endpoint - return empty array since activities feature is removed
   app.get('/api/dashboard/activities', authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const limit = parseInt(req.query.limit as string) || 20;
-      const storage = await storagePromise;
-      
-      // Get the new enhanced activities instead of legacy activityLog
-      const activities = await storage.getActivities(userId, { 
-        limit,
-        resolved: false // Show unresolved first
-      });
-      
-      res.json(activities);
-    } catch (error) {
-      console.error("Error fetching dashboard activities:", error);
-      res.status(500).json({ message: "Failed to fetch activities" });
-    }
+    res.json([]);
   });
 
-  // Enhanced activities endpoints
-  app.get('/api/activities', authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { type, priority, resolved, limit = '50', offset = '0' } = req.query;
-      
-      const storage = await storagePromise;
-      const activities = await storage.getActivities(userId, {
-        type: type as string,
-        priority: priority as string,
-        resolved: resolved === 'true',
-        limit: parseInt(limit as string),
-        offset: parseInt(offset as string)
-      });
-      
-      res.json(activities);
-    } catch (error) {
-      console.error("Error fetching activities:", error);
-      res.status(500).json({ message: "Failed to fetch activities" });
-    }
-  });
 
-  app.post('/api/activities/:id/resolve', authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const storage = await storagePromise;
-      
-      const success = await storage.resolveActivity(req.params.id, userId);
-      
-      if (success) {
-        res.json({ success: true, message: "Activity resolved" });
-      } else {
-        res.status(404).json({ message: "Activity not found" });
-      }
-    } catch (error) {
-      console.error("Error resolving activity:", error);
-      res.status(500).json({ message: "Failed to resolve activity" });
-    }
-  });
 
-  app.get('/api/activities/alerts/unresolved', authMiddleware, async (req: any, res) => {
-    try {
-      const storage = await storagePromise;
-      const alerts = await storage.getUnresolvedAlerts('default-company', 10);
-      
-      res.json(alerts);
-    } catch (error) {
-      console.error("Error fetching unresolved alerts:", error);
-      res.status(500).json({ message: "Failed to fetch unresolved alerts" });
-    }
-  });
 
-  // Trigger manual alert check
-  app.post('/api/alerts/check', authMiddleware, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      await AlertSystem.runAlerts(userId, 'default-company');
-      
-      res.json({ success: true, message: "Alert check completed" });
-    } catch (error) {
-      console.error("Error running alert check:", error);
-      res.status(500).json({ message: "Failed to run alert check" });
-    }
-  });
 
   // Seed dummy data endpoint
   app.post('/api/seed-dummy-data', authMiddleware, async (req: any, res) => {

@@ -12,7 +12,6 @@ import {
   Sun,
   LogOut,
   User,
-  Activity,
   Settings,
   Calculator,
   RefreshCw
@@ -24,7 +23,6 @@ const navigation = [
   { name: "Biler", href: "/cars", icon: Car },
   { name: "Kunder", href: "/customers", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
-  { name: "Aktiviteter", href: "/activities", icon: Activity },
   { name: "Regnskap", href: "/settings/regnskap", icon: Calculator },
   { name: "Synkronisering", href: "/sync", icon: RefreshCw },
   { name: "Innstillinger", href: "/settings", icon: Settings },

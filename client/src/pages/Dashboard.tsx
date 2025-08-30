@@ -8,7 +8,6 @@ import MainLayout from "@/components/layout/MainLayout";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import RecentCars from "@/components/dashboard/RecentCars";
 import QuickActions from "@/components/dashboard/QuickActions";
-import ActivityFeed from "@/components/dashboard/ActivityFeed";
 import { TodayFollowupsWidget } from "@/components/dashboard/TodayFollowupsWidget";
 
 export default function Dashboard() {
@@ -66,7 +65,6 @@ export default function Dashboard() {
           <div className={compactView ? "space-y-3" : "space-y-4"}>
             <TodayFollowupsWidget />
             <QuickActions />
-            <ActivityFeed limit={compactView ? 5 : 8} />
           </div>
         </div>
       </div>

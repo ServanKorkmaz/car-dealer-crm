@@ -210,21 +210,6 @@ export const activityLog = pgTable("activity_log", {
 
 // Removed invites table - no longer needed without multi-tenant
 
-// Enhanced Activities table for smart alerts and notifications
-export const activities = pgTable("activities", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
-  userId: varchar("user_id"),
-  type: varchar("type").notNull(), // IMPORT, CAR_UPDATE, CONTRACT_CREATED, CONTRACT_SIGNED, SALE, PRICE_CHANGE, FOLLOW_UP, ALERT
-  entityId: varchar("entity_id"), // ID of the related entity (car, customer, contract)
-  message: text("message").notNull(), // human-readable description
-  priority: varchar("priority").notNull().default("normal"), // 'low' | 'normal' | 'high'
-  resolved: boolean("resolved").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-}, (table) => [
-  index("idx_activities_user_type").on(table.userId, table.type),
-  index("idx_activities_priority").on(table.priority, table.resolved),
-]);
 
 // User Saved Views table for storing user filter preferences
 export const userSavedViews = pgTable("user_saved_views", {
@@ -403,40 +388,11 @@ export const insertSavedViewSchema = createInsertSchema(userSavedViews).omit({
   updatedAt: true,
 });
 
-export const insertActivitySchema = createInsertSchema(activities).omit({
-  id: true,
-  createdAt: true,
-});
 
-// Activity types enum
-export const ActivityType = {
-  IMPORT: "IMPORT",
-  CAR_UPDATE: "CAR_UPDATE", 
-  CONTRACT_CREATED: "CONTRACT_CREATED",
-  CONTRACT_SIGNED: "CONTRACT_SIGNED",
-  SALE: "SALE",
-  PRICE_CHANGE: "PRICE_CHANGE",
-  FOLLOW_UP: "FOLLOW_UP",
-  ALERT: "ALERT",
-} as const;
-
-export type ActivityTypeValue = typeof ActivityType[keyof typeof ActivityType];
-
-// Activity priority enum
-export const ActivityPriority = {
-  LOW: "low",
-  NORMAL: "normal", 
-  HIGH: "high",
-} as const;
-
-export type ActivityPriorityValue = typeof ActivityPriority[keyof typeof ActivityPriority];
 
 export type UserSavedView = typeof userSavedViews.$inferSelect;
 export type InsertSavedView = z.infer<typeof insertSavedViewSchema>;
 
-// Activities types
-export type Activity = typeof activities.$inferSelect;
-export type InsertActivity = z.infer<typeof insertActivitySchema>;
 
 // Market comparables table
 export const marketComps = pgTable("market_comps", {

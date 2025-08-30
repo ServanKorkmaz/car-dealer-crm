@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import type { Activity, Customer } from '@shared/schema';
+import type { Customer } from '@shared/schema';
 
 export type CustomerStatus = 'HOT' | 'WARM' | 'COLD';
 
@@ -16,9 +16,8 @@ export function useCustomerStatus() {
     queryKey: ['/api/customers'],
   });
 
-  const { data: activities = [] } = useQuery<Activity[]>({
-    queryKey: ['/api/activities'],
-  });
+  // Activities removed - set empty array for now
+  const activities: any[] = [];
 
   const customersWithStatus = useMemo(() => {
     return customers.map(customer => {
