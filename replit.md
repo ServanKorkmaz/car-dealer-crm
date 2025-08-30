@@ -30,6 +30,8 @@ The application employs a modern full-stack architecture with clear separation o
 - **Smart Rule-Based Activity System**: For real-time event logging and intelligent notifications.
 - **Natural Language Contract Creation System**: Parses commands to pre-fill contract forms and automatically creates new customers if needed.
 - **Enhanced AI Assistant (Chatbot Only)**: Features an "Answer-First" intent system for distinguishing between questions and commands, providing immediate data answers for questions and requiring confirmation for navigation from commands. AI Price Assistant functionality has been completely removed per user request.
+- **Google-style Settings Interface**: New overview-first settings design with categorized options (Profile, Security, Notifications, Company, Team) and clear navigation between overview and detail views.
+- **Multi-language Support**: Basic internationalization with Norwegian/English translations for navigation and settings interface.
 
 ### Database Design
 The PostgreSQL database includes:

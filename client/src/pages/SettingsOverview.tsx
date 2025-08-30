@@ -114,8 +114,12 @@ export default function SettingsOverviewPage() {
   );
 
   const renderDetailView = () => {
-    // For now, show the full settings page when any item is clicked
-    return <SettingsPage initialTab={currentView} />;
+    // Create a simple wrapper that passes the activeTab properly
+    return (
+      <div className="space-y-6">
+        <SettingsPage />
+      </div>
+    );
   };
 
   if (isLoading) {
