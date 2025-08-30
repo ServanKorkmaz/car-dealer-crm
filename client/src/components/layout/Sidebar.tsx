@@ -13,8 +13,6 @@ import {
   LogOut,
   User,
   Settings,
-  Calculator,
-  RefreshCw
 } from "lucide-react";
 
 const navigation = [
@@ -23,8 +21,6 @@ const navigation = [
   { name: "Biler", href: "/cars", icon: Car },
   { name: "Kunder", href: "/customers", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
-  { name: "Regnskap", href: "/settings/regnskap", icon: Calculator },
-  { name: "Synkronisering", href: "/sync", icon: RefreshCw },
   { name: "Innstillinger", href: "/settings", icon: Settings },
 ];
 

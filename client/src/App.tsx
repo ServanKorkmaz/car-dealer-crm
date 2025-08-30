@@ -23,8 +23,6 @@ import Contracts from "@/pages/Contracts";
 import Settings from "@/pages/Settings";
 import AssistantBubble from "@/components/AssistantBubble";
 import { useAuth } from "@/contexts/AuthContext";
-import { SettingsAccounting } from "@/features/accounting/pages/SettingsAccounting";
-import { SyncMonitor } from "@/features/accounting/pages/SyncMonitor";
 import { SettingsOrganization } from "@/pages/settings/SettingsOrganization";
 // import { SettingsUsers } from "@/pages/settings/SettingsUsers";
 // import { SettingsPlan } from "@/pages/settings/SettingsPlan";
@@ -116,16 +114,6 @@ function Router() {
           <SettingsPlan />
         </ProtectedRoute>
       </Route> */}
-      <Route path="/settings/regnskap">
-        <ProtectedRoute>
-          <SettingsAccounting />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/sync">
-        <ProtectedRoute>
-          <SyncMonitor />
-        </ProtectedRoute>
-      </Route>
       
       <Route component={NotFound} />
     </Switch>

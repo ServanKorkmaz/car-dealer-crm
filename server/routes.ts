@@ -1331,9 +1331,6 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
     }
   });
 
-  // Register accounting routes
-  const { registerAccountingRoutes } = await import('./accounting/routes');
-  registerAccountingRoutes(app, authMiddleware);
 
   const httpServer = createServer(app);
   return httpServer;
