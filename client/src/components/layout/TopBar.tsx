@@ -22,7 +22,7 @@ export default function TopBar() {
             <NotificationBell />
             <Button
               onClick={() => setShowAddCar(true)}
-              className="bg-primary hover:bg-primary-600 text-white"
+              variant="default"
             >
               <Plus className="w-4 h-4 mr-2" />
               Ny bil
@@ -30,7 +30,6 @@ export default function TopBar() {
             <Button
               variant="outline"
               onClick={() => setShowAddCustomer(true)}
-              className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
             >
               <UserPlus className="w-4 h-4 mr-2" />
               Ny kunde

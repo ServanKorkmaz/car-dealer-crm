@@ -317,6 +317,7 @@ export default function Contracts() {
           <Button 
             onClick={() => setShowGenerator(true)}
             size="lg"
+            variant="default"
             className="gap-2"
           >
             <Plus className="w-5 h-5" />
