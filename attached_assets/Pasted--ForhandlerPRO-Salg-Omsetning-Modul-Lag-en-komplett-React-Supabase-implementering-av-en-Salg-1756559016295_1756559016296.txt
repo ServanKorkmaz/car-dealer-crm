@@ -1,0 +1,795 @@
+# ForhandlerPRO - Salg/Omsetning Modul
+
+Lag en komplett React + Supabase implementering av en Salg/Omsetning-modul for et norsk DMS-system for bilforhandlere.
+
+## Teknisk Stack
+- React 18 med TypeScript
+- Supabase for database og autentisering
+- Tailwind CSS for styling
+- ShadCN UI komponenter
+- Recharts for datavisualisering
+- date-fns for datohåndtering
+- React Query for caching og state management
+
+## Database Schema (Supabase)
+
+```sql
+-- Biler tabell
+CREATE TABLE cars (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand VARCHAR(100) NOT NULL,
+  model VARCHAR(100) NOT NULL,
+  year INT NOT NULL,
+  vin VARCHAR(17) UNIQUE,
+  registration_number VARCHAR(10),
+  purchase_price DECIMAL(12,2) NOT NULL,
+  sale_price DECIMAL(12,2),
+  status VARCHAR(50) DEFAULT 'available' CHECK (status IN ('available', 'sold', 'reserved', 'service')),
+  purchase_date DATE NOT NULL,
+  mileage INT,
+  color VARCHAR(50),
+  fuel_type VARCHAR(50),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Salg tabell
+CREATE TABLE sales (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  car_id UUID REFERENCES cars(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES customers(id),
+  sale_date DATE NOT NULL,
+  sale_price DECIMAL(12,2) NOT NULL,
+  payment_method VARCHAR(50),
+  salesperson_id UUID REFERENCES employees(id),
+  commission DECIMAL(10,2),
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Kunder tabell (forenklet)
+CREATE TABLE customers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  first_name VARCHAR(100) NOT NULL,
+  last_name VARCHAR(100) NOT NULL,
+  email VARCHAR(255) UNIQUE,
+  phone VARCHAR(20),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Ansatte tabell (forenklet)
+CREATE TABLE employees (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(200) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  role VARCHAR(50),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indekser for ytelse
+CREATE INDEX idx_sales_sale_date ON sales(sale_date);
+CREATE INDEX idx_sales_car_id ON sales(car_id);
+CREATE INDEX idx_cars_status ON cars(status);
+CREATE INDEX idx_cars_brand_model ON cars(brand, model);
+
+-- Row Level Security
+ALTER TABLE cars ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+```
+
+## Filstruktur
+
+```
+src/
+├── components/
+│   ├── sales/
+│   │   ├── SalesDashboard.tsx
+│   │   ├── SalesMetrics.tsx
+│   │   ├── SalesChart.tsx
+│   │   ├── TopSellingModels.tsx
+│   │   ├── PeriodFilter.tsx
+│   │   └── MetricCard.tsx
+│   └── ui/
+│       └── [shadcn komponenter]
+├── hooks/
+│   ├── useSalesData.ts
+│   ├── useCarData.ts
+│   └── useSupabase.ts
+├── lib/
+│   ├── supabase.ts
+│   ├── utils.ts
+│   └── constants.ts
+├── types/
+│   └── index.ts
+└── App.tsx
+```
+
+## Hovedkomponent: SalesDashboard.tsx
+
+```tsx
+import React, { useState, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Car, 
+  DollarSign, 
+  Calendar,
+  BarChart3,
+  Download,
+  Filter
+} from 'lucide-react';
+import { format, startOfMonth, endOfMonth, subMonths, startOfYear } from 'date-fns';
+import { nb } from 'date-fns/locale';
+import { useSalesData } from '@/hooks/useSalesData';
+import SalesMetrics from './SalesMetrics';
+import SalesChart from './SalesChart';
+import TopSellingModels from './TopSellingModels';
+import PeriodFilter from './PeriodFilter';
+
+export default function SalesDashboard() {
+  const [period, setPeriod] = useState<'current_month' | 'last_month' | 'last_12_months' | 'year_to_date' | 'custom'>('current_month');
+  const [customDateRange, setCustomDateRange] = useState<{ from: Date | null; to: Date | null }>({ from: null, to: null });
+  
+  const { data, isLoading, error, refetch } = useSalesData(period, customDateRange);
+
+  const metrics = useMemo(() => {
+    if (!data) return null;
+    
+    const currentPeriodSales = data.sales.filter(sale => {
+      const saleDate = new Date(sale.sale_date);
+      const now = new Date();
+      
+      switch(period) {
+        case 'current_month':
+          return saleDate >= startOfMonth(now) && saleDate <= endOfMonth(now);
+        case 'last_month':
+          const lastMonth = subMonths(now, 1);
+          return saleDate >= startOfMonth(lastMonth) && saleDate <= endOfMonth(lastMonth);
+        case 'last_12_months':
+          return saleDate >= subMonths(now, 12);
+        case 'year_to_date':
+          return saleDate >= startOfYear(now);
+        case 'custom':
+          return customDateRange.from && customDateRange.to && 
+                 saleDate >= customDateRange.from && saleDate <= customDateRange.to;
+        default:
+          return true;
+      }
+    });
+
+    const totalRevenue = currentPeriodSales.reduce((sum, sale) => sum + sale.sale_price, 0);
+    const totalProfit = currentPeriodSales.reduce((sum, sale) => {
+      const car = data.cars.find(c => c.id === sale.car_id);
+      return sum + (sale.sale_price - (car?.purchase_price || 0));
+    }, 0);
+    const avgSalePrice = currentPeriodSales.length > 0 ? totalRevenue / currentPeriodSales.length : 0;
+    const avgProfitPerCar = currentPeriodSales.length > 0 ? totalProfit / currentPeriodSales.length : 0;
+
+    // Sammenlign med forrige periode
+    const previousPeriodSales = data.sales.filter(sale => {
+      const saleDate = new Date(sale.sale_date);
+      const now = new Date();
+      
+      switch(period) {
+        case 'current_month':
+          const prevMonth = subMonths(now, 1);
+          return saleDate >= startOfMonth(prevMonth) && saleDate <= endOfMonth(prevMonth);
+        case 'last_month':
+          const twoMonthsAgo = subMonths(now, 2);
+          return saleDate >= startOfMonth(twoMonthsAgo) && saleDate <= endOfMonth(twoMonthsAgo);
+        default:
+          return false;
+      }
+    });
+
+    const prevRevenue = previousPeriodSales.reduce((sum, sale) => sum + sale.sale_price, 0);
+    const revenueGrowth = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
+
+    return {
+      carsSoldThisPeriod: currentPeriodSales.length,
+      totalCarsSold: data.sales.length,
+      totalRevenue,
+      avgSalePrice,
+      avgProfitPerCar,
+      totalProfit,
+      revenueGrowth,
+      previousPeriodCount: previousPeriodSales.length
+    };
+  }, [data, period, customDateRange]);
+
+  const exportData = () => {
+    // Implementer CSV-eksport
+    const csv = convertToCSV(data);
+    downloadCSV(csv, `salgsrapport_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+  };
+
+  if (error) {
+    return (
+      <Card className="border-red-200 bg-red-50">
+        <CardContent className="pt-6">
+          <p className="text-red-600">Kunne ikke laste salgsdata. Vennligst prøv igjen senere.</p>
+          <Button onClick={() => refetch()} className="mt-4">Prøv igjen</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Salg & Omsetning</h1>
+          <p className="text-gray-500 mt-1">Oversikt over salgsytelse og nøkkeltall</p>
+        </div>
+        <div className="flex gap-2">
+          <PeriodFilter 
+            period={period} 
+            onPeriodChange={setPeriod}
+            customDateRange={customDateRange}
+            onCustomDateChange={setCustomDateRange}
+          />
+          <Button variant="outline" onClick={exportData}>
+            <Download className="h-4 w-4 mr-2" />
+            Eksporter
+          </Button>
+        </div>
+      </div>
+
+      {/* Hovedmetrikker */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-32" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : metrics && (
+        <SalesMetrics metrics={metrics} />
+      )}
+
+      {/* Tabs for detaljert visning */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsTrigger value="overview">Oversikt</TabsTrigger>
+          <TabsTrigger value="trends">Trender</TabsTrigger>
+          <TabsTrigger value="performance">Ytelse</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <SalesChart data={data} period={period} />
+            </div>
+            <div>
+              <TopSellingModels data={data} />
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="trends">
+          <Card>
+            <CardHeader>
+              <CardTitle>Salgstrender</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Implementer avanserte trendanalyser */}
+              <SalesTrendAnalysis data={data} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="performance">
+          <Card>
+            <CardHeader>
+              <CardTitle>Selgerytelse</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Implementer selgerstatistikk */}
+              <SalespersonPerformance data={data} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+```
+
+## SalesMetrics.tsx
+
+```tsx
+import React from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { TrendingUp, TrendingDown, Car, DollarSign, Target } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface MetricsProps {
+  metrics: {
+    carsSoldThisPeriod: number;
+    totalCarsSold: number;
+    totalRevenue: number;
+    avgSalePrice: number;
+    avgProfitPerCar: number;
+    totalProfit: number;
+    revenueGrowth: number;
+    previousPeriodCount: number;
+  };
+}
+
+export default function SalesMetrics({ metrics }: MetricsProps) {
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('nb-NO', {
+      style: 'currency',
+      currency: 'NOK',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const formatPercentage = (value: number) => {
+    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+  };
+
+  const metricCards = [
+    {
+      title: 'Biler solgt denne perioden',
+      value: metrics.carsSoldThisPeriod,
+      icon: Car,
+      change: metrics.previousPeriodCount ? 
+        ((metrics.carsSoldThisPeriod - metrics.previousPeriodCount) / metrics.previousPeriodCount) * 100 : 0,
+      format: (v: number) => v.toString(),
+      color: 'blue'
+    },
+    {
+      title: 'Total omsetning',
+      value: metrics.totalRevenue,
+      icon: DollarSign,
+      change: metrics.revenueGrowth,
+      format: formatCurrency,
+      color: 'green'
+    },
+    {
+      title: 'Gjennomsnittlig salgspris',
+      value: metrics.avgSalePrice,
+      icon: Target,
+      format: formatCurrency,
+      color: 'purple'
+    },
+    {
+      title: 'Fortjeneste per bil',
+      value: metrics.avgProfitPerCar,
+      icon: TrendingUp,
+      format: formatCurrency,
+      color: 'orange'
+    },
+    {
+      title: 'Totalt solgte biler',
+      value: metrics.totalCarsSold,
+      icon: Car,
+      format: (v: number) => v.toString(),
+      color: 'gray',
+      isAllTime: true
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      {metricCards.map((metric, index) => (
+        <Card key={index} className="hover:shadow-lg transition-shadow duration-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className={cn(
+                "p-2 rounded-lg",
+                metric.color === 'blue' && "bg-blue-100",
+                metric.color === 'green' && "bg-green-100",
+                metric.color === 'purple' && "bg-purple-100",
+                metric.color === 'orange' && "bg-orange-100",
+                metric.color === 'gray' && "bg-gray-100"
+              )}>
+                <metric.icon className={cn(
+                  "h-5 w-5",
+                  metric.color === 'blue' && "text-blue-600",
+                  metric.color === 'green' && "text-green-600",
+                  metric.color === 'purple' && "text-purple-600",
+                  metric.color === 'orange' && "text-orange-600",
+                  metric.color === 'gray' && "text-gray-600"
+                )} />
+              </div>
+              {metric.change !== undefined && !metric.isAllTime && (
+                <div className={cn(
+                  "flex items-center text-sm font-medium",
+                  metric.change >= 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {metric.change >= 0 ? (
+                    <TrendingUp className="h-4 w-4 mr-1" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 mr-1" />
+                  )}
+                  {formatPercentage(metric.change)}
+                </div>
+              )}
+              {metric.isAllTime && (
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">All time</span>
+              )}
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">
+                {metric.format(metric.value)}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">{metric.title}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+```
+
+## SalesChart.tsx
+
+```tsx
+import React, { useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { format, parseISO } from 'date-fns';
+import { nb } from 'date-fns/locale';
+
+export default function SalesChart({ data, period }) {
+  const chartData = useMemo(() => {
+    if (!data) return [];
+
+    // Grupper salg per måned
+    const salesByMonth = data.sales.reduce((acc, sale) => {
+      const monthKey = format(parseISO(sale.sale_date), 'yyyy-MM');
+      if (!acc[monthKey]) {
+        acc[monthKey] = {
+          month: monthKey,
+          displayMonth: format(parseISO(sale.sale_date), 'MMM yyyy', { locale: nb }),
+          count: 0,
+          revenue: 0,
+          profit: 0
+        };
+      }
+      
+      const car = data.cars.find(c => c.id === sale.car_id);
+      acc[monthKey].count += 1;
+      acc[monthKey].revenue += sale.sale_price;
+      acc[monthKey].profit += (sale.sale_price - (car?.purchase_price || 0));
+      
+      return acc;
+    }, {});
+
+    return Object.values(salesByMonth)
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-12); // Vis siste 12 måneder
+  }, [data]);
+
+  const formatTooltipValue = (value: number, name: string) => {
+    if (name === 'Antall biler') return value.toString();
+    return new Intl.NumberFormat('nb-NO', {
+      style: 'currency',
+      currency: 'NOK',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Salgsutvikling</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={350}>
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200" />
+            <XAxis 
+              dataKey="displayMonth" 
+              className="text-xs"
+              tick={{ fill: '#6B7280' }}
+            />
+            <YAxis 
+              yAxisId="left"
+              className="text-xs"
+              tick={{ fill: '#6B7280' }}
+            />
+            <YAxis 
+              yAxisId="right" 
+              orientation="right"
+              className="text-xs"
+              tick={{ fill: '#6B7280' }}
+            />
+            <Tooltip 
+              formatter={formatTooltipValue}
+              contentStyle={{ 
+                backgroundColor: 'white',
+                border: '1px solid #E5E7EB',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+              }}
+            />
+            <Legend />
+            <Bar 
+              yAxisId="left"
+              dataKey="count" 
+              name="Antall biler" 
+              fill="#3B82F6"
+              radius={[8, 8, 0, 0]}
+            />
+            <Line 
+              yAxisId="right"
+              type="monotone" 
+              dataKey="revenue" 
+              name="Omsetning" 
+              stroke="#10B981"
+              strokeWidth={2}
+              dot={{ fill: '#10B981', r: 4 }}
+              activeDot={{ r: 6 }}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+## TopSellingModels.tsx
+
+```tsx
+import React, { useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Trophy, TrendingUp } from 'lucide-react';
+
+export default function TopSellingModels({ data }) {
+  const topModels = useMemo(() => {
+    if (!data) return [];
+
+    const modelCounts = data.sales.reduce((acc, sale) => {
+      const car = data.cars.find(c => c.id === sale.car_id);
+      if (car) {
+        const key = `${car.brand} ${car.model}`;
+        acc[key] = (acc[key] || 0) + 1;
+      }
+      return acc;
+    }, {});
+
+    return Object.entries(modelCounts)
+      .map(([model, count]) => ({ model, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [data]);
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Trophy className="h-5 w-5 text-yellow-500" />
+          Topp 5 Bestselgere
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {topModels.map((item, index) => (
+            <div key={item.model} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                  index === 0 ? 'bg-yellow-100 text-yellow-700' :
+                  index === 1 ? 'bg-gray-100 text-gray-700' :
+                  index === 2 ? 'bg-orange-100 text-orange-700' :
+                  'bg-blue-50 text-blue-700'
+                }`}>
+                  {index + 1}
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">{item.model}</p>
+                  <p className="text-sm text-gray-500">{item.count} solgt</p>
+                </div>
+              </div>
+              {index === 0 && (
+                <Badge variant="default" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+                  Bestselger
+                </Badge>
+              )}
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+## useSalesData.ts Hook
+
+```tsx
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { startOfMonth, endOfMonth, subMonths, startOfYear } from 'date-fns';
+
+export function useSalesData(period: string, customDateRange?: { from: Date | null; to: Date | null }) {
+  return useQuery({
+    queryKey: ['sales', period, customDateRange],
+    queryFn: async () => {
+      let dateFilter = {};
+      const now = new Date();
+
+      switch(period) {
+        case 'current_month':
+          dateFilter = {
+            gte: startOfMonth(now).toISOString(),
+            lte: endOfMonth(now).toISOString()
+          };
+          break;
+        case 'last_month':
+          const lastMonth = subMonths(now, 1);
+          dateFilter = {
+            gte: startOfMonth(lastMonth).toISOString(),
+            lte: endOfMonth(lastMonth).toISOString()
+          };
+          break;
+        case 'last_12_months':
+          dateFilter = {
+            gte: subMonths(now, 12).toISOString()
+          };
+          break;
+        case 'year_to_date':
+          dateFilter = {
+            gte: startOfYear(now).toISOString()
+          };
+          break;
+        case 'custom':
+          if (customDateRange?.from && customDateRange?.to) {
+            dateFilter = {
+              gte: customDateRange.from.toISOString(),
+              lte: customDateRange.to.toISOString()
+            };
+          }
+          break;
+      }
+
+      // Hent salgsdata med relasjoner
+      const { data: sales, error: salesError } = await supabase
+        .from('sales')
+        .select(`
+          *,
+          car:cars(*),
+          customer:customers(*),
+          salesperson:employees(*)
+        `)
+        .order('sale_date', { ascending: false });
+
+      if (salesError) throw salesError;
+
+      // Hent alle biler for statistikk
+      const { data: cars, error: carsError } = await supabase
+        .from('cars')
+        .select('*');
+
+      if (carsError) throw carsError;
+
+      return {
+        sales: sales || [],
+        cars: cars || []
+      };
+    },
+    staleTime: 1000 * 60 * 5, // Cache i 5 minutter
+    cacheTime: 1000 * 60 * 10, // Hold i cache i 10 minutter
+  });
+}
+```
+
+## Supabase Setup (lib/supabase.ts)
+
+```tsx
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL!;
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  global: {
+    headers: {
+      'x-application-name': 'ForhandlerPRO'
+    }
+  }
+});
+
+// Realtime subscriptions for live updates
+export const subscribeToSales = (callback: (payload: any) => void) => {
+  return supabase
+    .channel('sales_changes')
+    .on('postgres_changes', { 
+      event: '*', 
+      schema: 'public', 
+      table: 'sales' 
+    }, callback)
+    .subscribe();
+};
+```
+
+## Ekstra Features
+
+### 1. Eksport til CSV/Excel
+```tsx
+export const exportToCSV = (data: any[]) => {
+  const headers = ['Dato', 'Merke', 'Modell', 'Kunde', 'Salgspris', 'Fortjeneste'];
+  const rows = data.map(sale => [
+    format(new Date(sale.sale_date), 'dd.MM.yyyy'),
+    sale.car.brand,
+    sale.car.model,
+    `${sale.customer.first_name} ${sale.customer.last_name}`,
+    sale.sale_price,
+    sale.sale_price - sale.car.purchase_price
+  ]);
+  
+  const csvContent = [headers, ...rows]
+    .map(row => row.join(','))
+    .join('\n');
+    
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `salgsrapport_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+  link.click();
+};
+```
+
+### 2. Tripletex Integrasjon (Forberedelse)
+```tsx
+interface TripletexIntegration {
+  apiUrl: string;
+  apiKey: string;
+  companyId: string;
+}
+
+export const syncWithTripletex = async (sale: Sale) => {
+  // Forbered datastruktur for Tripletex API
+  const invoice = {
+    customerId: sale.customer.tripletex_id,
+    invoiceDate: sale.sale_date,
+    lines: [{
+      product: {
+        name: `${sale.car.brand} ${sale.car.model}`,
+        number: sale.car.vin
+      },
+      unitPrice: sale.sale_price,
+      count: 1,
+      vat: 25
+    }]
+  };
+  
+  // Send til Tripletex API (implementeres senere)
+  // await tripletexApi.createInvoice(invoice);
+};
+```
+
+### 3. Performance Optimalisering
+```tsx
+// Implementer virtual scrolling for store datasett
+import { FixedSizeList } from 'react-window';
+
+// Lazy loading av komponenter
+const HeavyChart = React.lazy(() => import('./HeavyChart'));
+
+// Memoize expensive calculations
+const exp
