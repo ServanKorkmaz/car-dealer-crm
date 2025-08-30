@@ -143,10 +143,14 @@ export default function ContractWizard({
     enabled: open,
   });
 
-  const availableCars = useMemo(() => 
-    cars.filter((car: Car) => car.status === "available" || car.id === contract?.carId),
-    [cars, contract]
-  );
+  const availableCars = useMemo(() => {
+    // Vis alle biler som er tilgjengelige, reserverte, eller allerede i denne kontrakten
+    return cars.filter((car: Car) => 
+      car.status === "available" || 
+      car.status === "reserved" || 
+      car.id === contract?.carId
+    );
+  }, [cars, contract]);
 
   // Form setup with defaults
   const form = useForm<WizardFormData>({
