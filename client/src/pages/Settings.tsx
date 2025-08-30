@@ -359,10 +359,10 @@ export default function SettingsPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center">
                     <User className="mr-2 h-5 w-5" />
-                    Brukerprofil
+                    {t('Brukerprofil')}
                   </CardTitle>
                   <CardDescription>
-                    Oppdater din personlige informasjon
+                    {t('Oppdater din personlige informasjon')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -373,7 +373,7 @@ export default function SettingsPage() {
                         name="fullName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Fullt navn</FormLabel>
+                            <FormLabel>{t('Fullt navn')}</FormLabel>
                             <FormControl>
                               <Input 
                                 placeholder="Ditt fulle navn" 
@@ -391,7 +391,7 @@ export default function SettingsPage() {
                         name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>E-post</FormLabel>
+                            <FormLabel>{t('E-post')}</FormLabel>
                             <FormControl>
                               <Input 
                                 type="email" 
@@ -410,7 +410,7 @@ export default function SettingsPage() {
                         name="phone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Telefon</FormLabel>
+                            <FormLabel>{t('Telefon')}</FormLabel>
                             <FormControl>
                               <Input 
                                 type="tel" 
