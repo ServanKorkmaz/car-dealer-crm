@@ -127,6 +127,7 @@ export default function SettingsPage() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [currentView, setCurrentView] = useState<string | null>(null); // null = overview
+  const [activeTab, setActiveTab] = useState('profile');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
