@@ -180,7 +180,7 @@ export default function AssistantBubble({
       {/* Floating button */}
       <button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 z-50 rounded-full px-5 py-3 shadow-xl bg-blue-600 hover:bg-blue-700 text-white transition-all transform hover:scale-105 flex items-center gap-2"
+        className="fixed bottom-6 right-6 z-50 rounded-full px-5 py-3 shadow-xl bg-primary hover:bg-primary/90 text-primary-foreground transition-all transform hover:scale-105 flex items-center gap-2"
         aria-label="Åpne assistent"
         data-testid="assistant-bubble-button"
       >
@@ -258,7 +258,7 @@ export default function AssistantBubble({
           {pendingTool && (
             <div className="mb-3 flex justify-start">
               <button
-                className="text-xs rounded-full px-3 py-1 bg-blue-500/80 hover:bg-blue-500 text-white transition-colors"
+                className="text-xs rounded-full px-3 py-1 bg-primary/80 hover:bg-primary text-primary-foreground transition-colors"
                 onClick={() => {
                   window.dispatchEvent(new CustomEvent("assistant:action", { detail: pendingTool }));
                   setPendingTool(null);
@@ -284,7 +284,7 @@ export default function AssistantBubble({
             <button 
               onClick={send} 
               disabled={loading || !input.trim()}
-              className="rounded-xl px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white text-sm font-medium transition-colors"
+              className="rounded-xl px-4 py-2.5 bg-primary hover:bg-primary/90 disabled:bg-muted text-primary-foreground text-sm font-medium transition-colors"
               data-testid="assistant-send-button"
             >
               Send
