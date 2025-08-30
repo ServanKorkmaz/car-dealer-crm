@@ -1348,12 +1348,21 @@ Du er ForhandlerPRO-assistenten – en menneskelig, kortfattet veileder i appen 
       const storage = await storagePromise;
       const { fullName, email, phone } = req.body;
       
-      // Update user table
-      await storage.updateUser(req.user.id, {
-        firstName: fullName.split(' ')[0] || '',
-        lastName: fullName.split(' ').slice(1).join(' ') || '',
-        email,
-      });
+      // Update user table only if email is different
+      const currentUser = await storage.getUserById(req.user.id);
+      if (currentUser && currentUser.email !== email) {
+        await storage.updateUser(req.user.id, {
+          firstName: fullName.split(' ')[0] || '',
+          lastName: fullName.split(' ').slice(1).join(' ') || '',
+          email,
+        });
+      } else {
+        // Update only name fields if email is the same
+        await storage.updateUser(req.user.id, {
+          firstName: fullName.split(' ')[0] || '',
+          lastName: fullName.split(' ').slice(1).join(' ') || '',
+        });
+      }
 
       // Update or create profile with phone
       await storage.upsertProfile(req.user.id, { fullName, phone });
