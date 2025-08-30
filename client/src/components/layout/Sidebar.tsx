@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useTheme } from "@/components/ThemeProvider";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { 
@@ -27,6 +28,7 @@ const navigation = [
 export default function Sidebar() {
   const [location] = useLocation();
   const { theme, setTheme } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <div className="hidden md:flex md:flex-shrink-0">
@@ -76,7 +78,7 @@ export default function Sidebar() {
                       ? "text-primary" 
                       : "text-slate-400 group-hover:text-primary group-hover:scale-110"
                   )} />
-                  {item.name}
+                  {t(item.name)}
                   {/* Subtle highlight bar */}
                   {!isActive && (
                     <div className="absolute left-0 top-0 bottom-0 w-0 bg-primary rounded-r-full transition-all duration-200 group-hover:w-1 opacity-0 group-hover:opacity-100" />

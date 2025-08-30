@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -77,6 +78,7 @@ export default function SettingsPage() {
   const { data: roleData } = useUserRole();
   const role = roleData?.role;
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('profile');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -273,6 +275,11 @@ export default function SettingsPage() {
         description: 'Varselinnstillingene dine er oppdatert',
       });
       queryClient.invalidateQueries({ queryKey: ['/api/settings/user'] });
+      // Force page reload if language changed to apply translations
+      const currentLang = (notificationForm.getValues() as any).language;
+      if (currentLang !== (userSettings as any)?.language) {
+        setTimeout(() => window.location.reload(), 500);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -317,7 +324,7 @@ export default function SettingsPage() {
         <div>
           <h2 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center">
             <Settings className="mr-3 h-8 w-8" />
-            Innstillinger
+            {t('Innstillinger')}
           </h2>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
             Administrer profil, firma og systeminnstillinger
