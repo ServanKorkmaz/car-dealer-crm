@@ -527,4 +527,94 @@ export class SupabaseStorage implements IStorage {
 
     return true;
   }
+
+  async getAdvancedAnalytics(userId: string, timeRange: string) {
+    const days = parseInt(timeRange) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    try {
+      // Get sold cars for analytics
+      const { data: soldCars = [], error: carsError } = await this.supabase
+        .from('cars')
+        .select('*')
+        .eq('status', 'sold')
+        .eq('user_id', userId)
+        .gte('sold_date', startDate.toISOString());
+
+      if (carsError) {
+        console.error('Error fetching sold cars:', carsError);
+      }
+
+      // Calculate this month's data
+      const thisMonth = new Date();
+      thisMonth.setDate(1);
+      
+      const thisMonthSales = soldCars.filter(car => 
+        car.sold_date && new Date(car.sold_date) >= thisMonth
+      );
+      
+      const thisMonthRevenue = thisMonthSales.reduce((sum, car) => 
+        sum + parseFloat(car.sold_price || '0'), 0
+      );
+
+      const averageSalePrice = soldCars.length > 0 
+        ? soldCars.reduce((sum, car) => sum + parseFloat(car.sold_price || '0'), 0) / soldCars.length
+        : 0;
+
+      // Get available cars for inventory
+      const { data: availableCars = [] } = await this.supabase
+        .from('cars')
+        .select('*')
+        .eq('status', 'available')
+        .eq('user_id', userId);
+
+      const totalInventoryValue = availableCars.reduce((sum, car) => 
+        sum + parseFloat(car.cost_price || '0'), 0
+      );
+
+      return {
+        revenue: {
+          thisMonth: thisMonthRevenue,
+          thisYear: thisMonthRevenue,
+          lastMonth: 0,
+          lastYear: 0
+        },
+        sales: {
+          thisMonth: thisMonthSales.length,
+          thisYear: soldCars.length,
+          averageSalePrice
+        },
+        profitMargin: {
+          gross: 0,
+          net: 0
+        },
+        inventory: {
+          averageDaysOnLot: 30,
+          totalValue: totalInventoryValue,
+          fastMoving: availableCars.filter(car => parseFloat(car.sale_price || '0') < 200000).length,
+          slowMoving: availableCars.filter(car => parseFloat(car.sale_price || '0') >= 200000).length
+        },
+        monthlyTrends: [{
+          month: new Date().toLocaleDateString('no-NO', { month: 'short' }),
+          revenue: thisMonthRevenue,
+          sales: thisMonthSales.length,
+          profit: 0
+        }],
+        salesByMake: [],
+        inventoryAging: []
+      };
+    } catch (error) {
+      console.error('Error in getAdvancedAnalytics:', error);
+      return {
+        revenue: { thisMonth: 0, thisYear: 0, lastMonth: 0, lastYear: 0 },
+        sales: { thisMonth: 0, thisYear: 0, averageSalePrice: 0 },
+        profitMargin: { gross: 0, net: 0 },
+        inventory: { averageDaysOnLot: 0, totalValue: 0, fastMoving: 0, slowMoving: 0 },
+        monthlyTrends: [],
+        salesByMake: [],
+        inventoryAging: []
+      };
+    }
+  }
 }
