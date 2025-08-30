@@ -17,9 +17,9 @@ export default function SalesChart({ data, period }: SalesChartProps) {
   const chartData = useMemo(() => {
     if (!data) return [];
 
-    // Filtrer ut signerte/fullførte kontrakter som salg
-    const signedContracts = data.contracts.filter(contract => 
-      contract.status === 'signed' || contract.status === 'completed'
+    // Filtrer ut signerte/fullførte kontrakter samt solgte biler
+    const signedContracts = data.contracts.filter((contract: any) => 
+      contract.status === 'signed' || contract.status === 'completed' || contract.isSoldCar
     );
 
     // Grupper salg per måned

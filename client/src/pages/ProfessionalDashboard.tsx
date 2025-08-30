@@ -22,12 +22,12 @@ export default function ProfessionalDashboard() {
   const metrics = useMemo(() => {
     if (!data) return null;
     
-    // Filtrer ut signerte/fullførte kontrakter som salg
-    const allSoldContracts = data.contracts.filter((contract: Contract) => 
-      contract.status === 'signed' || contract.status === 'completed'
+    // Filtrer ut signerte/fullførte kontrakter samt solgte biler
+    const allSoldContracts = data.contracts.filter((contract: any) => 
+      contract.status === 'signed' || contract.status === 'completed' || contract.isSoldCar
     );
 
-    const currentPeriodSales = allSoldContracts.filter((contract: Contract) => {
+    const currentPeriodSales = allSoldContracts.filter((contract: any) => {
       const saleDate = new Date(contract.saleDate);
       const now = new Date();
       
@@ -49,8 +49,8 @@ export default function ProfessionalDashboard() {
       }
     });
 
-    const totalRevenue = currentPeriodSales.reduce((sum: number, contract: Contract) => sum + parseFloat(contract.salePrice), 0);
-    const totalProfit = currentPeriodSales.reduce((sum: number, contract: Contract) => {
+    const totalRevenue = currentPeriodSales.reduce((sum: number, contract: any) => sum + parseFloat(contract.salePrice), 0);
+    const totalProfit = currentPeriodSales.reduce((sum: number, contract: any) => {
       const car = data.cars.find((c: CarType) => c.id === contract.carId);
       const costPrice = car?.costPrice ? parseFloat(car.costPrice) : 0;
       return sum + (parseFloat(contract.salePrice) - costPrice);
@@ -59,7 +59,7 @@ export default function ProfessionalDashboard() {
     const avgProfitPerCar = currentPeriodSales.length > 0 ? totalProfit / currentPeriodSales.length : 0;
 
     // Sammenlign med forrige periode
-    const previousPeriodSales = allSoldContracts.filter((contract: Contract) => {
+    const previousPeriodSales = allSoldContracts.filter((contract: any) => {
       const saleDate = new Date(contract.saleDate);
       const now = new Date();
       
@@ -75,7 +75,7 @@ export default function ProfessionalDashboard() {
       }
     });
 
-    const prevRevenue = previousPeriodSales.reduce((sum: number, contract: Contract) => sum + parseFloat(contract.salePrice), 0);
+    const prevRevenue = previousPeriodSales.reduce((sum: number, contract: any) => sum + parseFloat(contract.salePrice), 0);
     const revenueGrowth = prevRevenue > 0 ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : 0;
 
     return {
@@ -95,8 +95,8 @@ export default function ProfessionalDashboard() {
     
     // Konverter til CSV
     const csvData = data.contracts
-      .filter((contract: Contract) => contract.status === 'signed' || contract.status === 'completed')
-      .map((contract: Contract) => {
+      .filter((contract: any) => contract.status === 'signed' || contract.status === 'completed' || contract.isSoldCar)
+      .map((contract: any) => {
         const car = data.cars.find((c: CarType) => c.id === contract.carId);
         return {
           'Kontraktnummer': contract.contractNumber,

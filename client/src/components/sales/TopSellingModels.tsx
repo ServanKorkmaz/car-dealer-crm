@@ -15,9 +15,9 @@ export default function TopSellingModels({ data }: TopSellingModelsProps) {
   const topModels = useMemo(() => {
     if (!data) return [];
 
-    // Filtrer ut signerte/fullførte kontrakter
-    const signedContracts = data.contracts.filter(contract => 
-      contract.status === 'signed' || contract.status === 'completed'
+    // Filtrer ut signerte/fullførte kontrakter samt solgte biler
+    const signedContracts = data.contracts.filter((contract: any) => 
+      contract.status === 'signed' || contract.status === 'completed' || contract.isSoldCar
     );
 
     const modelCounts = signedContracts.reduce((acc: any, contract) => {

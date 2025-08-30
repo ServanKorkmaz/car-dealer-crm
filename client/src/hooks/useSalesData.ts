@@ -18,8 +18,27 @@ export function useSalesData(period: string, customDateRange?: { from: Date | nu
       const contracts = await contractsRes.json();
       const cars = await carsRes.json();
 
+      // Kombiner kontrakter og solgte biler til salgsdata
+      const soldCars = cars.filter((car: any) => car.status === 'sold' && car.soldDate && car.soldPrice);
+      
+      // Lag "virtuelle kontrakter" for solgte biler som ikke har eksplisitte kontrakter
+      const soldCarContracts = soldCars
+        .filter((car: any) => !contracts.some((contract: any) => contract.carId === car.id))
+        .map((car: any) => ({
+          id: `sold-car-${car.id}`,
+          carId: car.id,
+          customerId: car.soldToCustomerId || 'unknown',
+          salePrice: car.soldPrice,
+          saleDate: car.soldDate,
+          status: 'completed',
+          contractNumber: `AUTO-${car.id.slice(0, 8)}`,
+          isSoldCar: true // marker for å skille fra eksplisitte kontrakter
+        }));
+
+      const allSalesData = [...contracts, ...soldCarContracts];
+
       return {
-        contracts,
+        contracts: allSalesData,
         cars
       };
     },
