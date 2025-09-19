@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { storagePromise } from '../storage';
+import { UsageTracker } from '../services/usageTracker';
 
 // Environment variables with defaults for development
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
@@ -157,6 +158,15 @@ export async function authenticateToken(req: Request & { user?: TokenPayload }, 
       role: payload.role,
       companyId: payload.companyId
     };
+
+    // Track user activity in admin portal
+    UsageTracker.sendHeartbeat(payload.userId);
+    UsageTracker.trackEvent(payload.userId, 'api_call', { 
+      endpoint: req.path, 
+      method: req.method,
+      source: 'main_app'
+    });
+
     next();
   } catch (error) {
     console.error('Authentication error:', error);

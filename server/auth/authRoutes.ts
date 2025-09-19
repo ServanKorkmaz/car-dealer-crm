@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
 import { randomUUID } from 'crypto';
 import { storagePromise } from '../storage';
+import { UsageTracker } from '../services/usageTracker';
 import {
   hashPassword,
   verifyPassword,
@@ -135,6 +136,20 @@ export function setupAuthRoutes(app: Express) {
         auditData.failureReason = undefined;
         await logLoginAttempt(auditData);
 
+        // Sync user to Supabase for admin portal tracking
+        await UsageTracker.syncUser(
+          user.id, 
+          user.email, 
+          `${user.firstName} ${user.lastName}`,
+          membership?.role || 'user'
+        );
+        
+        // Track login event
+        await UsageTracker.trackEvent(user.id, 'login', { 
+          source: 'main_app',
+          companyId: user.companyId
+        });
+
         // Return user data
         res.json({
           user: {
@@ -229,6 +244,20 @@ export function setupAuthRoutes(app: Express) {
             joinedAt: new Date()
           });
         }
+
+        // Sync new user to Supabase for admin portal tracking
+        await UsageTracker.syncUser(
+          user.id,
+          user.email,
+          `${user.firstName} ${user.lastName}`,
+          companyId ? 'admin' : 'user'
+        );
+
+        // Track registration event
+        await UsageTracker.trackEvent(user.id, 'register', {
+          source: 'main_app',
+          companyId
+        });
 
         res.status(201).json({
           message: 'Bruker opprettet. Vennligst logg inn.',

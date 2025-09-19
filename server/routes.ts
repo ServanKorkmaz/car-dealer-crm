@@ -28,8 +28,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Import new auth middleware
   const { authenticateToken } = await import('./auth/authService');
   
-  // Choose the right auth middleware
-  const authMiddleware = authenticateToken;
+  // Choose the right auth middleware based on environment
+  const authMiddleware = process.env.NODE_ENV === "development" 
+    ? isSimpleAuthenticated 
+    : authenticateToken;
+
+  // Heartbeat endpoint for active user tracking
+  app.post('/api/heartbeat', authMiddleware, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      if (userId) {
+        const { UsageTracker } = await import('./services/usageTracker');
+        await UsageTracker.sendHeartbeat(userId);
+        await UsageTracker.trackEvent(userId, 'heartbeat', { 
+          source: 'main_app',
+          timestamp: new Date().toISOString()
+        });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Heartbeat error:', error);
+      res.status(500).json({ error: 'Failed to send heartbeat' });
+    }
+  });
 
   // Role-based endpoints
   app.get('/api/user/role', authMiddleware, async (req: any, res) => {

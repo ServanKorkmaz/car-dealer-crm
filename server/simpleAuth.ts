@@ -1,6 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import { storagePromise } from "./storage";
 import session from "express-session";
+import { UsageTracker } from "./services/usageTracker";
 
 // Simple development authentication bypass
 export function setupSimpleAuth(app: Express) {
@@ -39,6 +40,20 @@ export function setupSimpleAuth(app: Express) {
         firstName: testUser.firstName,
         lastName: testUser.lastName,
       };
+
+      // Sync dev user to Supabase for admin portal tracking
+      await UsageTracker.syncUser(
+        testUser.id,
+        testUser.email,
+        `${testUser.firstName} ${testUser.lastName}`,
+        'EIER'
+      );
+      
+      // Track login event
+      await UsageTracker.trackEvent(testUser.id, 'login', {
+        source: 'main_app_dev',
+        companyId: 'default-company'
+      });
 
       res.redirect("/");
     } catch (error) {
@@ -96,6 +111,15 @@ export const isSimpleAuthenticated: RequestHandler = (req: any, res, next) => {
   if (req.session?.user) {
     // Add user to request for compatibility
     req.user = { claims: { sub: req.session.user.id } };
+    
+    // Track activity for dev user
+    UsageTracker.sendHeartbeat(req.session.user.id);
+    UsageTracker.trackEvent(req.session.user.id, 'api_call', {
+      endpoint: req.path,
+      method: req.method,
+      source: 'main_app_dev'
+    });
+    
     next();
   } else {
     res.status(401).json({ message: "Unauthorized" });
