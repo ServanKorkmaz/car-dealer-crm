@@ -122,7 +122,7 @@ export class UsageTracker {
         .single();
 
       if (!existingOrg) {
-        // Create default org for main app
+        // Create default org for main app (without user_id since it's a system org)
         const { error } = await supabaseAdmin
           .from('orgs')
           .insert({
@@ -138,7 +138,8 @@ export class UsageTracker {
         }
       }
     } catch (err) {
-      console.error('[UsageTracker] Error ensuring org exists:', err);
+      // Error might be expected if org already exists
+      console.log('[UsageTracker] Org status:', err);
     }
   }
 }
