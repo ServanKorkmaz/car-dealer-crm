@@ -41,7 +41,6 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { useAuth } from "@/contexts/AuthContext";
 import type { Car, Customer, Contract, InsertContract } from "@shared/schema";
 import {
   Plus, Minus, Copy, Trash2, Eye, Download, Send, 
@@ -131,7 +130,6 @@ export default function EnhancedContractGenerator({ onClose, contract, prefilled
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { company } = useAuth();
   const isEditing = !!contract;
 
   // Fetch data
@@ -390,7 +388,7 @@ export default function EnhancedContractGenerator({ onClose, contract, prefilled
           <div className="bg-white p-8 border rounded-lg">
             <div className="text-center mb-8">
               <h1 className="text-2xl font-bold text-slate-900">SALGSKONTRAKT</h1>
-              <p className="text-slate-600">{company?.name || "ForhandlerPRO AS"} - {contractTemplates[currentTemplate].name}</p>
+              <p className="text-slate-600">ForhandlerPRO AS - {contractTemplates[currentTemplate].name}</p>
             </div>
             
             {/* Contract content will be detailed here */}

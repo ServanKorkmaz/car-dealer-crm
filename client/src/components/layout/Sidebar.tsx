@@ -1,7 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useTheme } from "@/components/ThemeProvider";
 import { useTranslation } from "@/hooks/useTranslation";
-import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { 
@@ -30,7 +29,6 @@ export default function Sidebar() {
   const [location] = useLocation();
   const { theme, setTheme } = useTheme();
   const { t } = useTranslation();
-  const { company } = useAuth();
 
   return (
     <div className="hidden md:flex md:flex-shrink-0">
@@ -42,7 +40,7 @@ export default function Sidebar() {
               <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center group-hover:shadow-lg transition-all duration-200 group-hover:bg-primary-600">
                 <Car className="text-white text-sm" />
               </div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors duration-200">{company?.name || "ForhandlerPRO"}</h1>
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors duration-200">ForhandlerPRO</h1>
             </div>
           </Link>
           {/* Theme Toggle */}

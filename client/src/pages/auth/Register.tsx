@@ -13,15 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Car, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
 
 const registerSchema = z.object({
-  firstName: z.string().min(1, 'Fornavn er påkrevd'),
-  lastName: z.string().min(1, 'Etternavn er påkrevd'),
-  companyName: z.string().min(1, 'Bedriftsnavn er påkrevd'),
-  orgNumber: z.string().optional(),
   email: z.string().email('Ugyldig e-postadresse'),
-  password: z.string().min(8, 'Passord må være minst 8 tegn')
-    .regex(/[A-Z]/, 'Passord må inneholde minst én stor bokstav')
-    .regex(/[a-z]/, 'Passord må inneholde minst én liten bokstav')
-    .regex(/[0-9]/, 'Passord må inneholde minst ett tall'),
+  password: z.string().min(6, 'Passord må være minst 6 tegn'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passordene må være like',
@@ -53,12 +46,7 @@ export default function Register() {
     try {
       const { isSupabaseConfigured } = await import('@/lib/supabase');
       
-      await signUp(data.email, data.password, {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        companyName: data.companyName,
-        orgNumber: data.orgNumber,
-      });
+      await signUp(data.email, data.password);
       setSuccess(true);
       
       if (isSupabaseConfigured) {
@@ -125,74 +113,12 @@ export default function Register() {
                 </Alert>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">Fornavn</Label>
-                  <Input
-                    id="firstName"
-                    type="text"
-                    placeholder="Ola"
-                    {...register('firstName')}
-                    disabled={isLoading}
-                    className={errors.firstName ? 'border-red-500' : ''}
-                  />
-                  {errors.firstName && (
-                    <p className="text-sm text-red-500">{errors.firstName.message}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Etternavn</Label>
-                  <Input
-                    id="lastName"
-                    type="text"
-                    placeholder="Hansen"
-                    {...register('lastName')}
-                    disabled={isLoading}
-                    className={errors.lastName ? 'border-red-500' : ''}
-                  />
-                  {errors.lastName && (
-                    <p className="text-sm text-red-500">{errors.lastName.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Bedriftsnavn</Label>
-                <Input
-                  id="companyName"
-                  type="text"
-                  placeholder="Hansen Bil AS"
-                  {...register('companyName')}
-                  disabled={isLoading}
-                  className={errors.companyName ? 'border-red-500' : ''}
-                />
-                {errors.companyName && (
-                  <p className="text-sm text-red-500">{errors.companyName.message}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="orgNumber">Organisasjonsnummer (valgfritt)</Label>
-                <Input
-                  id="orgNumber"
-                  type="text"
-                  placeholder="123 456 789"
-                  {...register('orgNumber')}
-                  disabled={isLoading}
-                  className={errors.orgNumber ? 'border-red-500' : ''}
-                />
-                {errors.orgNumber && (
-                  <p className="text-sm text-red-500">{errors.orgNumber.message}</p>
-                )}
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="email">E-post</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="ola@hansenbil.no"
+                  placeholder="din@epost.no"
                   {...register('email')}
                   disabled={isLoading}
                   className={errors.email ? 'border-red-500' : ''}
@@ -207,7 +133,7 @@ export default function Register() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Minst 8 tegn"
+                  placeholder="Minst 6 tegn"
                   {...register('password')}
                   disabled={isLoading}
                   className={errors.password ? 'border-red-500' : ''}

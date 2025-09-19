@@ -563,19 +563,9 @@ export class DatabaseStorage implements IStorage {
       passwordHash: data.passwordHash,
       firstName: data.firstName || null,
       lastName: data.lastName || null,
-      companyId: data.companyId || null,
       role: 'user'
     }).returning();
-    
-    const user = result[0];
-    
-    // Create corresponding profile record (required for memberships foreign key)
-    if (user.id) {
-      const fullName = [data.firstName, data.lastName].filter(Boolean).join(' ') || 'User';
-      await this.createProfile(user.id, fullName);
-    }
-    
-    return user;
+    return result[0];
   }
 
   async updateUserPassword(userId: string, passwordHash: string) {

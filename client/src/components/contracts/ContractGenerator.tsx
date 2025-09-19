@@ -17,7 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, CalendarDays, FileText, Download, Eye } from "lucide-react";
 import { z } from "zod";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface ContractGeneratorProps {
   onClose: () => void;
@@ -37,7 +36,6 @@ export default function ContractGenerator({ onClose, contract }: ContractGenerat
   const [previewMode, setPreviewMode] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { company } = useAuth();
   const isEditing = !!contract;
 
   const { data: cars = [] } = useQuery<Car[]>({
@@ -172,14 +170,14 @@ export default function ContractGenerator({ onClose, contract }: ContractGenerat
           <div className="bg-white p-8 border rounded-lg">
             <div className="text-center mb-8">
               <h1 className="text-2xl font-bold text-slate-900">SALGSKONTRAKT</h1>
-              <p className="text-slate-600">{company?.name || "ForhandlerPRO AS"}</p>
+              <p className="text-slate-600">ForhandlerPRO AS</p>
             </div>
 
             <div className="grid grid-cols-2 gap-8 mb-8">
               <div>
                 <h3 className="font-semibold text-slate-900 mb-2">SELGER</h3>
                 <p className="text-sm text-slate-600">
-                  {company?.name || "ForhandlerPRO AS"}<br />
+                  ForhandlerPRO AS<br />
                   Org.nr: 123 456 789<br />
                   Forhandlerveien 1<br />
                   0123 Oslo
