@@ -1,0 +1,709 @@
+You are my senior full-stack pair-programmer. Tech: Node 18, React + Vite + TypeScript, Tailwind, Supabase (@supabase/supabase-js v2), Express for API. Build a minimal production-ready MVP with:
+
+Supabase Auth (email+password)
+
+orgs, org_members, profiles tables with RLS
+
+usage_events (append-only) + usage_daily (aggregates)
+
+SQL trigger to auto-assign org owner
+
+SQL RPC to aggregate yesterday → usage_daily
+
+Server: /api/admin/active (who’s online last 15 min), /api/admin/aggregateDaily (run aggregation)
+
+Cron job (00:15 Europe/Oslo) to run aggregation daily
+
+Frontend: login page, post-login auto-create org if missing, track(orgId,'login') on mount, Admin Usage page at /admin/usage (lists active users)
+
+Static build served by Express (single port). Dev flow = npm run build && npm start.
+
+Create/overwrite the following files exactly:
+
+1) package.json
+{
+  "name": "forhandlerpro-mvp",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "start": "node server/index.js",
+    "postinstall": "vite build"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.5",
+    "cors": "2.8.5",
+    "dotenv": "16.4.5",
+    "express": "4.19.2",
+    "node-cron": "3.0.3",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/express": "4.17.21",
+    "@types/node": "20.14.9",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "autoprefixer": "10.4.20",
+    "postcss": "8.4.41",
+    "tailwindcss": "3.4.10",
+    "typescript": "5.6.2",
+    "vite": "5.4.8",
+    "@vitejs/plugin-react": "4.3.1"
+  }
+}
+
+2) .env.example
+# Client (exposed in browser)
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+
+# Server only
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Server
+PORT=3000
+
+
+Create your .env by copying .env.example and filling values.
+
+3) server/supabaseAdminClient.js
+import { createClient } from '@supabase/supabase-js';
+
+const url = process.env.SUPABASE_URL;
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!url || !serviceKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment');
+  process.exit(1);
+}
+
+export const supabaseAdmin = createClient(url, serviceKey, {
+  auth: { persistSession: false }
+});
+
+4) server/aggregateDaily.js
+import { supabaseAdmin } from './supabaseAdminClient.js';
+
+export async function aggregateDaily(dayIsoDate) {
+  const day = dayIsoDate || new Date(Date.now() - 24*60*60*1000).toISOString().slice(0,10);
+  const { data, error } = await supabaseAdmin.rpc('aggregate_usage_daily', { day_input: day });
+  if (error) throw error;
+  return { ok: true, day };
+}
+
+5) server/index.js
+import 'dotenv/config';
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import cors from 'cors';
+import cron from 'node-cron';
+import { supabaseAdmin } from './supabaseAdminClient.js';
+import { aggregateDaily } from './aggregateDaily.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+app.get('/api/admin/active', async (req, res) => {
+  try {
+    const orgId = String(req.query.orgId || '');
+    if (!orgId) return res.status(400).json({ error: 'Missing orgId' });
+    const since = new Date(Date.now() - 15*60*1000).toISOString();
+    const { data: events, error } = await supabaseAdmin
+      .from('usage_events')
+      .select('user_id, created_at')
+      .eq('org_id', orgId)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+
+    const userIds = Array.from(new Set((events || []).map(e => e.user_id).filter(Boolean)));
+    let profiles = {};
+    if (userIds.length) {
+      const { data: profs, error: pErr } = await supabaseAdmin
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', userIds);
+      if (pErr) return res.status(500).json({ error: pErr.message });
+      (profs || []).forEach(p => { profiles[p.user_id] = p.full_name || null; });
+    }
+
+    const active = (events || []).map(e => ({
+      user_id: e.user_id,
+      last_seen: e.created_at,
+      name: e.user_id ? (profiles[e.user_id] ?? null) : null
+    }));
+    res.json({ active });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/admin/aggregateDaily', async (req, res) => {
+  try {
+    const { day } = req.body || {};
+    const out = await aggregateDaily(day);
+    res.json(out);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+cron.schedule('15 0 * * *', async () => {
+  try {
+    await aggregateDaily();
+  } catch (_) {}
+}, { timezone: 'Europe/Oslo' });
+
+const distPath = path.join(__dirname, '..', 'dist');
+app.use(express.static(distPath));
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+
+6) supabase/migrations/000_init_core.sql
+-- Enable needed extensions
+create extension if not exists "uuid-ossp";
+create extension if not exists pgcrypto;
+
+-- ORGS
+create table if not exists public.orgs (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  plan text not null default 'free',
+  created_at timestamptz default now()
+);
+
+-- ORG MEMBERS
+create table if not exists public.org_members (
+  org_id uuid not null references public.orgs(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null check (role in ('owner','admin','user')) default 'user',
+  created_at timestamptz default now(),
+  primary key (org_id, user_id)
+);
+
+-- PROFILES
+create table if not exists public.profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  full_name text,
+  phone text,
+  created_at timestamptz default now()
+);
+
+-- USAGE EVENTS
+create table if not exists public.usage_events (
+  id bigserial primary key,
+  org_id uuid not null references public.orgs(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete set null,
+  event text not null,
+  amount numeric not null default 1,
+  metadata jsonb,
+  created_at timestamptz default now()
+);
+
+-- DAILY AGGREGATES
+create table if not exists public.usage_daily (
+  org_id uuid not null references public.orgs(id) on delete cascade,
+  day date not null,
+  metric text not null,
+  value numeric not null,
+  primary key (org_id, day, metric)
+);
+
+-- AUDIT LOG
+create table if not exists public.audit_log (
+  id bigserial primary key,
+  org_id uuid references public.orgs(id) on delete set null,
+  user_id uuid references auth.users(id) on delete set null,
+  action text not null,
+  before jsonb,
+  after jsonb,
+  created_at timestamptz default now()
+);
+
+-- RLS
+alter table public.orgs enable row level security;
+alter table public.org_members enable row level security;
+alter table public.profiles enable row level security;
+alter table public.usage_events enable row level security;
+alter table public.usage_daily enable row level security;
+alter table public.audit_log enable row level security;
+
+-- Helper: is member of org
+create or replace function public.is_member(org uuid)
+returns boolean language sql stable as $$
+  select exists(
+    select 1 from public.org_members
+    where org_id = org and user_id = auth.uid()
+  );
+$$;
+
+-- ORGS policies
+create policy orgs_select_if_member on public.orgs
+for select using (public.is_member(id));
+
+create policy orgs_insert_any_user on public.orgs
+for insert with check (true);
+
+create policy orgs_update_admins on public.orgs
+for update using (
+  exists(select 1 from public.org_members m
+    where m.org_id = id and m.user_id = auth.uid() and m.role in ('owner','admin'))
+);
+
+-- ORG MEMBERS policies
+create policy org_members_select_if_member on public.org_members
+for select using (public.is_member(org_id));
+
+create policy org_members_insert_admin on public.org_members
+for insert with check (
+  exists(select 1 from public.org_members m
+    where m.org_id = org_id and m.user_id = auth.uid() and m.role in ('owner','admin'))
+);
+
+create policy org_members_delete_admin on public.org_members
+for delete using (
+  exists(select 1 from public.org_members m
+    where m.org_id = org_id and m.user_id = auth.uid() and m.role in ('owner','admin'))
+);
+
+-- PROFILES policies
+create policy profiles_select_self_or_same_org on public.profiles
+for select using (
+  user_id = auth.uid() or exists(
+    select 1 from public.org_members om1
+    join public.org_members om2 on om1.org_id = om2.org_id
+    where om1.user_id = user_id and om2.user_id = auth.uid()
+  )
+);
+
+create policy profiles_insert_self on public.profiles
+for insert with check (user_id = auth.uid());
+
+create policy profiles_update_self on public.profiles
+for update using (user_id = auth.uid());
+
+-- USAGE_EVENTS policies
+create policy usage_events_select_member on public.usage_events
+for select using (public.is_member(org_id));
+
+create policy usage_events_insert_member on public.usage_events
+for insert with check (public.is_member(org_id));
+
+-- USAGE_DAILY policies
+create policy usage_daily_select_member on public.usage_daily
+for select using (public.is_member(org_id));
+
+-- AUDIT_LOG policies
+create policy audit_log_select_admin on public.audit_log
+for select using (
+  exists(select 1 from public.org_members m
+    where m.org_id = audit_log.org_id and m.user_id = auth.uid() and m.role in ('owner','admin'))
+);
+
+-- Trigger: after org insert, add creator as owner
+create or replace function public.add_creator_as_owner()
+returns trigger language plpgsql as $$
+begin
+  insert into public.org_members (org_id, user_id, role)
+  values (new.id, auth.uid(), 'owner')
+  on conflict do nothing;
+  return new;
+end; $$;
+
+drop trigger if exists trg_org_owner on public.orgs;
+create trigger trg_org_owner
+after insert on public.orgs
+for each row execute function public.add_creator_as_owner();
+
+-- RPC: aggregate usage into usage_daily for a given day (YYYY-MM-DD)
+create or replace function public.aggregate_usage_daily(day_input date)
+returns void
+language plpgsql
+as $$
+begin
+  delete from public.usage_daily where day = day_input and metric = 'api.calls';
+  insert into public.usage_daily (org_id, day, metric, value)
+  select org_id, day_input as day, 'api.calls' as metric, count(*)::numeric
+  from public.usage_events
+  where created_at::date = day_input
+  group by org_id;
+end;
+$$;
+
+
+Run this migration in Supabase SQL editor once.
+
+7) vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: 'dist',
+    sourcemap: false
+  }
+});
+
+8) tailwind.config.cjs
+module.exports = {
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: { extend: {} },
+  plugins: []
+};
+
+9) postcss.config.cjs
+module.exports = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {}
+  }
+};
+
+10) index.html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>ForhandlerPRO Admin</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
+11) src/index.css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+
+12) src/lib/supabaseClient.ts
+import { createClient } from '@supabase/supabase-js';
+
+export const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL!,
+  import.meta.env.VITE_SUPABASE_ANON_KEY!,
+  { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
+);
+
+13) src/lib/track.ts
+import { supabase } from './supabaseClient';
+
+export async function track(orgId: string, event: string, amount = 1, metadata: Record<string, any> = {}) {
+  const { data: { user } } = await supabase.auth.getUser();
+  await supabase.from('usage_events').insert({
+    org_id: orgId,
+    user_id: user?.id ?? null,
+    event,
+    amount,
+    metadata
+  });
+}
+
+14) src/auth.ts
+import { supabase } from './lib/supabaseClient';
+
+export async function signIn(email: string, password: string) {
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
+export async function signUp(email: string, password: string, fullName?: string) {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  const user = data.user;
+  if (user) {
+    const { error: pErr } = await supabase.from('profiles').insert({
+      user_id: user.id,
+      full_name: fullName || null
+    });
+    if (pErr && pErr.code !== '23505') throw pErr;
+  }
+}
+
+export async function signOut() {
+  await supabase.auth.signOut();
+}
+
+15) src/org.ts
+import { supabase } from './lib/supabaseClient';
+
+export async function getOrCreateMyOrg(): Promise<{ orgId: string; role: 'owner'|'admin'|'user' }> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: memberships, error } = await supabase
+    .from('org_members')
+    .select('org_id, role')
+    .eq('user_id', user.id)
+    .limit(1);
+  if (error) throw error;
+
+  if (memberships && memberships.length) {
+    return { orgId: memberships[0].org_id, role: memberships[0].role as any };
+  }
+
+  const { data: org, error: insErr } = await supabase
+    .from('orgs')
+    .insert({ name: 'Default Org' })
+    .select('id')
+    .single();
+  if (insErr) throw insErr;
+
+  return { orgId: org.id, role: 'owner' };
+}
+
+16) src/main.tsx
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import './index.css';
+import { supabase } from './lib/supabaseClient';
+import Login from './pages/Login';
+import UsageAdmin from './pages/UsageAdmin';
+import Home from './pages/Home';
+
+function AuthedRoute({ children }: { children: JSX.Element }) {
+  const [ready, setReady] = React.useState(false);
+  const [authed, setAuthed] = React.useState(false);
+
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthed(!!session);
+      setReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setAuthed(!!session));
+    return () => { sub.subscription.unsubscribe(); };
+  }, []);
+
+  if (!ready) return <div className="p-6">Loading…</div>;
+  return authed ? children : <Navigate to="/login" replace />;
+}
+
+function Nav() {
+  return (
+    <nav className="p-4 border-b flex gap-4">
+      <Link to="/">Home</Link>
+      <Link to="/admin/usage">Admin Usage</Link>
+    </nav>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Nav />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/admin/usage" element={
+          <AuthedRoute><UsageAdmin/></AuthedRoute>
+        } />
+        <Route path="/" element={
+          <AuthedRoute><Home/></AuthedRoute>
+        } />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<App />);
+
+17) src/pages/Login.tsx
+import React from 'react';
+import { signIn, signUp } from '../auth';
+import { useNavigate } from 'react-router-dom';
+
+export default function Login() {
+  const nav = useNavigate();
+  const [email, setEmail] = React.useState('');
+  const [name, setName] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [mode, setMode] = React.useState<'signin'|'signup'>('signin');
+  const [err, setErr] = React.useState<string|null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    setLoading(true);
+    try {
+      if (mode === 'signin') await signIn(email, password);
+      else await signUp(email, password, name || undefined);
+      nav('/');
+    } catch (e:any) {
+      setErr(e.message || 'Error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="p-6 max-w-md mx-auto">
+      <h1 className="text-2xl font-bold mb-4">{mode === 'signin' ? 'Sign in' : 'Create account'}</h1>
+      <form className="space-y-3" onSubmit={handleSubmit}>
+        {mode === 'signup' && (
+          <div>
+            <label className="block text-sm">Full name</label>
+            <input className="border rounded px-3 py-2 w-full" value={name} onChange={(e)=>setName(e.target.value)} />
+          </div>
+        )}
+        <div>
+          <label className="block text-sm">Email</label>
+          <input className="border rounded px-3 py-2 w-full" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+        </div>
+        <div>
+          <label className="block text-sm">Password</label>
+          <input className="border rounded px-3 py-2 w-full" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required />
+        </div>
+        {err && <div className="text-red-600 text-sm">{err}</div>}
+        <button disabled={loading} className="bg-black text-white rounded px-4 py-2">
+          {loading ? 'Please wait…' : (mode === 'signin' ? 'Sign in' : 'Sign up')}
+        </button>
+      </form>
+      <div className="mt-4 text-sm">
+        {mode === 'signin' ? (
+          <button className="underline" onClick={()=>setMode('signup')}>Create an account</button>
+        ) : (
+          <button className="underline" onClick={()=>setMode('signin')}>I already have an account</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+18) src/pages/Home.tsx
+import React from 'react';
+import { getOrCreateMyOrg } from '../org';
+import { track } from '../lib/track';
+import { supabase } from '../lib/supabaseClient';
+import { useNavigate } from 'react-router-dom';
+
+export default function Home() {
+  const nav = useNavigate();
+  const [orgId, setOrgId] = React.useState<string>('');
+  const [role, setRole] = React.useState<'owner'|'admin'|'user'>('user');
+  const [me, setMe] = React.useState<{email:string}|null>(null);
+
+  React.useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setMe({ email: user.email || '' });
+      const o = await getOrCreateMyOrg();
+      setOrgId(o.orgId);
+      setRole(o.role);
+      await track(o.orgId, 'login');
+    })();
+  }, []);
+
+  async function logout() {
+    await supabase.auth.signOut();
+    nav('/login');
+  }
+
+  return (
+    <div className="p-6 space-y-4">
+      <h1 className="text-2xl font-bold">Welcome</h1>
+      <div>Your org: <b>{orgId || '—'}</b> | Role: <b>{role}</b></div>
+      <div>User: <b>{me?.email}</b></div>
+      <div className="flex gap-2">
+        <button className="rounded border px-3 py-2" onClick={()=>track(orgId,'car.create')}>Simulate: car.create</button>
+        <button className="rounded border px-3 py-2" onClick={()=>track(orgId,'contract.generate')}>Simulate: contract.generate</button>
+      </div>
+      <div>
+        <button className="bg-black text-white rounded px-4 py-2" onClick={logout}>Log out</button>
+      </div>
+    </div>
+  );
+}
+
+19) src/pages/UsageAdmin.tsx
+import React from 'react';
+import { getOrCreateMyOrg } from '../org';
+
+type ActiveRow = { user_id: string|null; last_seen: string; name: string|null };
+
+export default function UsageAdmin() {
+  const [orgId, setOrgId] = React.useState('');
+  const [rows, setRows] = React.useState<ActiveRow[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    (async () => {
+      const o = await getOrCreateMyOrg();
+      setOrgId(o.orgId);
+      await refresh(o.orgId);
+      const t = setInterval(()=>refresh(o.orgId), 5000);
+      return () => clearInterval(t);
+    })();
+  }, []);
+
+  async function refresh(oid: string) {
+    if (!oid) return;
+    setLoading(true);
+    const res = await fetch(`/api/admin/active?orgId=${oid}`);
+    const json = await res.json();
+    setRows(json.active || []);
+    setLoading(false);
+  }
+
+  return (
+    <div className="p-6 space-y-4">
+      <h1 className="text-2xl font-bold">Active users (last 15 min)</h1>
+      <div className="text-sm opacity-80">Org: {orgId}</div>
+      <button className="rounded border px-3 py-2" onClick={()=>refresh(orgId)} disabled={loading}>
+        {loading ? 'Refreshing…' : 'Refresh now'}
+      </button>
+      <div className="grid gap-2">
+        {rows.map((r, i) => (
+          <div key={i} className="rounded border px-3 py-2">
+            <div><b>User:</b> {r.name || r.user_id || 'Anonymous'}</div>
+            <div><b>Last seen:</b> {new Date(r.last_seen).toLocaleString()}</div>
+          </div>
+        ))}
+        {!rows.length && <div>No active users in the last 15 minutes.</div>}
+      </div>
+    </div>
+  );
+}
+
+How to run
+
+Create .env from .env.example and fill:
+
+VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+
+SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+
+PORT=3000 (or leave)
+
+In Supabase SQL editor, run supabase/migrations/000_init_core.sql once.
+
+Back in Replit shell:
+
+npm install
+npm start
+
+
+Replit will build the client and start Express on one port. Open the webview. Create an account on /login, you’ll be redirected to /, your org will be created, usage tracked, and /admin/usage will show currently active users (last 15 min). Daily aggregation runs automatically at 00:15 Europe/Oslo; you can also trigger it now:
+
+curl -X POST http://localhost:3000/api/admin/aggregateDaily -H "Content-Type: application/json" -d '{"day":"2025-09-18"}'
