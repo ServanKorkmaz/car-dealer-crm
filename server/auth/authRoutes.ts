@@ -225,7 +225,7 @@ export function setupAuthRoutes(app: Express) {
           await storage.createMembership({
             userId: user.id,
             companyId,
-            role: 'admin',
+            role: 'EIER', // Owner in Norwegian - person who creates the company becomes owner
             joinedAt: new Date()
           });
         }

@@ -7,7 +7,7 @@ interface AuthContextType {
   company: AuthCompany | null;
   isLoading: boolean;
   signIn: (email: string, password: string, remember?: boolean) => Promise<boolean>;
-  signUp: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, additionalData?: { firstName: string; lastName: string; companyName: string; orgNumber?: string }) => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   hasPermission: (feature: string) => boolean;
@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string): Promise<void> => {
+  const signUp = async (email: string, password: string, additionalData?: { firstName: string; lastName: string; companyName: string; orgNumber?: string }): Promise<void> => {
     try {
       // Use internal register API to match login system
       const { register } = await import('@/lib/authApi');
@@ -63,9 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await register({
         email,
         password,
-        firstName: 'Ny',
-        lastName: 'Bruker',
-        companyName: 'Min Bilforhandler',
+        firstName: additionalData?.firstName || 'Ny',
+        lastName: additionalData?.lastName || 'Bruker', 
+        companyName: additionalData?.companyName || 'Min Bilforhandler',
+        orgNumber: additionalData?.orgNumber,
       });
 
     } catch (error: any) {

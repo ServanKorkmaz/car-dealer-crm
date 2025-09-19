@@ -31,6 +31,7 @@ import { z } from "zod";
 import { debounce } from "@/lib/utils";
 import { renderContractTemplate, prepareContractData } from "@/lib/contracts/render";
 import { generateAndDownloadPdf, htmlToPdf } from "@/lib/contracts/pdf";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ContractWizardProps {
   open: boolean;
@@ -128,7 +129,7 @@ export default function ContractWizard({
   const [lastSaved, setLastSaved] = useState(new Date());
   
   const { toast } = useToast();
-  
+  const { company } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!contract;
 
@@ -1027,7 +1028,7 @@ export default function ContractWizard({
                                   formData,
                                   selectedCar,
                                   selectedCustomer,
-                                  { name: "ForhandlerPRO AS", orgNumber: "123456789" } // TODO: Get from auth context
+                                  { name: company?.name || "ForhandlerPRO AS", orgNumber: "123456789" }
                                 );
                                 
                                 // Generate HTML
@@ -1071,7 +1072,7 @@ export default function ContractWizard({
                                   formData,
                                   selectedCar,
                                   selectedCustomer,
-                                  { name: "ForhandlerPRO AS", orgNumber: "123456789" } // TODO: Get from auth context
+                                  { name: company?.name || "ForhandlerPRO AS", orgNumber: "123456789" }
                                 );
                                 
                                 // Generate HTML
