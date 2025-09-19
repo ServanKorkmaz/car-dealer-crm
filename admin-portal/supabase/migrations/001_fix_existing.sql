@@ -1,4 +1,5 @@
 -- This migration can be used if you already have some tables/policies and need to clean up
+-- Run this BEFORE 000_init_core.sql if you get errors about existing policies
 
 -- Drop all existing policies first (if they exist)
 drop policy if exists orgs_select_if_member on public.orgs;

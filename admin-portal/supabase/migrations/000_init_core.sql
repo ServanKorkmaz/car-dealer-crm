@@ -114,10 +114,10 @@ for delete using (
 drop policy if exists profiles_select_self_or_same_org on public.profiles;
 create policy profiles_select_self_or_same_org on public.profiles
 for select using (
-  user_id = auth.uid() or exists(
+  profiles.user_id = auth.uid() or exists(
     select 1 from public.org_members om1
     join public.org_members om2 on om1.org_id = om2.org_id
-    where om1.user_id = user_id and om2.user_id = auth.uid()
+    where om1.user_id = profiles.user_id and om2.user_id = auth.uid()
   )
 );
 
