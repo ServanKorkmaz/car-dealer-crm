@@ -1,5 +1,6 @@
 import React from 'react';
 import { getOrCreateMyOrg } from '../org';
+import { supabase } from '../lib/supabaseClient';
 
 type ActiveRow = { user_id: string|null; last_seen: string; name: string|null };
 
@@ -21,7 +22,27 @@ export default function UsageAdmin() {
   async function refresh(oid: string) {
     if (!oid) return;
     setLoading(true);
-    const res = await fetch(`/api/admin/active?orgId=${oid}`);
+    
+    // Get the session token
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setLoading(false);
+      return;
+    }
+    
+    const res = await fetch(`/api/admin/active?orgId=${oid}`, {
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      }
+    });
+    
+    if (!res.ok) {
+      console.error('Failed to fetch active users:', await res.text());
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+    
     const json = await res.json();
     setRows(json.active || []);
     setLoading(false);

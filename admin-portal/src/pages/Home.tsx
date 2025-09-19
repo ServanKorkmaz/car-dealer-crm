@@ -13,7 +13,19 @@ export default function Home() {
   React.useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) setMe({ email: user.email || '' });
+      if (user) {
+        setMe({ email: user.email || '' });
+        
+        // Ensure profile exists (in case email confirmation was required)
+        const { error } = await supabase
+          .from('profiles')
+          .upsert({ 
+            user_id: user.id,
+            full_name: user.user_metadata?.full_name || null
+          }, { onConflict: 'user_id' });
+        if (error) console.error('Profile upsert error:', error);
+      }
+      
       const o = await getOrCreateMyOrg();
       setOrgId(o.orgId);
       setRole(o.role);
