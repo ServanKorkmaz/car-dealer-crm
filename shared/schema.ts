@@ -336,6 +336,11 @@ export const insertCarSchema = createInsertSchema(cars).omit({
     if (!val || val === null) return null;
     return typeof val === 'string' ? parseInt(val) || null : val;
   }),
+  soldDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => {
+    if (!val || val === null) return null;
+    if (typeof val === 'string') return new Date(val);
+    return val;
+  }),
 });
 
 export const insertCustomerSchema = createInsertSchema(customers).omit({
