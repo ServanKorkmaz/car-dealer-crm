@@ -25,7 +25,6 @@ import {
   Upload,
   Eye,
   Edit,
-  Copy,
   Trash2,
   MoreVertical,
   SlidersHorizontal,
@@ -245,10 +244,6 @@ const CarCard = ({
                         <DropdownMenuItem onClick={(e) => handleQuickAction("Rediger", e)}>
                           <Edit className="w-4 h-4 mr-2" />
                           Rediger
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => handleQuickAction("Dupliser", e)}>
-                          <Copy className="w-4 h-4 mr-2" />
-                          Dupliser
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={(e) => handleQuickAction("Publiser til Finn.no", e)}>

@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import MainLayout from "@/components/layout/MainLayout";
 import type { Car } from "@shared/schema";
 import { 
-  ArrowLeft, Edit2, Save, X, Copy, Trash2, Upload, Eye, EyeOff,
+  ArrowLeft, Edit2, Save, X, Trash2, Upload, Eye, EyeOff,
   Calendar, Fuel, Gauge, Hash, Settings, Zap, Droplets, Wind,
   Car as CarIcon, MapPin, DollarSign, TrendingUp, ExternalLink,
   Check, AlertCircle, ChevronLeft, ChevronRight, Plus, Image as ImageIcon
@@ -245,17 +245,6 @@ export default function CarProfile() {
                     >
                       <Edit2 className="h-4 w-4 mr-2" />
                       Rediger
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        // Duplicate logic here
-                        toast({ title: "Funksjon kommer snart" });
-                      }}
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
-                      Dupliser
                     </Button>
                     <Button
                       variant="outline"
