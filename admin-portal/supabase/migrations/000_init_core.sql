@@ -76,12 +76,15 @@ returns boolean language sql stable as $$
 $$;
 
 -- ORGS policies
+drop policy if exists orgs_select_if_member on public.orgs;
 create policy orgs_select_if_member on public.orgs
 for select using (public.is_member(id));
 
+drop policy if exists orgs_insert_any_user on public.orgs;
 create policy orgs_insert_any_user on public.orgs
 for insert with check (true);
 
+drop policy if exists orgs_update_admins on public.orgs;
 create policy orgs_update_admins on public.orgs
 for update using (
   exists(select 1 from public.org_members m
@@ -89,15 +92,18 @@ for update using (
 );
 
 -- ORG MEMBERS policies
+drop policy if exists org_members_select_if_member on public.org_members;
 create policy org_members_select_if_member on public.org_members
 for select using (public.is_member(org_id));
 
+drop policy if exists org_members_insert_admin on public.org_members;
 create policy org_members_insert_admin on public.org_members
 for insert with check (
   exists(select 1 from public.org_members m
     where m.org_id = org_id and m.user_id = auth.uid() and m.role in ('owner','admin'))
 );
 
+drop policy if exists org_members_delete_admin on public.org_members;
 create policy org_members_delete_admin on public.org_members
 for delete using (
   exists(select 1 from public.org_members m
@@ -105,6 +111,7 @@ for delete using (
 );
 
 -- PROFILES policies
+drop policy if exists profiles_select_self_or_same_org on public.profiles;
 create policy profiles_select_self_or_same_org on public.profiles
 for select using (
   user_id = auth.uid() or exists(
@@ -114,24 +121,30 @@ for select using (
   )
 );
 
+drop policy if exists profiles_insert_self on public.profiles;
 create policy profiles_insert_self on public.profiles
 for insert with check (user_id = auth.uid());
 
+drop policy if exists profiles_update_self on public.profiles;
 create policy profiles_update_self on public.profiles
 for update using (user_id = auth.uid());
 
 -- USAGE_EVENTS policies
+drop policy if exists usage_events_select_member on public.usage_events;
 create policy usage_events_select_member on public.usage_events
 for select using (public.is_member(org_id));
 
+drop policy if exists usage_events_insert_member on public.usage_events;
 create policy usage_events_insert_member on public.usage_events
 for insert with check (public.is_member(org_id));
 
 -- USAGE_DAILY policies
+drop policy if exists usage_daily_select_member on public.usage_daily;
 create policy usage_daily_select_member on public.usage_daily
 for select using (public.is_member(org_id));
 
 -- AUDIT_LOG policies
+drop policy if exists audit_log_select_admin on public.audit_log;
 create policy audit_log_select_admin on public.audit_log
 for select using (
   exists(select 1 from public.org_members m
