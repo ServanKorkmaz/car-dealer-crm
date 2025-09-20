@@ -22,7 +22,7 @@ import { CustomerProfilePage } from "@/pages/CustomerProfilePage";
 import Contracts from "@/pages/Contracts";
 import SettingsOverviewPage from "@/pages/SettingsOverview";
 import AssistantBubble from "@/components/AssistantBubble";
-import AdminPortal from "@/pages/AdminPortal";
+import SimpleAdminPortal from "@/pages/SimpleAdminPortal";
 import { useAuth } from "@/contexts/AuthContext";
 import { SettingsOrganization } from "@/pages/settings/SettingsOrganization";
 // import { SettingsUsers } from "@/pages/settings/SettingsUsers";
@@ -107,7 +107,7 @@ function Router() {
       </Route>
       <Route path="/admin">
         <ProtectedRoute>
-          <AdminPortal />
+          <SimpleAdminPortal />
         </ProtectedRoute>
       </Route>
       {/* <Route path="/settings/brukere">
