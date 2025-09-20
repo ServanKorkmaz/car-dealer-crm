@@ -165,6 +165,7 @@ function UserManagement() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('sales');
   const { toast } = useToast();
+  const { user, company } = useAuth();
 
   // Mock data - replace with real API call
   const users = [
