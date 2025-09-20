@@ -33,8 +33,9 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     });
     console.log('Email sent successfully to:', params.to);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('SendGrid email error:', error);
+    console.error('SendGrid error details:', error?.response?.body?.errors);
     return false;
   }
 }
@@ -97,7 +98,7 @@ Hvis du ikke forventet denne invitasjonen, kan du trygt ignorere denne e-posten.
 
   return await sendEmail({
     to: toEmail,
-    from: 'noreply@forhandlerpro.no', // You should verify this domain with SendGrid
+    from: 'servank@stud.ntnu.no', // Verified SendGrid sender address
     subject: `Invitasjon til ${companyName} på ForhandlerPRO`,
     text: text,
     html: html
