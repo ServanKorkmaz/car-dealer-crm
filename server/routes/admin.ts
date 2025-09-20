@@ -63,6 +63,55 @@ router.post('/invite', async (req, res) => {
   }
 });
 
+// Accept invite endpoint
+router.post('/invite/accept', async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'Token påkrevd.' });
+    }
+
+    // Decode the invite token
+    try {
+      const decoded = Buffer.from(token, 'base64').toString('utf-8');
+      const [email, role, timestamp] = decoded.split(':');
+      
+      console.log('Invite token accepted for:', email, 'Role:', role);
+      
+      // Check if token is expired (older than 7 days)
+      const tokenTime = parseInt(timestamp);
+      const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+      
+      if (tokenTime < sevenDaysAgo) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Invitasjonen har utløpt. Be om en ny invitasjon.' 
+        });
+      }
+      
+      // TODO: Add user to organization in database
+      // For now, just return success
+      res.json({ 
+        success: true, 
+        message: 'Invitasjon godtatt! Du kan nå logge inn.',
+        companyName: 'Forhandleren',
+        email: email,
+        role: role
+      });
+    } catch (decodeError) {
+      console.error('Token decode error:', decodeError);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Ugyldig invitasjonstoken.' 
+      });
+    }
+  } catch (error) {
+    console.error('Accept invite error:', error);
+    res.status(500).json({ success: false, message: 'Kunne ikke godta invitasjon.' });
+  }
+});
+
 // Get admin stats (placeholder)
 router.get('/stats', async (req, res) => {
   try {

@@ -47,7 +47,9 @@ export async function sendInvitationEmail(
   role: string,
   inviteToken: string
 ): Promise<boolean> {
-  const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
+    : process.env.BASE_URL || 'http://localhost:5000';
   const inviteUrl = `${baseUrl}/invite?token=${inviteToken}`;
   
   const html = `

@@ -23,6 +23,7 @@ import Contracts from "@/pages/Contracts";
 import SettingsOverviewPage from "@/pages/SettingsOverview";
 import AssistantBubble from "@/components/AssistantBubble";
 import SimpleAdminPortal from "@/pages/SimpleAdminPortal";
+import InviteAccept from "@/pages/InviteAccept";
 import { useAuth } from "@/contexts/AuthContext";
 import { SettingsOrganization } from "@/pages/settings/SettingsOrganization";
 // import { SettingsUsers } from "@/pages/settings/SettingsUsers";
@@ -41,6 +42,7 @@ function Router() {
       {/* Public routes */}
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/invite" component={InviteAccept} />
       
       {/* Semi-protected routes (need auth but not org) */}
       <Route path="/onboarding">
