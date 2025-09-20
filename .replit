@@ -16,12 +16,12 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 33249
-externalPort = 3001
-
-[[ports]]
 localPort = 35333
 externalPort = 3000
+
+[[ports]]
+localPort = 45337
+externalPort = 3001
 
 [env]
 PORT = "5000"
@@ -46,6 +46,15 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Admin portal"
+mode = "sequential"
+author = 45706276
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd admin-portal && node server/index.js"
 
 [agent]
 integrations = ["javascript_log_in_with_replit==1.0.0", "javascript_websocket==1.0.0", "javascript_openai==1.0.0", "javascript_supabase==1.0.0", "javascript_database==1.0.0"]

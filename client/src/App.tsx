@@ -22,6 +22,7 @@ import { CustomerProfilePage } from "@/pages/CustomerProfilePage";
 import Contracts from "@/pages/Contracts";
 import SettingsOverviewPage from "@/pages/SettingsOverview";
 import AssistantBubble from "@/components/AssistantBubble";
+import AdminPortal from "@/pages/AdminPortal";
 import { useAuth } from "@/contexts/AuthContext";
 import { SettingsOrganization } from "@/pages/settings/SettingsOrganization";
 // import { SettingsUsers } from "@/pages/settings/SettingsUsers";
@@ -102,6 +103,11 @@ function Router() {
       <Route path="/settings/organisasjon">
         <ProtectedRoute>
           <SettingsOrganization />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin">
+        <ProtectedRoute>
+          <AdminPortal />
         </ProtectedRoute>
       </Route>
       {/* <Route path="/settings/brukere">

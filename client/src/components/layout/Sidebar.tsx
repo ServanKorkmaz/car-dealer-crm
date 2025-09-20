@@ -14,6 +14,7 @@ import {
   LogOut,
   User,
   Settings,
+  Shield,
 } from "lucide-react";
 
 const navigation = [
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Kunder", href: "/customers", icon: Users },
   { name: "Kontrakter", href: "/contracts", icon: FileText },
   { name: "Innstillinger", href: "/settings", icon: Settings },
+  { name: "Admin Portal", href: "/admin", icon: Shield },
 ];
 
 export default function Sidebar() {
