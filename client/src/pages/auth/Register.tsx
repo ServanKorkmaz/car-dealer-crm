@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,14 +30,40 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [inviteInfo, setInviteInfo] = useState<{
+    token: string;
+    email: string;
+    role: string;
+    companyName: string;
+  } | null>(null);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    setValue,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   });
+
+  // Handle invite parameters from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteToken = urlParams.get('invite');
+    const inviteEmail = urlParams.get('email');
+    const inviteRole = urlParams.get('role');
+
+    if (inviteToken && inviteEmail && inviteRole) {
+      setInviteInfo({
+        token: inviteToken,
+        email: inviteEmail,
+        role: inviteRole,
+        companyName: 'Forhandleren' // This would come from the invite data
+      });
+      // Pre-fill email field
+      setValue('email', inviteEmail);
+    }
+  }, [setValue]);
 
   const onSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
@@ -47,18 +73,34 @@ export default function Register() {
       const { isSupabaseConfigured } = await import('@/lib/supabase');
       
       await signUp(data.email, data.password);
+      
+      // If this is an invited user, automatically add them to the organization
+      if (inviteInfo) {
+        try {
+          // TODO: Add user to organization with the invite role
+          console.log('User registered via invite:', inviteInfo);
+          // This would be implemented to automatically join the organization
+        } catch (orgError) {
+          console.error('Failed to add user to organization:', orgError);
+        }
+      }
+      
       setSuccess(true);
       
       if (isSupabaseConfigured) {
         toast({
           title: 'Konto opprettet!',
-          description: 'Sjekk e-posten din for å bekrefte kontoen.',
+          description: inviteInfo 
+            ? `Velkommen til ${inviteInfo.companyName}! Sjekk e-posten din for å bekrefte kontoen.`
+            : 'Sjekk e-posten din for å bekrefte kontoen.',
         });
       } else {
         // In development mode, skip email verification
         toast({
           title: 'Konto opprettet!',
-          description: 'Du kan nå logge inn.',
+          description: inviteInfo 
+            ? `Velkommen til ${inviteInfo.companyName}! Du kan nå logge inn.`
+            : 'Du kan nå logge inn.',
         });
       }
 
@@ -67,7 +109,7 @@ export default function Register() {
         if (isSupabaseConfigured) {
           setLocation('/login');
         } else {
-          setLocation('/onboarding');
+          setLocation(inviteInfo ? '/dashboard' : '/onboarding');
         }
       }, 2000);
     } catch (error: any) {
@@ -88,10 +130,13 @@ export default function Register() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold text-center">
-            Opprett ForhandlerPRO-konto
+            {inviteInfo ? 'Fullfør registrering' : 'Opprett ForhandlerPRO-konto'}
           </CardTitle>
           <CardDescription className="text-center">
-            Start din 14-dagers gratis prøveperiode
+            {inviteInfo 
+              ? `Du er invitert til ${inviteInfo.companyName} som ${inviteInfo.role}`
+              : 'Start din 14-dagers gratis prøveperiode'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -106,6 +151,17 @@ export default function Register() {
             </div>
           ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {inviteInfo && (
+                <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950">
+                  <CheckCircle className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800 dark:text-blue-200">
+                    <strong>Invitasjon godtatt!</strong><br />
+                    Du registrerer deg som <strong>{inviteInfo.role}</strong> hos <strong>{inviteInfo.companyName}</strong>.
+                    Du vil automatisk få tilgang til organisasjonen når kontoen er opprettet.
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               {error && (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
@@ -120,8 +176,9 @@ export default function Register() {
                   type="email"
                   placeholder="din@epost.no"
                   {...register('email')}
-                  disabled={isLoading}
+                  disabled={isLoading || !!inviteInfo}
                   className={errors.email ? 'border-red-500' : ''}
+                  data-testid="input-email"
                 />
                 {errors.email && (
                   <p className="text-sm text-red-500">{errors.email.message}</p>

@@ -36,12 +36,12 @@ export default function InviteAccept() {
 
         if (data.success) {
           setStatus('success');
-          setMessage('Invitasjon godtatt! Du blir omdirigert til dashbordet...');
+          setMessage('Invitasjon godtatt! Du blir omdirigert til registrering...');
           setOrgName(data.companyName);
           
-          // Redirect to login if not authenticated, otherwise to dashboard
+          // Redirect to registration with invite token preserved
           setTimeout(() => {
-            window.location.href = '/login';
+            window.location.href = `/register?invite=${token}&email=${encodeURIComponent(data.email)}&role=${data.role}`;
           }, 2000);
         } else {
           setStatus('error');
