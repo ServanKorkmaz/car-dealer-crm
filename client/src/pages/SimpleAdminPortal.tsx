@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Activity, BarChart3, Shield, AlertCircle } from 'lucide-react';
+import { Users, Activity, BarChart3, Shield, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'wouter';
+import Sidebar from '@/components/layout/Sidebar';
 
 export default function SimpleAdminPortal() {
   const { user, company } = useAuth();
@@ -34,57 +36,66 @@ export default function SimpleAdminPortal() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Shield className="h-8 w-8 text-primary" />
-            Admin Portal
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Administrer systemet og se aktivitet
-          </p>
+    <div className="flex min-h-screen bg-background">
+      <Sidebar />
+      <div className="flex-1 p-6 space-y-6">
+        {/* Back button and Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <Link href="/">
+              <Button variant="ghost" size="sm" className="mb-4">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Tilbake til Dashboard
+              </Button>
+            </Link>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Shield className="h-8 w-8 text-primary" />
+              Admin Portal
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Administrer systemet og se aktivitet
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Badge variant="outline">
+              {company?.name || 'Forhandler'}
+            </Badge>
+            <Badge variant={user?.role === 'owner' ? 'default' : 'secondary'}>
+              {user?.role === 'owner' ? 'Eier' : 'Admin'}
+            </Badge>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Badge variant="outline">
-            {company?.name || 'Forhandler'}
-          </Badge>
-          <Badge variant={user?.role === 'owner' ? 'default' : 'secondary'}>
-            {user?.role === 'owner' ? 'Eier' : 'Admin'}
-          </Badge>
-        </div>
-      </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Oversikt
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Brukere
-          </TabsTrigger>
-          <TabsTrigger value="activity" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Aktivitet
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="overview" className="space-y-4">
-          <SystemOverview />
-        </TabsContent>
-        
-        <TabsContent value="users" className="space-y-4">
-          <UserManagement />
-        </TabsContent>
-        
-        <TabsContent value="activity" className="space-y-4">
-          <ActivityLog />
-        </TabsContent>
-      </Tabs>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Oversikt
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Brukere
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Aktivitet
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="overview" className="space-y-4">
+            <SystemOverview />
+          </TabsContent>
+          
+          <TabsContent value="users" className="space-y-4">
+            <UserManagement />
+          </TabsContent>
+          
+          <TabsContent value="activity" className="space-y-4">
+            <ActivityLog />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
