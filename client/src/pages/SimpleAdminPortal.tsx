@@ -272,8 +272,14 @@ function UserManagement() {
                 </div>
                 <div className="flex items-center gap-2">
                   {getRoleBadge(userItem.role)}
-                  <Badge variant={userItem.status === 'active' ? 'outline' : 'secondary'}>
-                    {userItem.status === 'active' ? 'Aktiv' : 'Inaktiv'}
+                  <Badge variant={
+                    userItem.status === 'active' ? 'outline' : 
+                    userItem.status === 'invited' ? 'secondary' :
+                    userItem.status === 'pending' ? 'secondary' : 'destructive'
+                  }>
+                    {userItem.status === 'active' ? 'Aktiv' : 
+                     userItem.status === 'invited' ? 'Invitert' :
+                     userItem.status === 'pending' ? 'Venter' : 'Inaktiv'}
                   </Badge>
                   <Button variant="outline" size="sm">Rediger</Button>
                 </div>
