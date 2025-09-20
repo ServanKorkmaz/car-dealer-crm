@@ -4,10 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Users, Activity, BarChart3, Shield, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Users, Activity, BarChart3, Shield, AlertCircle, ArrowLeft, Plus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import Sidebar from '@/components/layout/Sidebar';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SimpleAdminPortal() {
   const { user, company } = useAuth();
@@ -156,6 +161,11 @@ function SystemOverview() {
 }
 
 function UserManagement() {
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('sales');
+  const { toast } = useToast();
+
   // Mock data - replace with real API call
   const users = [
     { id: 1, name: "Ola Nordmann", email: "ola@example.com", role: "owner", status: "active", lastActive: "2 min siden" },
@@ -173,6 +183,28 @@ function UserManagement() {
     };
     const config = variants[role] || { label: role, variant: "outline" };
     return <Badge variant={config.variant as any}>{config.label}</Badge>;
+  };
+
+  const handleInviteUser = () => {
+    if (!inviteEmail) {
+      toast({
+        title: "Feil",
+        description: "Vennligst fyll inn e-postadresse",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Mock invite functionality
+    toast({
+      title: "Invitasjon sendt!",
+      description: `En invitasjon er sendt til ${inviteEmail} som ${inviteRole}`,
+    });
+
+    // Reset form and close dialog
+    setInviteEmail('');
+    setInviteRole('sales');
+    setIsInviteOpen(false);
   };
 
   return (
@@ -204,7 +236,61 @@ function UserManagement() {
         </div>
         
         <div className="mt-6 pt-6 border-t">
-          <Button className="w-full">Inviter ny bruker</Button>
+          <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                Inviter ny bruker
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Inviter ny bruker</DialogTitle>
+                <DialogDescription>
+                  Send en invitasjon til en ny bruker. De vil motta en e-post med instruksjoner for å bli med.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="email" className="text-right">
+                    E-post
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="bruker@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="col-span-3"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="role" className="text-right">
+                    Rolle
+                  </Label>
+                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sales">Selger</SelectItem>
+                      <SelectItem value="workshop">Verksted</SelectItem>
+                      <SelectItem value="admin">Administrator</SelectItem>
+                      <SelectItem value="owner">Eier</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsInviteOpen(false)}>
+                  Avbryt
+                </Button>
+                <Button onClick={handleInviteUser}>
+                  Send invitasjon
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </CardContent>
     </Card>
