@@ -185,7 +185,7 @@ function UserManagement() {
     return <Badge variant={config.variant as any}>{config.label}</Badge>;
   };
 
-  const handleInviteUser = () => {
+  const handleInviteUser = async () => {
     if (!inviteEmail) {
       toast({
         title: "Feil",
@@ -195,16 +195,48 @@ function UserManagement() {
       return;
     }
 
-    // Mock invite functionality
-    toast({
-      title: "Invitasjon sendt!",
-      description: `En invitasjon er sendt til ${inviteEmail} som ${inviteRole}`,
-    });
+    try {
+      const response = await fetch('/api/admin/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: inviteEmail,
+          role: inviteRole,
+          inviterName: user?.fullName || 'Administrator',
+          companyName: company?.name || 'Forhandleren'
+        })
+      });
 
-    // Reset form and close dialog
-    setInviteEmail('');
-    setInviteRole('sales');
-    setIsInviteOpen(false);
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Invitasjon sendt!",
+          description: `En invitasjon er sendt til ${inviteEmail} som ${inviteRole}`,
+        });
+
+        // Reset form and close dialog
+        setInviteEmail('');
+        setInviteRole('sales');
+        setIsInviteOpen(false);
+      } else {
+        toast({
+          title: "Feil",
+          description: result.message || "Kunne ikke sende invitasjon",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Invite error:', error);
+      toast({
+        title: "Feil",
+        description: "Kunne ikke sende invitasjon. Prøv igjen senere.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (

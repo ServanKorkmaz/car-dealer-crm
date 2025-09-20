@@ -53,4 +53,4 @@ task = "shell.exec"
 args = "cd admin-portal && node server/index.js"
 
 [agent]
-integrations = ["javascript_log_in_with_replit==1.0.0", "javascript_websocket==1.0.0", "javascript_openai==1.0.0", "javascript_supabase==1.0.0", "javascript_database==1.0.0"]
+integrations = ["javascript_log_in_with_replit:1.0.0", "javascript_websocket:1.0.0", "javascript_openai:1.0.0", "javascript_supabase:1.0.0", "javascript_database:1.0.0", "javascript_sendgrid:1.0.0"]

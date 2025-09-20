@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { setupAuthRoutes } from "./auth/authRoutes";
+import adminRoutes from "./routes/admin.js";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 
@@ -64,6 +65,9 @@ app.use((req, res, next) => {
 (async () => {
   // Setup authentication routes first
   setupAuthRoutes(app);
+  
+  // Setup admin routes
+  app.use('/api/admin', adminRoutes);
   
   // Then register application routes
   const server = await registerRoutes(app);
