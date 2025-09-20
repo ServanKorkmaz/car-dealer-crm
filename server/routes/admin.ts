@@ -112,6 +112,29 @@ router.post('/invite/accept', async (req, res) => {
   }
 });
 
+// Get users endpoint
+router.get('/users', async (req, res) => {
+  try {
+    // This is a placeholder - in a real app, you'd query your user database
+    // For now, return the current user and some placeholder data until we have proper auth/database
+    const users = [
+      {
+        id: '1',
+        name: req.user?.name || 'Pålogget bruker',
+        email: req.user?.email || 'bruker@example.com',
+        role: req.user?.role || 'admin',
+        status: 'active',
+        lastActive: 'Nå online'
+      }
+    ];
+    
+    res.json({ users });
+  } catch (error) {
+    console.error('Admin users error:', error);
+    res.status(500).json({ message: 'Kunne ikke hente brukere' });
+  }
+});
+
 // Get admin stats (placeholder)
 router.get('/stats', async (req, res) => {
   try {

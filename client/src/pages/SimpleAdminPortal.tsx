@@ -167,13 +167,13 @@ function UserManagement() {
   const { toast } = useToast();
   const { user, company } = useAuth();
 
-  // Mock data - replace with real API call
-  const users = [
-    { id: 1, name: "Ola Nordmann", email: "ola@example.com", role: "owner", status: "active", lastActive: "2 min siden" },
-    { id: 2, name: "Kari Hansen", email: "kari@example.com", role: "admin", status: "active", lastActive: "15 min siden" },
-    { id: 3, name: "Per Jensen", email: "per@example.com", role: "sales", status: "active", lastActive: "1 time siden" },
-    { id: 4, name: "Lisa Olsen", email: "lisa@example.com", role: "workshop", status: "inactive", lastActive: "3 dager siden" },
-  ];
+  // Fetch real users from API
+  const { data: usersData, isLoading, error } = useQuery({
+    queryKey: ['/api/admin/users'],
+    enabled: !!user // Only fetch if user is logged in
+  });
+
+  const users = usersData?.users || [];
 
   const getRoleBadge = (role: string) => {
     const variants: Record<string, any> = {
@@ -206,7 +206,7 @@ function UserManagement() {
         body: JSON.stringify({
           email: inviteEmail,
           role: inviteRole,
-          inviterName: user?.fullName || 'Administrator',
+          inviterName: user?.name || 'Administrator',
           companyName: company?.name || 'Forhandleren'
         })
       });
@@ -249,24 +249,38 @@ function UserManagement() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          {users.map(user => (
-            <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="space-y-1">
-                <div className="font-medium">{user.name}</div>
-                <div className="text-sm text-muted-foreground">{user.email}</div>
-                <div className="text-xs text-muted-foreground">Sist aktiv: {user.lastActive}</div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-sm text-muted-foreground">Laster brukere...</div>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-sm text-red-500">Kunne ikke laste brukere</div>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-sm text-muted-foreground">Ingen brukere funnet</div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {users.map((userItem: any) => (
+              <div key={userItem.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="space-y-1">
+                  <div className="font-medium">{userItem.name}</div>
+                  <div className="text-sm text-muted-foreground">{userItem.email}</div>
+                  <div className="text-xs text-muted-foreground">Sist aktiv: {userItem.lastActive}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {getRoleBadge(userItem.role)}
+                  <Badge variant={userItem.status === 'active' ? 'outline' : 'secondary'}>
+                    {userItem.status === 'active' ? 'Aktiv' : 'Inaktiv'}
+                  </Badge>
+                  <Button variant="outline" size="sm">Rediger</Button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                {getRoleBadge(user.role)}
-                <Badge variant={user.status === 'active' ? 'outline' : 'secondary'}>
-                  {user.status === 'active' ? 'Aktiv' : 'Inaktiv'}
-                </Badge>
-                <Button variant="outline" size="sm">Rediger</Button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
         
         <div className="mt-6 pt-6 border-t">
           <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
