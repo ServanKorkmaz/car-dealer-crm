@@ -52,11 +52,7 @@ export async function sendInvitationEmail(
     : process.env.BASE_URL || 'http://localhost:5000';
   const inviteUrl = `${baseUrl}/invite?token=${inviteToken}`;
   
-  console.log('Email URL generation:');
-  console.log('- REPLIT_DEV_DOMAIN:', process.env.REPLIT_DEV_DOMAIN);
-  console.log('- BASE_URL:', process.env.BASE_URL);  
-  console.log('- Generated baseUrl:', baseUrl);
-  console.log('- Full inviteUrl:', inviteUrl);
+  console.log('Generated invite URL:', inviteUrl);
   
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

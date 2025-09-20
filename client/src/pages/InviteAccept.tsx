@@ -24,7 +24,7 @@ export default function InviteAccept() {
         }
 
         // Try to accept the invitation
-        const response = await apiRequest('/api/admin/invite/accept', {
+        const response = await fetch('/api/admin/invite/accept', {
           method: 'POST',
           body: JSON.stringify({ token }),
           headers: {
@@ -32,10 +32,12 @@ export default function InviteAccept() {
           },
         });
 
-        if (response.success) {
+        const data = await response.json();
+
+        if (data.success) {
           setStatus('success');
           setMessage('Invitasjon godtatt! Du blir omdirigert til dashbordet...');
-          setOrgName(response.companyName);
+          setOrgName(data.companyName);
           
           // Redirect to login if not authenticated, otherwise to dashboard
           setTimeout(() => {
@@ -43,21 +45,12 @@ export default function InviteAccept() {
           }, 2000);
         } else {
           setStatus('error');
-          setMessage(response.message || 'Kunne ikke godta invitasjon.');
+          setMessage(data.message || 'Kunne ikke godta invitasjon.');
         }
       } catch (error: any) {
         console.error('Invite acceptance error:', error);
-        
-        if (error.message?.includes('expired')) {
-          setStatus('expired');
-          setMessage('Invitasjonen har utløpt. Be om en ny invitasjon.');
-        } else if (error.message?.includes('already')) {
-          setStatus('error');
-          setMessage('Du er allerede medlem av denne organisasjonen.');
-        } else {
-          setStatus('error');
-          setMessage('Kunne ikke godta invitasjon. Prøv igjen senere.');
-        }
+        setStatus('error');
+        setMessage('Kunne ikke godta invitasjon. Prøv igjen senere.');
       }
     };
 
