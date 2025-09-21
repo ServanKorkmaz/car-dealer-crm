@@ -359,7 +359,6 @@ function UserManagement() {
 }
 
 function ActivityLog() {
-  // Mock activity data
   const activities = [
     { id: 1, user: "Ola Nordmann", action: "Opprettet ny kontrakt", target: "#K-2024-023", time: "2 min siden", type: "create" },
     { id: 2, user: "Kari Hansen", action: "Oppdaterte bil", target: "Tesla Model 3", time: "15 min siden", type: "update" },

@@ -1,8 +1,5 @@
 import { MailService } from '@sendgrid/mail';
 
-if (!process.env.SENDGRID_API_KEY) {
-  console.warn("SENDGRID_API_KEY environment variable not set - email functionality disabled");
-}
 
 const mailService = new MailService();
 if (process.env.SENDGRID_API_KEY) {
@@ -19,7 +16,6 @@ interface EmailParams {
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
   if (!process.env.SENDGRID_API_KEY) {
-    console.log('Email would be sent to:', params.to, 'Subject:', params.subject);
     return false;
   }
 
@@ -31,11 +27,8 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       text: params.text,
       html: params.html,
     });
-    console.log('Email sent successfully to:', params.to);
     return true;
-  } catch (error: any) {
-    console.error('SendGrid email error:', error);
-    console.error('SendGrid error details:', error?.response?.body?.errors);
+  } catch (error) {
     return false;
   }
 }
@@ -51,8 +44,6 @@ export async function sendInvitationEmail(
     ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
     : process.env.BASE_URL || 'http://localhost:5000';
   const inviteUrl = `${baseUrl}/invite?token=${inviteToken}`;
-  
-  console.log('Generated invite URL:', inviteUrl);
   
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -102,7 +93,7 @@ Hvis du ikke forventet denne invitasjonen, kan du trygt ignorere denne e-posten.
 
   return await sendEmail({
     to: toEmail,
-    from: 'servank@stud.ntnu.no', // Verified SendGrid sender address
+    from: 'servank@stud.ntnu.no',
     subject: `Invitasjon til ${companyName} på ForhandlerPRO`,
     text: text,
     html: html
