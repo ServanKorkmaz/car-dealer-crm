@@ -138,6 +138,14 @@ export interface AuthUser {
   role?: OrgRole;
 }
 
+declare global {
+  namespace Express {
+    interface Request {
+      auth?: AuthUser;
+    }
+  }
+}
+
 // Plan pricing (for display)
 export const PLAN_PRICING = {
   basic: {

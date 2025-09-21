@@ -34,9 +34,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     : authenticateToken;
 
   // Heartbeat endpoint for active user tracking
-  app.post('/api/heartbeat', authMiddleware, async (req: any, res) => {
+  app.post('/api/heartbeat', authMiddleware, async (req, res) => {
     try {
-      const userId = req.user?.id || req.user?.claims?.sub;
+      const userId = req.auth?.id;
       if (userId) {
         const { UsageTracker } = await import('./services/usageTracker');
         await UsageTracker.sendHeartbeat(userId);
@@ -47,13 +47,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.json({ success: true });
     } catch (error) {
-      console.error('Heartbeat error:', error);
       res.status(500).json({ error: 'Failed to send heartbeat' });
     }
   });
 
   // Role-based endpoints
-  app.get('/api/user/role', authMiddleware, async (req: any, res) => {
+  app.get('/api/user/role', authMiddleware, async (req, res) => {
     try {
       res.json({
         role: 'EIER', // Single tenant - user is owner
@@ -62,15 +61,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canInvite: true,
       });
     } catch (error) {
-      console.error("Error fetching user role:", error);
       res.status(500).json({ message: "Failed to fetch user role" });
     }
   });
 
   // Invite management endpoints (EIER only)
-  app.post('/api/invites', authMiddleware, async (req: any, res) => {
+  app.post('/api/invites', authMiddleware, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.auth?.id || '';
       const { email, role } = req.body;
       
       if (!email || !role) {
@@ -90,20 +88,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         inviteLink: `${req.protocol}://${req.get('host')}/accept-invite?token=${invite.token}`
       });
     } catch (error) {
-      console.error("Error creating invite:", error);
       res.status(403).json({ message: error instanceof Error ? error.message : "Failed to create invite" });
     }
   });
 
-  app.get('/api/invites', authMiddleware, async (req: any, res) => {
+  app.get('/api/invites', authMiddleware, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.auth?.id || '';
       const storage = await storagePromise;
       const invites = await storage.getCompanyInvites('default-company', userId);
       
       res.json(invites);
     } catch (error) {
-      console.error("Error fetching invites:", error);
       res.status(403).json({ message: error instanceof Error ? error.message : "Failed to fetch invites" });
     }
   });

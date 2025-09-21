@@ -20,13 +20,16 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
   }
 
   try {
-    await mailService.send({
+    const emailData: any = {
       to: params.to,
       from: params.from,
       subject: params.subject,
-      text: params.text,
-      html: params.html,
-    });
+    };
+    
+    if (params.text) emailData.text = params.text;
+    if (params.html) emailData.html = params.html;
+    
+    await mailService.send(emailData);
     return true;
   } catch (error) {
     return false;

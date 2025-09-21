@@ -4,6 +4,7 @@ import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { storagePromise } from '../storage';
 import { UsageTracker } from '../services/usageTracker';
+import type { AuthUser } from '@shared/auth-types';
 
 // Environment variables with defaults for development
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
@@ -132,7 +133,7 @@ export async function logLoginAttempt(audit: LoginAudit): Promise<void> {
 }
 
 // Middleware to verify JWT token
-export async function authenticateToken(req: Request & { user?: TokenPayload }, res: Response, next: NextFunction) {
+export async function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
     // Get token from cookie or authorization header
     const token = req.cookies?.accessToken || req.headers.authorization?.replace('Bearer ', '');
@@ -146,17 +147,11 @@ export async function authenticateToken(req: Request & { user?: TokenPayload }, 
       return res.status(401).json({ message: 'Ugyldig eller utløpt token' });
     }
 
-    // Attach user to request in format expected by routes
-    req.user = {
-      claims: {
-        sub: payload.userId,
-        email: payload.email,
-        role: payload.role
-      },
+    // Set normalized auth user
+    req.auth = {
       id: payload.userId,
       email: payload.email,
-      role: payload.role,
-      companyId: payload.companyId
+      role: payload.role
     };
 
     // Track user activity in admin portal
@@ -169,19 +164,18 @@ export async function authenticateToken(req: Request & { user?: TokenPayload }, 
 
     next();
   } catch (error) {
-    console.error('Authentication error:', error);
     res.status(401).json({ message: 'Autentisering feilet' });
   }
 }
 
 // Check if user has required role
 export function requireRole(roles: string[]) {
-  return (req: Request & { user?: TokenPayload }, res: Response, next: NextFunction) => {
-    if (!req.user) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.auth) {
       return res.status(401).json({ message: 'Ikke autentisert' });
     }
 
-    if (!roles.includes(req.user.role)) {
+    if (!req.auth.role || !roles.includes(req.auth.role)) {
       return res.status(403).json({ message: 'Ingen tilgang til denne ressursen' });
     }
 

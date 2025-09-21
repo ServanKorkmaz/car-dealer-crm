@@ -2,6 +2,7 @@ import type { Express, RequestHandler } from "express";
 import { storagePromise } from "./storage";
 import session from "express-session";
 import { UsageTracker } from "./services/usageTracker";
+import type { AuthUser } from "@shared/auth-types";
 
 // Simple development authentication bypass
 export function setupSimpleAuth(app: Express) {
@@ -107,10 +108,14 @@ export function setupSimpleAuth(app: Express) {
 }
 
 // Simple authentication middleware
-export const isSimpleAuthenticated: RequestHandler = (req: any, res, next) => {
+export const isSimpleAuthenticated: RequestHandler = (req, res, next) => {
   if (req.session?.user) {
-    // Add user to request for compatibility
-    req.user = { claims: { sub: req.session.user.id } };
+    // Set normalized auth user
+    req.auth = {
+      id: req.session.user.id,
+      email: req.session.user.email,
+      role: 'owner'
+    };
     
     // Track activity for dev user
     UsageTracker.sendHeartbeat(req.session.user.id);
