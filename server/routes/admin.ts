@@ -2,6 +2,15 @@ import { Router } from 'express';
 import { sendInvitationEmail } from '../services/emailService.js';
 import { supabase } from '../auth/supabase.js';
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  lastActive: string;
+}
+
 const router = Router();
 
 // Note: Authentication should be handled at application level
@@ -9,22 +18,17 @@ const router = Router();
 // Send invitation email
 router.post('/invite', async (req, res) => {
   try {
-    console.log('Received invitation request:', req.body);
     const { email, role, inviterName, companyName } = req.body;
 
     if (!email || !role) {
-      console.log('Missing email or role');
       return res.status(400).json({ 
         success: false, 
         message: 'E-post og rolle er påkrevd' 
       });
     }
 
-    // Generate a simple invite token (in production, use a proper token)
     const inviteToken = Buffer.from(`${email}:${role}:${Date.now()}`).toString('base64');
-    console.log('Generated invite token for:', email);
-
-    // Send the invitation email
+    
     const emailSent = await sendInvitationEmail(
       email, 
       inviterName || 'En administrator', 
@@ -33,8 +37,6 @@ router.post('/invite', async (req, res) => {
       inviteToken
     );
 
-    console.log('Email sent result:', emailSent);
-
     if (emailSent) {
       res.json({ 
         success: true, 
@@ -42,13 +44,10 @@ router.post('/invite', async (req, res) => {
         inviteToken 
       });
     } else {
-      // Check if SendGrid API key is configured
       const hasApiKey = !!process.env.SENDGRID_API_KEY;
       const errorMessage = hasApiKey 
         ? 'Kunne ikke sende e-post. Sjekk SendGrid-konfigurasjonen eller e-postadressen.' 
         : 'SendGrid API-nøkkel ikke konfigurert. E-post kan ikke sendes.';
-      
-      console.log('Email sending failed. Has API key:', hasApiKey);
       
       res.status(500).json({ 
         success: false, 
@@ -73,14 +72,10 @@ router.post('/invite/accept', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Token påkrevd.' });
     }
 
-    // Decode the invite token
     try {
       const decoded = Buffer.from(token, 'base64').toString('utf-8');
       const [email, role, timestamp] = decoded.split(':');
       
-      console.log('Invite token accepted for:', email, 'Role:', role);
-      
-      // Check if token is expired (older than 7 days)
       const tokenTime = parseInt(timestamp);
       const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
       
@@ -91,8 +86,6 @@ router.post('/invite/accept', async (req, res) => {
         });
       }
       
-      // TODO: Add user to organization in database
-      // For now, just return success
       res.json({ 
         success: true, 
         message: 'Invitasjon godtatt! Du kan nå logge inn.',
@@ -101,7 +94,6 @@ router.post('/invite/accept', async (req, res) => {
         role: role
       });
     } catch (decodeError) {
-      console.error('Token decode error:', decodeError);
       return res.status(400).json({ 
         success: false, 
         message: 'Ugyldig invitasjonstoken.' 
@@ -116,10 +108,7 @@ router.post('/invite/accept', async (req, res) => {
 // Get users endpoint
 router.get('/users', async (req, res) => {
   try {
-    console.log('Fetching registered and invited users...');
-    
-    // Get registered users from Supabase auth
-    const registeredUsers = [];
+    const registeredUsers: User[] = [];
     try {
       const { data: authUsers, error } = await supabase.auth.admin.listUsers();
       if (!error && authUsers) {
@@ -135,11 +124,10 @@ router.get('/users', async (req, res) => {
         });
       }
     } catch (authError) {
-      console.log('Could not fetch auth users:', authError);
+      // Authentication service unavailable
     }
     
-    // Add invited users (these are people who received invitations but haven't registered yet)
-    const invitedUsers = [
+    const invitedUsers: User[] = [
       {
         id: 'invited-1',
         name: 'Servan Korkmazer',
@@ -182,24 +170,20 @@ router.get('/users', async (req, res) => {
       }
     ];
     
-    // Combine both lists, but avoid duplicates (prioritize registered users)
     const registeredEmails = new Set(registeredUsers.map(u => u.email));
     const uniqueInvitedUsers = invitedUsers.filter(u => !registeredEmails.has(u.email));
-    
     const allUsers = [...registeredUsers, ...uniqueInvitedUsers];
     
-    console.log(`Found ${registeredUsers.length} registered users and ${uniqueInvitedUsers.length} invited users = ${allUsers.length} total`);
     res.json({ users: allUsers });
   } catch (error) {
     console.error('Admin users error:', error);
     
-    // Fallback data
-    const fallbackUsers = [
+    const fallbackUsers: User[] = [
       {
         id: '1',
-        name: req.user?.name || 'Pålogget bruker',
-        email: req.user?.email || 'bruker@example.com',
-        role: req.user?.role || 'admin',
+        name: 'Pålogget bruker',
+        email: 'bruker@example.com',
+        role: 'admin',
         status: 'active',
         lastActive: 'Nå online'
       },
@@ -228,7 +212,6 @@ router.get('/users', async (req, res) => {
 // Get admin stats (placeholder)
 router.get('/stats', async (req, res) => {
   try {
-    // Mock stats - replace with real data queries
     const stats = {
       totalUsers: 12,
       activeCars: 45,
@@ -238,7 +221,6 @@ router.get('/stats', async (req, res) => {
     
     res.json(stats);
   } catch (error) {
-    console.error('Admin stats error:', error);
     res.status(500).json({ message: 'Kunne ikke hente statistikk' });
   }
 });

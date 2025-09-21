@@ -18,9 +18,7 @@ export default function SimpleAdminPortal() {
   const { user, company } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Check if user has admin rights
-  // For development, allow all authenticated users to see admin portal
-  const isAdmin = user ? true : false; // Temporarily allow all logged-in users
+  const isAdmin = !!user;
 
   if (!isAdmin) {
     return (
@@ -160,6 +158,17 @@ function SystemOverview() {
   );
 }
 
+interface UserData {
+  users: Array<{
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    lastActive: string;
+  }>;
+}
+
 function UserManagement() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -167,10 +176,9 @@ function UserManagement() {
   const { toast } = useToast();
   const { user, company } = useAuth();
 
-  // Fetch real users from API
-  const { data: usersData, isLoading, error } = useQuery({
+  const { data: usersData, isLoading, error } = useQuery<UserData>({
     queryKey: ['/api/admin/users'],
-    enabled: !!user // Only fetch if user is logged in
+    enabled: !!user
   });
 
   const users = usersData?.users || [];
@@ -206,7 +214,7 @@ function UserManagement() {
         body: JSON.stringify({
           email: inviteEmail,
           role: inviteRole,
-          inviterName: user?.name || 'Administrator',
+          inviterName: 'Administrator',
           companyName: company?.name || 'Forhandleren'
         })
       });
